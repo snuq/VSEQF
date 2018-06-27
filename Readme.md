@@ -12,14 +12,15 @@ If context menus are enabled, fades can be set by right clicking on the edges of
 
 The 'QuickFades' panel provides buttons for setting and removing fades.
 
-* Fade Length
+* __Fade Length__
 
    The target length for fade editing or creating.  
    This can be set to 0 to remove a fade.
 
-#### Set Fadein/Set Fadeout
-Allows easy adding and changing of fade in/out.  The script will check the curve for any fades already applied to the sequence (either manually or by the script), and edit them if found.  
-These buttons can apply the same fade to multiple selected sequences at once.
+* __Set Fadein/Set Fadeout__
+
+   Allows easy adding and changing of fade in/out.  The script will check the curve for any fades already applied to the sequence (either manually or by the script), and edit them if found.  
+   These buttons can apply the same fade to multiple selected sequences at once.
 
 #### Clear Fades
 Remove fades on all selected strips.
