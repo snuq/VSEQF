@@ -2,6 +2,7 @@
 
 This script is designed to make Blender's VSE easier to use by implementing features often found in other video editors, or features that I find useful as a video editor.
 
+
 ## QuickFades
 Enables one-click adding or changing a fade-in or fade-out.  
 Also enables one-click crossfading between multiple strips.
@@ -69,4 +70,44 @@ If context menu is enabled, some snaps will be found on right clicking the curso
 * __Selected To Previous/Next Sequence__
 
    Detects the previous or next sequence in the timeline from the active sequence, and moves the active sequence so it's beginning or end matches the other sequence's end or beginning.
+
+
+## QuickZooms
+A menu with zoom shortcuts.
+
+Can be found in the sequence editor 'View' menu, or by pressing the 'z' key over the sequencer.  
+If context menus are enabled, can be found by right clicking in an open area.
+
+* __Zoom All Strips__
+
+   Zooms the sequencer out to show all sequences.
+
+* __Zoom To Timeline__
+
+   Zooms the sequencer to the timeline start and end.
+
+* __Zoom Selected__
+
+   Zooms the sequencer to show the currently selected sequence(s).
+
+* __Zoom Cursor__
+
+   Zooms the sequencer to an amount of frames around the cursor.
+
+* __Size__
+
+   How many frames should be shown by using Zoom Cursor. Changing this value will automatically activate Zoom Cursor.
+
+* __Save Current Zoom__
+
+   Saves the current zoom level and view position in the presets menu.
+
+* __Zoom Presets__
+
+   Submenu containing saved presets. Click the 'X' next to each preset to remove it, or click 'Clear All' to erase all presets.
+
+* __Zoom (Time Lengths)__
+
+   Several preset zoom values for convenience.
+
 
