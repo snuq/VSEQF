@@ -39,3 +39,34 @@ The 'QuickFades' panel provides buttons for setting and removing fades.
    Adjust the length of the active sequence and the next sequence to create a transition of the target fade length.  
    This will also attempt to avoid extending the sequences past their end points if possible.
 
+
+## QuickSnaps
+A menu for extra cursor and strip snapping functions.
+
+Can be found in the sequence editor 'Strip' menu, or by pressing the 's' key over the sequencer.  
+If context menu is enabled, some snaps will be found on right clicking the cursor, and some while right clicking strips.
+
+* __Cursor To Nearest Second__
+
+   Will round the cursor position to the nearest second, based on framerate.
+
+* __Jump To Previous/Next Sequence__
+
+   Snap the cursor to the previous or next sequence in the timeline.
+
+* __Cursor To Beginning/End Of Active__
+
+   Will move the cursor to the beginning or end of the active sequence.
+
+* __Selected To Cursor__
+
+   Snaps the beginning of selected strips to the cursor.  This is the same as the 'shift-s' shortcut in the VSE.
+
+* __Selected Beginning/End To Cursor__
+
+   Moves all selected sequences so their beginning/end is at the cursor.
+
+* __Selected To Previous/Next Sequence__
+
+   Detects the previous or next sequence in the timeline from the active sequence, and moves the active sequence so it's beginning or end matches the other sequence's end or beginning.
+

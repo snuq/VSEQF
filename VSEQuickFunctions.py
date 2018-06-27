@@ -3371,20 +3371,25 @@ class VSEQFQuickSnapsMenu(bpy.types.Menu):
     def draw(self, context):
         layout = self.layout
         layout.operator('vseqf.quicksnaps', text='Cursor To Nearest Second').type = 'cursor_to_seconds'
-
+        props = layout.operator("sequencer.strip_jump", text="Jump to Previous Sequence")
+        props.next = False
+        props.center = False
+        props = layout.operator("sequencer.strip_jump", text="Jump to Next Sequence")
+        props.next = True
+        props.center = False
         try:
             #Display only if active sequence is set
             sequence = current_active(context)
             if sequence:
+                layout.operator('vseqf.quicksnaps', text='Cursor To Beginning Of Active').type = 'cursor_to_beginning'
+                layout.operator('vseqf.quicksnaps', text='Cursor To End Of Active').type = 'cursor_to_end'
+                layout.separator()
                 layout.operator('vseqf.quicksnaps', text='Selected To Cursor').type = 'selection_to_cursor'
                 layout.separator()
-                layout.operator('vseqf.quicksnaps', text='Cursor To Beginning Of Sequence').type = 'cursor_to_beginning'
-                layout.operator('vseqf.quicksnaps', text='Cursor To End Of Sequence').type = 'cursor_to_end'
-                layout.separator()
-                layout.operator('vseqf.quicksnaps', text='Sequence Beginning To Cursor').type = 'begin_to_cursor'
-                layout.operator('vseqf.quicksnaps', text='Sequence End To Cursor').type = 'end_to_cursor'
-                layout.operator('vseqf.quicksnaps', text='Sequence To Previous Sequence').type = 'sequence_to_previous'
-                layout.operator('vseqf.quicksnaps', text='Sequence To Next Sequence').type = 'sequence_to_next'
+                layout.operator('vseqf.quicksnaps', text='Selected Beginnings To Cursor').type = 'begin_to_cursor'
+                layout.operator('vseqf.quicksnaps', text='Selected Ends To Cursor').type = 'end_to_cursor'
+                layout.operator('vseqf.quicksnaps', text='Selected To Previous Sequence').type = 'sequence_to_previous'
+                layout.operator('vseqf.quicksnaps', text='Selected To Next Sequence').type = 'sequence_to_next'
         except:
             pass
 
