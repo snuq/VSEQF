@@ -10,24 +10,24 @@ Detected fades will also be shown on the active strip in the timeline, or in the
 If context menus are enabled, fades can be set by right clicking on the edges of a strip.
 
 The 'QuickFades' panel provides buttons for setting and removing fades.
-###Fade Length
+### Fade Length
 The target length for fade editing or creating.
 This can be set to 0 to remove a fade.
 
-###Set Fadein/Set Fadeout
+### Set Fadein/Set Fadeout
 Allows easy adding and changing of fade in/out.  The script will check the curve for any fades already applied to the sequence (either manually or by the script), and edit them if found.
 These buttons can apply the same fade to multiple selected sequences at once.
 
-###Clear Fades
+### Clear Fades
 Remove fades on all selected strips.
 
-###Transition Type
+### Transition Type
 Selects the type of transition for adding with the following buttons.
 
-###Crossfade Prev/Next Sequence
+### Crossfade Prev/Next Sequence
 Allows easy adding of transitions between sequences.  This will simply find the closest sequence to the active sequence, and add a transition between them.
 
-###Smart Cross to Prev/Next
+### Smart Cross to Prev/Next
 Adjust the length of the active sequence and the next sequence to create a transition of the target fade length.
 This will also attempt to avoid extending the sequences past their end points if possible.
 
