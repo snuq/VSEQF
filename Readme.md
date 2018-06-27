@@ -13,6 +13,7 @@ If context menus are enabled, fades can be set by right clicking on the edges of
 The 'QuickFades' panel provides buttons for setting and removing fades.
 
 * Fade Length
+
    The target length for fade editing or creating.  
    This can be set to 0 to remove a fade.
 
