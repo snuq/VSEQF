@@ -3,6 +3,69 @@
 This script is designed to make Blender's VSE easier to use by implementing features often found in other video editors, or features that I find useful as a video editor.
 
 
+
+## Sequence Editor Additions
+The built-in 'grab', 'select' and  operators have been added to, this enables:
+
+* Sequence Parenting
+
+   Child sequences will follow parents.
+   Child edges that match the parent's edge will move along with the parent.
+
+* Ripple Editing
+
+   While in grab mode, press the alt key to toggle between ripple, ripple-pop, and normal mode.  
+   Ripple mode will move all sequences after the grabbed sequence the same amount.
+   Ripple-Pop will allow you to move a sequence above and out of a line, automatically closing the gap left behind.  This will only operate when one sequence is grabbed.
+
+* Edge Grab Improvements
+
+   When an edge is moved into another sequence, the selected sequence will be moved up a channel to allow the edge to be moved.
+
+* Marker Moving Improvements
+
+   Markers can be grabbed by right-click dragging the marker line as well as the bottom marker indicator.
+
+* Right-Click Context Menus
+
+   Right-click and hold to open a popup menu allowing different operations to be performed depending on what is clicked on.  
+   See the QuickContext section for more information.
+
+
+
+## QuickContext
+Enables right-click and hold in the sequencer to pop up a context menu allowing for different operations depending on what is clicked on.
+
+'Enable Context Menu' must be checked in the Quick Functions Settings menu.
+
+None of the menu options are unique, some are built-in in blender, some are provided by other parts of this script.
+
+Note that all menus start with the undo operator.
+
+The different menu types are:
+
+* __Sequences__
+
+   Click on the center of a sequence to show a menu providing some settings for the active sequence, and selected sequences.  
+
+* __Sequence Left/Right Handles__
+
+   Click on or near the edge of a sequence to pop up a menu allowing for the changing and clearing of the fade in or out.
+
+* __Cursor__
+
+   Click on or near the cursor to show a menu providing some snapping options.
+
+* __Markers__
+
+   Click on or near a marker to show a menu providing some marker operations.
+
+* __Empty Area__
+
+   Click in an empty area of the sequencer to show a menu providing options to add sequences, and to zoom the sequencer.
+
+
+
 ## QuickFades
 Enables one-click adding or changing a fade-in or fade-out.  
 Also enables one-click crossfading between multiple strips.
@@ -41,6 +104,7 @@ The 'QuickFades' panel provides buttons for setting and removing fades.
    This will also attempt to avoid extending the sequences past their end points if possible.
 
 
+
 ## QuickSnaps
 A menu for extra cursor and strip snapping functions.
 
@@ -70,6 +134,7 @@ If context menu is enabled, some snaps will be found on right clicking the curso
 * __Selected To Previous/Next Sequence__
 
    Detects the previous or next sequence in the timeline from the active sequence, and moves the active sequence so it's beginning or end matches the other sequence's end or beginning.
+
 
 
 ## QuickZooms
@@ -111,11 +176,11 @@ If context menus are enabled, can be found by right clicking in an open area.
    Several preset zoom values for convenience.
 
 
+
 ## QuickParents
 This implements a parenting system for sequences, any children of a moved or cut sequence will have the same operations performed on them.  
 If the sequence is cut, any children under the cursor will be cut as well, and the script will duplicate parent/child relationships to the cut sequences.  
 If the parent sequence is resized and a child sequences have the same endpoints, they will be resized as well.
-
 
 Can be found in the sequence editor properties panel under "Edit Strip", or by pressing the 'Ctrl-p' key over the sequencer.  
 If context menus are enabled, the QuickParents popup menu will be shown when right clicking a sequence as well.  
@@ -149,6 +214,7 @@ Parenting relationships are show in the timeline view for the active sequence, a
    When a parent sequence is deleted, all children will be deleted as well.
 
 These settings can also be found in the Quick Functions Settings menu.
+
 
 
 ## QuickList
@@ -232,6 +298,7 @@ If a sequence is an effect, and it is applied to another sequence, it will be in
 If QuickList is in Position sorting mode, up and down arrows will be displayed next to each strip, these can be used to swap position of a strip with the previous or next strip in the timeline.  If parenting is enabled, this will ignore child strips.  This may cause unpredictable behavior if strips are highly layered, it is best used on a very linear timeline.
 
 
+
 ## QuickProxy
 Automatically sets proxies for imported strips, and optionally can generate them automatically as well.
 
@@ -248,6 +315,7 @@ All settings for QuickProxy are found in the Quick Functions Settings menu.
    This will cause a performance hit on Blender as it is generating the proxies in the background.
 
 The other settings are standard proxy settings, see the Blender help documentation for information on them.
+
 
 
 ## QuickMarkers
@@ -277,6 +345,7 @@ Can be found in the sequence editor properties panel under 'QuickMarkers', also 
 
    Click a marker title to jump the cursor to this marker.  
    Click the X button next to a marker to delete it.
+
 
 
 ## QuickBatchRender
@@ -342,6 +411,7 @@ Preset render settings for various types of strips.  Each type has a 'Scene Sett
    File type to use for rendering an audio strip.
 
 
+
 ## QuickTags
 Create tags, text snippets that can describe sequences, and apply them to any sequences in the timeline.  All sequences with a specific tag can be easily selected with one click.
 
@@ -374,6 +444,7 @@ Create tags, text snippets that can describe sequences, and apply them to any se
 * __Clear Selected Tags__
 
    Removes all tags from all selected sequences.
+
 
 
 ## QuickCuts
@@ -440,5 +511,6 @@ Provides a quick interface for basic and advanced cutting and trimming functions
 * __Full Timeline Setup__
 
    Moves all sequences back so they start on frame 1, then sets the start and endpoints of the timeline so they encompass all sequences.
+
 
 

@@ -1535,14 +1535,19 @@ class VSEQFGrabAdd(bpy.types.Operator):
             self.alt_pressed = True
         else:
             if self.alt_pressed:
-                self.alt_pressed = False
-                if self.ripple and self.ripple_pop:
-                    self.ripple = False
-                    self.ripple_pop = False
-                elif self.ripple:
-                    self.ripple_pop = True
+                if len(self.grabbed_sequences) == 1:
+                    self.alt_pressed = False
+                    if self.ripple and self.ripple_pop:
+                        self.ripple = False
+                        self.ripple_pop = False
+                    elif self.ripple:
+                        self.ripple_pop = True
+                    else:
+                        self.ripple = True
                 else:
-                    self.ripple = True
+                    self.alt_pressed = False
+                    self.ripple = not self.ripple
+                    self.ripple_pop = False
 
         pos_x = 0
         pos_y = self.target_grab_sequence.channel
