@@ -600,8 +600,11 @@ These are things I want to add, but I don't yet know how to do so.
 * 0.86
 
    Fixed transparency in title scenes
+   
    Fixed no sequences in a scene throwing an error
+   
    Added auto-parenting of movie sequences with sound
+   
    Cleaned up quicklist, meta strips now list sub-sequences, effects are indented under the parent sequence
 
 * 0.87
