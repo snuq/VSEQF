@@ -7,51 +7,51 @@ This script is designed to make Blender's VSE easier to use by implementing feat
 ## Sequence Editor Additions
 The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' operators have been added to, this enables:
 
-* Sequencer 'Strip' Menu Changes
+* __Sequencer 'Strip' Menu Changes__
 
    Snap options added to menu.  
    'Simplify' option added, this removes some less-used features from this menu.  Enable this option in the Quick Functions Settings menu.
 
-* 'Compact' Edit Panel
+* __'Compact' Edit Panel__
 
    A new Edit Strip panel for the sequence editor properties area, providing more information in a smaller space than the default panel.  
    This can be enabled or disabled in the addon preferences when the addon is enabled.
 
-* Sequence Parenting
+* __Sequence Parenting__
 
    Child sequences will follow parents.
    Child edges that match the parent's edge will move along with the parent.
 
-* Ripple Editing
+* __Ripple Editing__
 
    While in grab mode, press the alt key to toggle between ripple, ripple-pop, and normal mode.  
    Ripple mode will move all sequences after the grabbed sequence the same amount.
    Ripple-Pop will allow you to move a sequence above and out of a line, automatically closing the gap left behind.  This will only operate when one sequence is grabbed.
 
-* Grab Multiple With Right-Click Drag
+* __Grab Multiple With Right-Click Drag__
 
    Option to change the behavior of the right click drag to grab, the previous selected sequences will be added to the grab before it is activated.  
    This can be enabled in the Quick Functions Settings menu.
 
-* Edge Grab Improvements
+* __Edge Grab Improvements__
 
    When an edge is moved into another sequence, the selected sequence will be moved up a channel to allow the edge to be moved.
 
-* Marker Moving Improvements
+* __Marker Moving Improvements__
 
    Markers can be grabbed by right-click dragging the marker line as well as the bottom marker indicator.
 
-* Right-Click Context Menus
+* __Right-Click Context Menus__
 
    Right-click and hold to open a popup menu allowing different operations to be performed depending on what is clicked on.  
    See the QuickContext section for more information.
 
-* Making Meta Strip Additions
+* __Making Meta Strip Additions__
 
    If Cut/Move Children is on, child sequences will be added to a meta strip when a parent is added.  
    Effect sequences with a single input will be automatically added to meta strips when their input sequence is added.
 
-* Cut Sequence Additions
+* __Cut Sequence Additions__
 
    Child sequences of a parent will be automatically cut as well as the parent.  
    Ripple cuts enabled, press Alt-K to trim and slide one side of the selected sequences.  
@@ -59,12 +59,12 @@ The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' o
    Crossfades and other two-input effect strips are handled properly now. If the effect is applied to the right side of a cut, it will be applied correctly. (See https://developer.blender.org/T50877 )  
    The active strip after a cut is correctly handled now, if the mouse is on the right side of a cut, the right sequence will be active as well as selected.
 
-* Delete Sequence Additions
+* __Delete Sequence Additions__
 
    Deleting a sequence can also delete child sequences if enabled.  
    Ripple delete enabled, press Alt-X or Alt-Delete to delete the sequence, and move all following sequences back to fill the gap.
 
-* Import Additions
+* __Import Additions__
 
    Allows the cursor to automatically move to the end of the imported sequence, allowing multiple files to be added in sequence very easily. This must be enabled in the Quick Functions Settings menu.  
    Allows automatic proxy settings to be applied to Movie and Image types while being imported.  
@@ -594,3 +594,94 @@ These are things I want to add, but I don't yet know how to do so.
 
 * Export to EDL format that Reaper can read.
 
+
+
+# Changelog
+* 0.86
+   Fixed transparency in title scenes
+   Fixed no sequences in a scene throwing an error
+   Added auto-parenting of movie sequences with sound
+   Cleaned up quicklist, meta strips now list sub-sequences, effects are indented under the parent sequence
+* 0.87
+   Continuous functions should work inside meta strips now
+   Fixed a couple small bugs
+* 0.88
+   Added drop shadows to titler
+   Added color picker and material duplicate button to titler
+   Hopefully fixed continuous functions from throwing errors when no strips are loaded
+   Improved adding/changing fades, added a clear fades button
+* 0.89
+   Fixed zoom to cursor not working inside meta strips
+   Fixed zoom to cursor not working in Blender 2.74
+   Fixed child sequences being moved twice if they were manually moved along with the parent
+   Recoded continuous function - parenting is more reliable, all cut sequences are detected and parented properly, fades are now moved when a sequence is resized
+   Removed continuous snapping, snapping is now built-in in blender as of 2.73
+   Added quick zoom presets
+   Added settings to hide different Quick panels
+   Added QuickParenting option to auto-select child sequences, also child sequences' endpoints will be moved when a parent is resized if they match up.
+   Added font loading button to QuickTitler
+   Added templates to QuickTitler
+   Added display modes for QuickList
+   Cleaned and commented code
+* 0.89.1
+   Removed an extra check in the modal function that wasn't doing anything but slowing down the script
+* 0.9
+   Split QuickTitling off into its own addon
+   Cleaned up variables
+   Improved child sequence auto-select: handle selections are now duplicated as well
+   Parenting is now stored in a sequence variable of .parent
+   Rewrote continuous modal operator to hopefully fix incorrect detections of add/cut/resize/move
+   Now uses addon preferences to enable or disable features (list, fades and parenting)
+   Edit panel displays fade in/out
+   Parenting panel is simplified and merged into the edit panel
+   Improved crossfade adding
+   Added Quickproxy to automatically enable proxies on imported sequences
+   Added Quickmarkers to add markers to the timeline with a preset name
+   Rewrote the continuous function AGAIN, to now be a handler - this means movement/resizing of child clips is now in real-time, and fades are continuously updated.  Also, switching scenes shouldn't have any adverse affect on the script.
+   New variables added to sequence strips to help track changes: .last_frame_final_start, .last_frame_start, .last_frame_final_duration, .last_select, and .new
+   Child sequences can now be automatically deleted when deleting a parent
+   Renaming a clip should now fix the relationships
+   QuickRipple implemented to enable timeline ripple-style editing, still new and buggy
+   Improved performance by only checking sequences in current editing scope (not checking sequences inside meta strips if not in that meta strip)
+* 0.91
+   Added QuickBatchRender to automatically separately render out sequences.  Still in beta, needs testing.
+   Fixed custom zooms freaking out ripple mode
+   Added option to correct the active strip when cutting (if you cut with mouse on the right, active strip remains on left even tho right is selected)
+   Updated panel layouts a bit
+   Fixed ripple thinking meta-ed strips are deleted
+   Ripple delete now moves the cursor with moved strips
+   Ripple delete should now preserve strip channels when possible
+   Child strips now try to follow vertical movement of parent strips, but still get pushed out of the way by other strips
+   Fixed zoom presets being wrong sometimes
+   Moved some settings around to streamline panels a bit
+   Fixed QuickList time index display
+* 0.92
+   Added QuickTags for adding metadata text tags to strips
+   Reworked QuickList interface
+   Added reverse sorting in QuickList
+   Added ability to switch strip with previous/next in QuickList
+   Revamped QuickMarkers UI, also adding a marker over a current marker will now rename the current marker
+   Added QuickCuts, a panel and menu for specialized cutting operations and easy timeline adjustments
+   More code cleanup and documentation of functions and classes
+   Reworked frame skipping, can now play in reverse when active, and should work better with slow playback
+* 0.93
+   Added seconds offset and seconds position display to edit panel
+   Added 'compact' edit strip panel, displays more information in a smaller space than the original.
+   Added categories to panels
+   Implemented new function wrappers, many features should now be more reliable, and new small features are added
+   * New 'Grab' operator - parenting and ripple features are reliable now, press 'Alt' to toggle ripple mode
+   * New 'Select' operator - can now right-click-drag multiple files
+   * New 'Cut' operator - parenting and ripple is now properly handled
+   * New 'Delete' operator - can ripple delete, and can remove children, New ripple delete shortcut - Alt-Delete and Alt-X
+   * New 'Meta Make' operator - automatically adds child strips to new metastrip
+   * New strip importer operator - has some new features and will auto-parent and auto-generate proxies
+   Replaced the sequencer Strip and Add menus so they can use the custom operators, also new option to simplify strip menu by removing some items
+   New ripple cut shortcuts - Alt-K will ripple trim the strip based on which side the mouse is on
+   Minimized continuous function handler, only needs to detect new strips and renames now
+   Implemented graphic display of fades and parent/child relationships of the active strip
+   Cursor following is back, works properly at all zoom levels now!
+   Implemented Quick3Point - a basic 3point editing workflow, import from the file browser to the clip editor, then to the sequencer.
+   Auto-Set Timeline Operator - move strips up to frame 1, set timeline start to frame 1, set timeline end to last frame of last strip
+   The new cut operator now fixes effect sequence chains - it will duplicate single input effects (such as speed control) to the newly cut sequence, and it will fix crossfades that should be applied to the right cut sequence.  See https://developer.blender.org/T50877 for more info on the bug.
+   Now can save and recall zoom levels in the vse.  No way to do vertical (channel) zooms yet tho...
+   Right-click context menu option added, hold right click to activate it.  Options will differ depending on what is clicked on - cursor, sequence, sequence handles, markers, empty area
