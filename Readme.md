@@ -610,28 +610,43 @@ These are things I want to add, but I don't yet know how to do so.
 * 0.87
 
    Continuous functions should work inside meta strips now
+   
    Fixed a couple small bugs
 
 * 0.88
 
    Added drop shadows to titler
+   
    Added color picker and material duplicate button to titler
+   
    Hopefully fixed continuous functions from throwing errors when no strips are loaded
+   
    Improved adding/changing fades, added a clear fades button
 
 * 0.89
 
    Fixed zoom to cursor not working inside meta strips
+   
    Fixed zoom to cursor not working in Blender 2.74
+   
    Fixed child sequences being moved twice if they were manually moved along with the parent
+   
    Recoded continuous function - parenting is more reliable, all cut sequences are detected and parented properly, fades are now moved when a sequence is resized
+   
    Removed continuous snapping, snapping is now built-in in blender as of 2.73
+   
    Added quick zoom presets
+   
    Added settings to hide different Quick panels
+   
    Added QuickParenting option to auto-select child sequences, also child sequences' endpoints will be moved when a parent is resized if they match up.
+   
    Added font loading button to QuickTitler
+   
    Added templates to QuickTitler
+   
    Added display modes for QuickList
+   
    Cleaned and commented code
 
 * 0.89.1
@@ -641,69 +656,102 @@ These are things I want to add, but I don't yet know how to do so.
 * 0.9
 
    Split QuickTitling off into its own addon
+   
    Cleaned up variables
+   
    Improved child sequence auto-select: handle selections are now duplicated as well
+   
    Parenting is now stored in a sequence variable of .parent
+   
    Rewrote continuous modal operator to hopefully fix incorrect detections of add/cut/resize/move
+   
    Now uses addon preferences to enable or disable features (list, fades and parenting)
+   
    Edit panel displays fade in/out
+   
    Parenting panel is simplified and merged into the edit panel
+   
    Improved crossfade adding
+   
    Added Quickproxy to automatically enable proxies on imported sequences
+   
    Added Quickmarkers to add markers to the timeline with a preset name
+   
    Rewrote the continuous function AGAIN, to now be a handler - this means movement/resizing of child clips is now in real-time, and fades are continuously updated.  Also, switching scenes shouldn't have any adverse affect on the script.
+   
    New variables added to sequence strips to help track changes: .last_frame_final_start, .last_frame_start, .last_frame_final_duration, .last_select, and .new
+   
    Child sequences can now be automatically deleted when deleting a parent
+   
    Renaming a clip should now fix the relationships
+   
    QuickRipple implemented to enable timeline ripple-style editing, still new and buggy
+   
    Improved performance by only checking sequences in current editing scope (not checking sequences inside meta strips if not in that meta strip)
 
 * 0.91
 
    Added QuickBatchRender to automatically separately render out sequences.  Still in beta, needs testing.
+   
    Fixed custom zooms freaking out ripple mode
+   
    Added option to correct the active strip when cutting (if you cut with mouse on the right, active strip remains on left even tho right is selected)
+   
    Updated panel layouts a bit
+   
    Fixed ripple thinking meta-ed strips are deleted
+   
    Ripple delete now moves the cursor with moved strips
+   
    Ripple delete should now preserve strip channels when possible
+   
    Child strips now try to follow vertical movement of parent strips, but still get pushed out of the way by other strips
+   
    Fixed zoom presets being wrong sometimes
+   
    Moved some settings around to streamline panels a bit
+   
    Fixed QuickList time index display
 
 * 0.92
 
    Added QuickTags for adding metadata text tags to strips
+   
    Reworked QuickList interface
+   
    Added reverse sorting in QuickList
+   
    Added ability to switch strip with previous/next in QuickList
+   
    Revamped QuickMarkers UI, also adding a marker over a current marker will now rename the current marker
+   
    Added QuickCuts, a panel and menu for specialized cutting operations and easy timeline adjustments
+   
    More code cleanup and documentation of functions and classes
+   
    Reworked frame skipping, can now play in reverse when active, and should work better with slow playback
 
-* 0.93
+0.93
+   * Added seconds offset and seconds position display to edit panel
+   * Added 'compact' edit strip panel, displays more information in a smaller space than the original
+   * Added categories to panels
+   * Implemented new function wrappers, many features should now be more reliable, and new small features are added
+      * New 'Grab' operator - parenting and ripple features are reliable now, press 'Alt' to toggle ripple mode
+      * New 'Select' operator - can now right-click-drag multiple files
+      * New 'Cut' operator - parenting and ripple is now properly handled
+      * New 'Delete' operator - can ripple delete, and can remove children, New ripple delete shortcut - Alt-Delete and Alt-X
+      * New 'Meta Make' operator - automatically adds child strips to new metastrip
+      * New strip importer operator - has some new features and will auto-parent and auto-generate proxies
 
-   Added seconds offset and seconds position display to edit panel
-   Added 'compact' edit strip panel, displays more information in a smaller space than the original.
-   Added categories to panels
-   Implemented new function wrappers, many features should now be more reliable, and new small features are added
+   * Replaced the sequencer Strip and Add menus so they can use the custom operators, also new option to simplify strip menu by removing some items
+   * New ripple cut shortcuts - Alt-K will ripple trim the strip based on which side the mouse is on
+   * Minimized continuous function handler, only needs to detect new strips and renames now
+   * Implemented graphic display of fades and parent/child relationships of the active strip
+   * Cursor following is back, works properly at all zoom levels now!
+   * Implemented Quick3Point - a basic 3point editing workflow, import from the file browser to the clip editor, then to the sequencer.
+   * Auto-Set Timeline Operator - move strips up to frame 1, set timeline start to frame 1, set timeline end to last frame of last strip
+   * The new cut operator now fixes effect sequence chains - it will duplicate single input effects (such as speed control) to the newly cut sequence, and it will fix crossfades that should be applied to the right cut sequence.  See https://developer.blender.org/T50877 for more info on the bug.
+   * Now can save and recall zoom levels in the vse.  No way to do vertical (channel) zooms yet tho...
+   * Right-click context menu option added, hold right click to activate it.  Options will differ depending on what is clicked on - cursor, sequence, sequence handles, markers, empty area
 
-   * New 'Grab' operator - parenting and ripple features are reliable now, press 'Alt' to toggle ripple mode
-   * New 'Select' operator - can now right-click-drag multiple files
-   * New 'Cut' operator - parenting and ripple is now properly handled
-   * New 'Delete' operator - can ripple delete, and can remove children, New ripple delete shortcut - Alt-Delete and Alt-X
-   * New 'Meta Make' operator - automatically adds child strips to new metastrip
-   * New strip importer operator - has some new features and will auto-parent and auto-generate proxies
 
-   Replaced the sequencer Strip and Add menus so they can use the custom operators, also new option to simplify strip menu by removing some items
-   New ripple cut shortcuts - Alt-K will ripple trim the strip based on which side the mouse is on
-   Minimized continuous function handler, only needs to detect new strips and renames now
-   Implemented graphic display of fades and parent/child relationships of the active strip
-   Cursor following is back, works properly at all zoom levels now!
-   Implemented Quick3Point - a basic 3point editing workflow, import from the file browser to the clip editor, then to the sequencer.
-   Auto-Set Timeline Operator - move strips up to frame 1, set timeline start to frame 1, set timeline end to last frame of last strip
-   The new cut operator now fixes effect sequence chains - it will duplicate single input effects (such as speed control) to the newly cut sequence, and it will fix crossfades that should be applied to the right cut sequence.  See https://developer.blender.org/T50877 for more info on the bug.
-   Now can save and recall zoom levels in the vse.  No way to do vertical (channel) zooms yet tho...
-   Right-click context menu option added, hold right click to activate it.  Options will differ depending on what is clicked on - cursor, sequence, sequence handles, markers, empty area

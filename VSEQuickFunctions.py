@@ -34,26 +34,40 @@ Future Possibilities:
    Some kind of audio-only export to reaper (export blender timeline to EDL?)
 
 Changelog:
-0.93
+* 0.93
    Added seconds offset and seconds position display to edit panel
+
    Added 'compact' edit strip panel, displays more information in a smaller space than the original.
+
    Added categories to panels
+
    Implemented new function wrappers, many features should now be more reliable, and new small features are added
+
       New 'Grab' operator - parenting and ripple features are reliable now, press 'Alt' to toggle ripple mode
       New 'Select' operator - can now right-click-drag multiple files
       New 'Cut' operator - parenting and ripple is now properly handled
       New 'Delete' operator - can ripple delete, and can remove children, New ripple delete shortcut - Alt-Delete and Alt-X
       New 'Meta Make' operator - automatically adds child strips to new metastrip
       New strip importer operator - has some new features and will auto-parent and auto-generate proxies
+
    Replaced the sequencer Strip and Add menus so they can use the custom operators, also new option to simplify strip menu by removing some items
+
    New ripple cut shortcuts - Alt-K will ripple trim the strip based on which side the mouse is on
+
    Minimized continuous function handler, only needs to detect new strips and renames now
+
    Implemented graphic display of fades and parent/child relationships of the active strip
+
    Cursor following is back, works properly at all zoom levels now!
+
    Implemented Quick3Point - a basic 3point editing workflow, import from the file browser to the clip editor, then to the sequencer.
+
    Auto-Set Timeline Operator - move strips up to frame 1, set timeline start to frame 1, set timeline end to last frame of last strip
+
    The new cut operator now fixes effect sequence chains - it will duplicate single input effects (such as speed control) to the newly cut sequence, and it will fix crossfades that should be applied to the right cut sequence.  See https://developer.blender.org/T50877 for more info on the bug.
+
    Now can save and recall zoom levels in the vse.  No way to do vertical (channel) zooms yet tho...
+
    Right-click context menu option added, hold right click to activate it.  Options will differ depending on what is clicked on - cursor, sequence, sequence handles, markers, empty area
 """
 
