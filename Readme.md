@@ -325,7 +325,7 @@ Can be found in the sequence editor properties panel.
 
       Process the entire meta strip as one strip, and replace it with a single rendered strip.
 
-### Render Presets
+#### Render Presets
 Preset render settings for various types of strips.  Each type has a 'Scene Setting' option that will simply use the render settings of the current scene.
 
 * __Opaque Strips__
@@ -340,5 +340,105 @@ Preset render settings for various types of strips.  Each type has a 'Scene Sett
 * __Audio Strips__
 
    File type to use for rendering an audio strip.
+
+
+## QuickTags
+Create tags, text snippets that can describe sequences, and apply them to any sequences in the timeline.  All sequences with a specific tag can be easily selected with one click.
+
+* __All Tags__
+
+   This list shows all tags on all sequences in the timeline.  
+   Click a tag to select all sequences with that tag.  
+   Click the '+' button to add that tag to all selected sequences.
+
+* __New Tag__
+
+   Type a tag into the field, and press the '+' button to add to all selected strips.  This tag will now show up in the list above as well.
+
+* __Show All Selected__
+
+   This button toggles the lower list between showing the tags for the active sequence (Active Tags) or showing tags for all selected sequences (Selected Tags).
+
+* __Active Tags__
+
+   Shows a list of tags for the active sequence.
+   Click a tag to select all sequences with this tag.
+   Click the 'X' button to remove the tag from the active sequence.
+
+* __Selected Tags__
+
+   Shows a list of tags for all selected sequence.
+   Click a tag to select all sequences with this tag.
+   Click the 'X' button to remove the tag from all selected sequences.
+
+* __Clear Selected Tags__
+
+   Removes all tags from all selected sequences.
+
+
+## QuickCuts
+Provides a quick interface for basic and advanced cutting and trimming functions.
+
+* __Cut All Sequences__
+
+   If enabled, all sequences under the cursor (besides locked sequences) will be affected by any button in this panel.  
+   If disabled, only selected sequences will be affected.
+
+* __Frames To Insert__
+
+   When the 'Cut Insert' function is used, the number of frames here will be inserted.
+
+* __Cut__
+
+   Basic soft cut function, equivalent to the 'K' shortcut in the VSE.
+
+* __Cut Insert__
+
+   Performs a soft cut, then slides all sequences following the cut down the timeline by the amount of frames defined in the 'Frames To Insert' variable.
+
+* __UnCut Left/UnCut Right__
+
+   Merges a selected sequence with the one to the left or right if they are from the same source file, and have not been slid on the timeline.  
+   Useful for 'undoing' an accidental cut.
+
+* __Delete__
+
+   Removes selected sequences from the timeline.
+
+* __Ripple Delete__
+
+   Removes selected sequences from the timeline, and attempts to remove any empty space left behind.
+
+* __Trim Left/Right__
+
+   Removes any part of the selected sequences to the left or right of the cursor.
+
+* __Slide Trim Left/Right__
+
+   Removes any part of the selected sequences to the left of the cursor, then slides the remaining sequence back or forward to where the original edge was.
+
+* __Ripple Trim Left/Right__
+
+   Trims one side of the selected sequences, then slides the sequence, and all following sequences back to attempt to fill the empty space
+
+* __Timeline To All__
+
+   Sets the start and end points of the VSE timeline to fit all sequences loaded in.
+
+* __Timeline To Selected__
+
+   Sets the start and end points of the VSE timeline to fit the currently selected sequences. 
+
+* __Start To All/End To All__
+
+   Sets only the start or end of the VSE timeline to fit all sequences.
+
+* __Start To Selected/End To Selected__
+
+   Sets only the start or end of the VSE timeline to fit the selected sequences.
+
+* __Full Timeline Setup__
+
+   Moves all sequences back so they start on frame 1, then sets the start and endpoints of the timeline so they encompass all sequences.
 
 
