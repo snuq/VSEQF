@@ -160,17 +160,17 @@ Can be found in the sequence editor properties panel on the QuickList tab.
 
    Changes the details that are displayed for each sequence:  
 
-   Settings
+   * Settings
 
-   * Adds an extra area for editing the length, position, and proxy settings of each sequence.
+      Adds an extra area for editing the length, position, and proxy settings of each sequence.
 
-   Parenting
+   * Parenting
 
-   * Adds an extra area that displays children of each sequence.
+      Adds an extra area that displays children of each sequence.
    
-   Tags
+   * Tags
    
-   * Adds an extra area that displays tags for each sequence.
+      Adds an extra area that displays tags for each sequence.
 
 * __Select/Deselect All Sequences__
 
