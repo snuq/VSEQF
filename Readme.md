@@ -28,6 +28,11 @@ The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' o
    Ripple mode will move all sequences after the grabbed sequence the same amount.
    Ripple-Pop will allow you to move a sequence above and out of a line, automatically closing the gap left behind.  This will only operate when one sequence is grabbed.
 
+* Grab Multiple With Right-Click Drag
+
+   Option to change the behavior of the right click drag to grab, the previous selected sequences will be added to the grab before it is activated.  
+   This can be enabled in the Quick Functions Settings menu.
+
 * Edge Grab Improvements
 
    When an edge is moved into another sequence, the selected sequence will be moved up a channel to allow the edge to be moved.
@@ -61,6 +66,7 @@ The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' o
 
 * Import Additions
 
+   Allows the cursor to automatically move to the end of the imported sequence, allowing multiple files to be added in sequence very easily. This must be enabled in the Quick Functions Settings menu.  
    Allows automatic proxy settings to be applied to Movie and Image types while being imported.  
    Allows proxies to be automatically generated when importing a Movie or Image.  
    Allows setting the length of a single imported image in frames.  
