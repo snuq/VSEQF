@@ -505,9 +505,10 @@ def edit_panel(self, context):
         if len(selected) <= 1:
             split.enabled = False
         split.operator('vseqf.quickparents', text='Set Active As Parent').action = 'add'
+        row.prop(vseqf, 'children', toggle=True)
         row = box.row()
         row.prop(vseqf, 'select_children', toggle=True)
-        row.prop(vseqf, 'children', toggle=True)
+        row.prop(vseqf, 'delete_children', toggle=True)
 
 
 def draw_quicksettings_menu(self, context):
@@ -897,13 +898,14 @@ class VSEQFCompactEdit(bpy.types.Panel):
                         index = index + 1
 
             row = box.row()
-            row.operator('vseqf.quickparents', text='Set Active As Parent').action = 'add'
-            if len(selected) <= 1:
-                row.enabled = False
-            row = box.row()
             split = row.split()
-            split.prop(vseqf, 'select_children', toggle=True)
+            split.operator('vseqf.quickparents', text='Set Active As Parent').action = 'add'
+            if len(selected) <= 1:
+                split.enabled = False
             row.prop(vseqf, 'children', toggle=True)
+            row = box.row()
+            row.prop(vseqf, 'select_children', toggle=True)
+            row.prop(vseqf, 'delete_children', toggle=True)
 
 
 #Functions related to continuous update

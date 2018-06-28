@@ -111,3 +111,43 @@ If context menus are enabled, can be found by right clicking in an open area.
    Several preset zoom values for convenience.
 
 
+## QuickParents
+This implements a parenting system for sequences, any children of a moved or cut sequence will have the same operations performed on them.  
+If the sequence is cut, any children under the cursor will be cut as well, and the script will duplicate parent/child relationships to the cut sequences.  
+If the parent sequence is resized and a child sequences have the same endpoints, they will be resized as well.
+
+
+Can be found in the sequence editor properties panel under "Edit Strip", or by pressing the 'Ctrl-p' key over the sequencer.  
+If context menus are enabled, the QuickParents popup menu will be shown when right clicking a sequence as well.  
+Children or Parents of selected sequence will be shown in these places.
+
+Parenting relationships are show in the timeline view for the active sequence, a light line indicates children of the active sequence, a dark line indicates a parent of the active sequence.
+
+* __Select Children or Parent (Small Selection Button)__
+
+   Selects any related sequences to the current sequence.  
+   Also can be accomplished with the shortcut 'Shift-p'.
+
+* __Clear Children or Parent (Small X Button)__
+
+   Removes relationships from selected sequence.
+
+* __Set Active As Parent__
+
+   If multiple sequences are selected, this will set selected sequences as children of the active (last selected) sequence.
+
+* __Cut/Move Sequence Children__
+
+   Enables parenting operations on child sequences.
+
+* __Auto-Select Children__
+
+   When a parent sequence is selected, child sequences will be selected as well.
+
+* __Auto-Delete Children__
+
+   When a parent sequence is deleted, all children will be deleted as well.
+
+These settings can also be found in the Quick Functions Settings menu.
+
+
