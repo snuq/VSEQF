@@ -24,9 +24,10 @@
 #   Uncut does not work on movieclip type sequences... there appears to be no way of getting the sequence's source file.
 #   Cancelling a grab while playing back will cause the cursor to jump back to where it was when the grab started.
 #       Unfortunately, I can't fix this due to a bug in blender.
+#   Right now the script cannot apply a vertical zoom level, as far as I can tell this is missing functionality in
+#       Blenders python api.
 #
 #Future Possibilities:
-#   Figure out how to control the vertical zoom
 #   Ripple insert... need to think about how to do this, but I want it!
 #   Copy/paste wrapper that copies strip animation data
 #   Some kind of audio-only export to reaper (export blender timeline to EDL?)

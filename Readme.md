@@ -572,3 +572,25 @@ Provides a quick interface for basic and advanced cutting and trimming functions
 
 
 
+# Known Problems
+I welcome any help with these problems, if you have an idea on how to fix them, please contact me.
+
+* Sometimes undo pushing breaks, it may add extra undo steps.  Not sure whats going on here...
+
+* Uncut does not work on movieclip type sequences, this seems to be a limitation in Blender - there appears to be no way to get the sequence's source file.
+
+* Canceling a grab while playing back will cause the cursor to jump back to where it was when the grab started.  Unfortunately, a bug in Blender prevents me from fixing this.
+
+* Right now the script cannot apply a vertical zoom level, as far as I can tell this is missing functionality in Blenders python api.
+
+
+
+# Future Possibilities
+These are things I want to add, but I don't yet know how to do so.
+
+* Ripple insert (opposite of ripple pop).  Not entirely sure how to code this yet, but I want it!
+
+* Copy/paste wrapper that will copy sequence animation data.
+
+* Export to EDL format that Reaper can read.
+
