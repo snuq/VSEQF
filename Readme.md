@@ -597,141 +597,82 @@ These are things I want to add, but I don't yet know how to do so.
 
 
 # Changelog
-* 0.86
+## 0.86
+   * Fixed transparency in title scenes
+   * Fixed no sequences in a scene throwing an error
+   * Added auto-parenting of movie sequences with sound
+   * Cleaned up quicklist, meta strips now list sub-sequences, effects are indented under the parent sequence
 
-   Fixed transparency in title scenes
-   
-   Fixed no sequences in a scene throwing an error
-   
-   Added auto-parenting of movie sequences with sound
-   
-   Cleaned up quicklist, meta strips now list sub-sequences, effects are indented under the parent sequence
+## 0.87
+   * Continuous functions should work inside meta strips now
+   * Fixed a couple small bugs
 
-* 0.87
+## 0.88
+   * Added drop shadows to titler
+   * Added color picker and material duplicate button to titler
+   * Hopefully fixed continuous functions from throwing errors when no strips are loaded
+   * Improved adding/changing fades, added a clear fades button
 
-   Continuous functions should work inside meta strips now
-   
-   Fixed a couple small bugs
+## 0.89
+   * Fixed zoom to cursor not working inside meta strips
+   * Fixed zoom to cursor not working in Blender 2.74
+   * Fixed child sequences being moved twice if they were manually moved along with the parent
+   * Recoded continuous function - parenting is more reliable, all cut sequences are detected and parented properly, fades are now moved when a sequence is resized
+   * Removed continuous snapping, snapping is now built-in in blender as of 2.73
+   * Added quick zoom presets
+   * Added settings to hide different Quick panels
+   * Added QuickParenting option to auto-select child sequences, also child sequences' endpoints will be moved when a parent is resized if they match up.
+   * Added font loading button to QuickTitler
+   * Added templates to QuickTitler
+   * Added display modes for QuickList
+   * Cleaned and commented code
 
-* 0.88
+## 0.89.1
+   * Removed an extra check in the modal function that wasn't doing anything but slowing down the script
 
-   Added drop shadows to titler
-   
-   Added color picker and material duplicate button to titler
-   
-   Hopefully fixed continuous functions from throwing errors when no strips are loaded
-   
-   Improved adding/changing fades, added a clear fades button
+## 0.9
+   * Split QuickTitling off into its own addon
+   * Cleaned up variables
+   * Improved child sequence auto-select: handle selections are now duplicated as well
+   * Parenting is now stored in a sequence variable of .parent
+   * Rewrote continuous modal operator to hopefully fix incorrect detections of add/cut/resize/move
+   * Now uses addon preferences to enable or disable features (list, fades and parenting)
+   * Edit panel displays fade in/out
+   * Parenting panel is simplified and merged into the edit panel
+   * Improved crossfade adding
+   * Added Quickproxy to automatically enable proxies on imported sequences
+   * Added Quickmarkers to add markers to the timeline with a preset name
+   * Rewrote the continuous function AGAIN, to now be a handler - this means movement/resizing of child clips is now in real-time, and fades are continuously updated.  Also, switching scenes shouldn't have any adverse affect on the script.
+   * New variables added to sequence strips to help track changes: .last_frame_final_start, .last_frame_start, .last_frame_final_duration, .last_select, and .new
+   * Child sequences can now be automatically deleted when deleting a parent
+   * Renaming a clip should now fix the relationships
+   * QuickRipple implemented to enable timeline ripple-style editing, still new and buggy
+   * Improved performance by only checking sequences in current editing scope (not checking sequences inside meta strips if not in that meta strip)
 
-* 0.89
+## 0.91
+   * Added QuickBatchRender to automatically separately render out sequences.  Still in beta, needs testing.
+   * Fixed custom zooms freaking out ripple mode
+   * Added option to correct the active strip when cutting (if you cut with mouse on the right, active strip remains on left even tho right is selected)
+   * Updated panel layouts a bit
+   * Fixed ripple thinking meta-ed strips are deleted
+   * Ripple delete now moves the cursor with moved strips
+   * Ripple delete should now preserve strip channels when possible
+   * Child strips now try to follow vertical movement of parent strips, but still get pushed out of the way by other strips
+   * Fixed zoom presets being wrong sometimes
+   * Moved some settings around to streamline panels a bit
+   * Fixed QuickList time index display
 
-   Fixed zoom to cursor not working inside meta strips
-   
-   Fixed zoom to cursor not working in Blender 2.74
-   
-   Fixed child sequences being moved twice if they were manually moved along with the parent
-   
-   Recoded continuous function - parenting is more reliable, all cut sequences are detected and parented properly, fades are now moved when a sequence is resized
-   
-   Removed continuous snapping, snapping is now built-in in blender as of 2.73
-   
-   Added quick zoom presets
-   
-   Added settings to hide different Quick panels
-   
-   Added QuickParenting option to auto-select child sequences, also child sequences' endpoints will be moved when a parent is resized if they match up.
-   
-   Added font loading button to QuickTitler
-   
-   Added templates to QuickTitler
-   
-   Added display modes for QuickList
-   
-   Cleaned and commented code
+## 0.92
+   * Added QuickTags for adding metadata text tags to strips
+   * Reworked QuickList interface
+   * Added reverse sorting in QuickList
+   * Added ability to switch strip with previous/next in QuickList
+   * Revamped QuickMarkers UI, also adding a marker over a current marker will now rename the current marker
+   * Added QuickCuts, a panel and menu for specialized cutting operations and easy timeline adjustments
+   * More code cleanup and documentation of functions and classes
+   * Reworked frame skipping, can now play in reverse when active, and should work better with slow playback
 
-* 0.89.1
-
-   Removed an extra check in the modal function that wasn't doing anything but slowing down the script
-
-* 0.9
-
-   Split QuickTitling off into its own addon
-   
-   Cleaned up variables
-   
-   Improved child sequence auto-select: handle selections are now duplicated as well
-   
-   Parenting is now stored in a sequence variable of .parent
-   
-   Rewrote continuous modal operator to hopefully fix incorrect detections of add/cut/resize/move
-   
-   Now uses addon preferences to enable or disable features (list, fades and parenting)
-   
-   Edit panel displays fade in/out
-   
-   Parenting panel is simplified and merged into the edit panel
-   
-   Improved crossfade adding
-   
-   Added Quickproxy to automatically enable proxies on imported sequences
-   
-   Added Quickmarkers to add markers to the timeline with a preset name
-   
-   Rewrote the continuous function AGAIN, to now be a handler - this means movement/resizing of child clips is now in real-time, and fades are continuously updated.  Also, switching scenes shouldn't have any adverse affect on the script.
-   
-   New variables added to sequence strips to help track changes: .last_frame_final_start, .last_frame_start, .last_frame_final_duration, .last_select, and .new
-   
-   Child sequences can now be automatically deleted when deleting a parent
-   
-   Renaming a clip should now fix the relationships
-   
-   QuickRipple implemented to enable timeline ripple-style editing, still new and buggy
-   
-   Improved performance by only checking sequences in current editing scope (not checking sequences inside meta strips if not in that meta strip)
-
-* 0.91
-
-   Added QuickBatchRender to automatically separately render out sequences.  Still in beta, needs testing.
-   
-   Fixed custom zooms freaking out ripple mode
-   
-   Added option to correct the active strip when cutting (if you cut with mouse on the right, active strip remains on left even tho right is selected)
-   
-   Updated panel layouts a bit
-   
-   Fixed ripple thinking meta-ed strips are deleted
-   
-   Ripple delete now moves the cursor with moved strips
-   
-   Ripple delete should now preserve strip channels when possible
-   
-   Child strips now try to follow vertical movement of parent strips, but still get pushed out of the way by other strips
-   
-   Fixed zoom presets being wrong sometimes
-   
-   Moved some settings around to streamline panels a bit
-   
-   Fixed QuickList time index display
-
-* 0.92
-
-   Added QuickTags for adding metadata text tags to strips
-   
-   Reworked QuickList interface
-   
-   Added reverse sorting in QuickList
-   
-   Added ability to switch strip with previous/next in QuickList
-   
-   Revamped QuickMarkers UI, also adding a marker over a current marker will now rename the current marker
-   
-   Added QuickCuts, a panel and menu for specialized cutting operations and easy timeline adjustments
-   
-   More code cleanup and documentation of functions and classes
-   
-   Reworked frame skipping, can now play in reverse when active, and should work better with slow playback
-
-0.93
+## 0.93
    * Added seconds offset and seconds position display to edit panel
    * Added 'compact' edit strip panel, displays more information in a smaller space than the original
    * Added categories to panels
