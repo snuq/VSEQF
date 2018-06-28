@@ -230,3 +230,51 @@ Settings For Each Sequence:
 If a sequence is an effect, and it is applied to another sequence, it will be indented and placed below it's parent.
 
 If QuickList is in Position sorting mode, up and down arrows will be displayed next to each strip, these can be used to swap position of a strip with the previous or next strip in the timeline.  If parenting is enabled, this will ignore child strips.  This may cause unpredictable behavior if strips are highly layered, it is best used on a very linear timeline.
+
+
+## QuickProxy
+Automatically sets proxies for imported strips, and optionally can generate them automatically as well.
+
+All settings for QuickProxy are found in the Quick Functions Settings menu.
+
+* __Enable Proxy On Import__
+
+   Enables the given proxy settings on any compatible sequence type when it is imported.
+
+* __Auto-Build Proxy On Import__
+
+   Starts the proxy building process on imported sequences.  
+   Will only function if Enable Proxy On Import is active.
+   This will cause a performance hit on Blender as it is generating the proxies in the background.
+
+The other settings are standard proxy settings, see the Blender help documentation for information on them.
+
+
+## QuickMarkers
+Add markers to the timeline using name presets, or quickly jump to and remove any marker.  
+
+
+Can be found in the sequence editor properties panel under 'QuickMarkers', also Alt-M in the sequencer.
+
+* __New Preset__
+
+   Enter a marker title into the text field, and click the + button to add a preset.
+
+* __Place A Marker__
+
+   Click on a marker button once a preset has been added to add a marker with this name at the current cursor location.  
+   Adding a marker in the location of a previously existing marker will rename the marker to the marker preset name.
+
+* __Remove A Preset__
+
+   Click the X button next to a preset to remove it.
+
+* __Deselect New Markers__
+
+   With this enabled, newly created markers will be unselected to prevent accidental moving.
+
+* __Marker List__
+
+   Click a marker title to jump the cursor to this marker.  
+   Click the X button next to a marker to delete it.
+
