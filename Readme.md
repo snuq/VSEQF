@@ -7,6 +7,16 @@ This script is designed to make Blender's VSE easier to use by implementing feat
 ## Sequence Editor Additions
 The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' operators have been added to, this enables:
 
+* Sequencer 'Strip' Menu Changes
+
+   Snap options added to menu.  
+   'Simplify' option added, this removes some less-used features from this menu.  Enable this option in the Quick Functions Settings menu.
+
+* 'Compact' Edit Panel
+
+   A new Edit Strip panel for the sequence editor properties area, providing more information in a smaller space than the default panel.  
+   This can be enabled or disabled in the addon preferences when the addon is enabled.
+
 * Sequence Parenting
 
    Child sequences will follow parents.

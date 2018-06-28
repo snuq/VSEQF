@@ -5792,14 +5792,14 @@ class SEQUENCER_MT_strip(bpy.types.Menu):
 
         layout.operator("sequencer.mute", text="Mute Deselected Strips").unselected = True
 
-        layout.separator()
-        layout.operator('vseqf.quicksnaps', text='Snap Cursor To Nearest Second').type = 'cursor_to_seconds'
+        #layout.operator('vseqf.quicksnaps', text='Snap Cursor To Nearest Second').type = 'cursor_to_seconds'
         try:
             #Display only if active sequence is set
             sequence = current_active(context)
             if sequence:
-                layout.operator('vseqf.quicksnaps', text='Snap Cursor To Beginning Of Sequence').type = 'cursor_to_beginning'
-                layout.operator('vseqf.quicksnaps', text='Snap Cursor To End Of Sequence').type = 'cursor_to_end'
+                layout.separator()
+                #layout.operator('vseqf.quicksnaps', text='Snap Cursor To Beginning Of Sequence').type = 'cursor_to_beginning'
+                #layout.operator('vseqf.quicksnaps', text='Snap Cursor To End Of Sequence').type = 'cursor_to_end'
                 layout.operator('vseqf.quicksnaps', text='Snap Sequence Beginning To Cursor').type = 'begin_to_cursor'
                 layout.operator('vseqf.quicksnaps', text='Snap Sequence End To Cursor').type = 'end_to_cursor'
                 layout.operator('vseqf.quicksnaps', text='Snap Sequence To Previous Sequence').type = 'sequence_to_previous'
