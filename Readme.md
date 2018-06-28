@@ -244,7 +244,7 @@ All settings for QuickProxy are found in the Quick Functions Settings menu.
 * __Auto-Build Proxy On Import__
 
    Starts the proxy building process on imported sequences.  
-   Will only function if Enable Proxy On Import is active.
+   Will only function if Enable Proxy On Import is active.  
    This will cause a performance hit on Blender as it is generating the proxies in the background.
 
 The other settings are standard proxy settings, see the Blender help documentation for information on them.
@@ -277,4 +277,68 @@ Can be found in the sequence editor properties panel under 'QuickMarkers', also 
 
    Click a marker title to jump the cursor to this marker.  
    Click the X button next to a marker to delete it.
+
+
+## QuickBatchRender
+Render sequences in the timeline to individual files and automatically create a new copy of the current scene with these strips replaced with the rendered versions.  
+Effects and unprocessed strips will still be in copied scene and unaffected.
+
+Can be found in the sequence editor properties panel.
+
+* __Batch Render__
+
+   Begin the batch render process using the settings below.
+
+* __Render Directory__
+
+   Type in, or select the directory to render the files into.  
+   If left blank, the default scene render directory will be used.
+
+* __Render Only Selected__
+
+   Only process selected strips, others will not be replaced.
+
+* __Render Modifiers__
+
+   Apply modifiers to rendered strips.  
+   Uncheck this to copy the modifiers to the rendered strip instead.
+
+* __Render Audio__
+
+   Check this to process audio strips as separate strips.  
+   Uncheck to not process audio strips.
+
+* __Render Meta Strips__
+
+   Drop-down menu to decide what is done with meta strips:
+
+   * Ignore
+
+      Meta strips will not be processed, only copied over.
+
+   * Individual Substrips
+
+      Process and replace all strips inside meta strips.  
+      The rendered strips will remain grouped in a meta strip in the new scene.
+
+   * Single Strip
+
+      Process the entire meta strip as one strip, and replace it with a single rendered strip.
+
+###Render Presets
+Preset render settings for various types of strips.  Each type has a 'Scene Setting' option that will simply use the render settings of the current scene.
+
+* __Opaque Strips__
+
+   Strips with no transparency set.
+
+* __Transparent Strips__
+
+   Strips with transparency set.  
+   Several render settings will not render any transparency information, be careful when selecting these!
+
+* __Audio Strips__
+
+   File type to use for rendering an audio strip.
+
 
