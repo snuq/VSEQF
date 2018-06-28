@@ -5,7 +5,7 @@ This script is designed to make Blender's VSE easier to use by implementing feat
 
 
 ## Sequence Editor Additions
-The built-in 'grab', 'select' and  operators have been added to, this enables:
+The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' operators have been added to, this enables:
 
 * Sequence Parenting
 
@@ -30,6 +30,48 @@ The built-in 'grab', 'select' and  operators have been added to, this enables:
 
    Right-click and hold to open a popup menu allowing different operations to be performed depending on what is clicked on.  
    See the QuickContext section for more information.
+
+* Making Meta Strip Additions
+
+   If Cut/Move Children is on, child sequences will be added to a meta strip when a parent is added.  
+   Effect sequences with a single input will be automatically added to meta strips when their input sequence is added.
+
+* Cut Sequence Additions
+
+   Child sequences of a parent will be automatically cut as well as the parent.  
+   Ripple cuts enabled, press Alt-K to trim and slide one side of the selected sequences.  
+   Effect strips are now duplicated to both sides of a cut strip, this includes an entire effect stack.  
+   Crossfades and other two-input effect strips are handled properly now. If the effect is applied to the right side of a cut, it will be applied correctly. (See https://developer.blender.org/T50877 )  
+   The active strip after a cut is correctly handled now, if the mouse is on the right side of a cut, the right sequence will be active as well as selected.
+
+* Delete Sequence Additions
+
+   Deleting a sequence can also delete child sequences if enabled.  
+   Ripple delete enabled, press Alt-X or Alt-Delete to delete the sequence, and move all following sequences back to fill the gap.
+
+* Import Additions
+
+   Allows automatic proxy settings to be applied to Movie and Image types while being imported.  
+   Allows proxies to be automatically generated when importing a Movie or Image.  
+   Allows setting the length of a single imported image in frames.  
+   When a movie sequence with sound is imported, the sound may be automatically parented to the video.  
+   Provides additional options for placing an imported sequence on the timeline:  
+
+   * Import At Frame
+
+      Standard import behavior, places new sequences at the current frame.
+
+   * Insert At Frame
+
+      Following sequence will be moved forward by the length of the imported sequence.
+
+   * Cut And Insert At Frame
+
+      All sequences at the current frame will be cut and all following sequences will be moved forward by the length of the imported sequence.
+
+   * Import At End
+
+      Places the imported sequences at the end of the timeline.
 
 
 
