@@ -177,7 +177,10 @@ Can be found in the sequence editor properties panel on the QuickList tab.
    Like pressing the 'a' key in the sequencer, this will toggle the selection of all sequences.
 
 * __Sort by__
-   Reorders the list based on timeline position, title, or length.  Click the small arrow to change the sorting order.
+
+   Reorders the list based on timeline position, title, or length.  
+   Click the small arrow to change the sorting order.
+
 
 Settings For Each Sequence:
 
