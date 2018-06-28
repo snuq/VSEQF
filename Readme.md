@@ -597,23 +597,23 @@ These are things I want to add, but I don't yet know how to do so.
 
 
 # Changelog
-## 0.86
+### 0.86
    * Fixed transparency in title scenes
    * Fixed no sequences in a scene throwing an error
    * Added auto-parenting of movie sequences with sound
    * Cleaned up quicklist, meta strips now list sub-sequences, effects are indented under the parent sequence
 
-## 0.87
+### 0.87
    * Continuous functions should work inside meta strips now
    * Fixed a couple small bugs
 
-## 0.88
+### 0.88
    * Added drop shadows to titler
    * Added color picker and material duplicate button to titler
    * Hopefully fixed continuous functions from throwing errors when no strips are loaded
    * Improved adding/changing fades, added a clear fades button
 
-## 0.89
+### 0.89
    * Fixed zoom to cursor not working inside meta strips
    * Fixed zoom to cursor not working in Blender 2.74
    * Fixed child sequences being moved twice if they were manually moved along with the parent
@@ -627,10 +627,10 @@ These are things I want to add, but I don't yet know how to do so.
    * Added display modes for QuickList
    * Cleaned and commented code
 
-## 0.89.1
+### 0.89.1
    * Removed an extra check in the modal function that wasn't doing anything but slowing down the script
 
-## 0.9
+### 0.9
    * Split QuickTitling off into its own addon
    * Cleaned up variables
    * Improved child sequence auto-select: handle selections are now duplicated as well
@@ -649,7 +649,7 @@ These are things I want to add, but I don't yet know how to do so.
    * QuickRipple implemented to enable timeline ripple-style editing, still new and buggy
    * Improved performance by only checking sequences in current editing scope (not checking sequences inside meta strips if not in that meta strip)
 
-## 0.91
+### 0.91
    * Added QuickBatchRender to automatically separately render out sequences.  Still in beta, needs testing.
    * Fixed custom zooms freaking out ripple mode
    * Added option to correct the active strip when cutting (if you cut with mouse on the right, active strip remains on left even tho right is selected)
@@ -662,7 +662,7 @@ These are things I want to add, but I don't yet know how to do so.
    * Moved some settings around to streamline panels a bit
    * Fixed QuickList time index display
 
-## 0.92
+### 0.92
    * Added QuickTags for adding metadata text tags to strips
    * Reworked QuickList interface
    * Added reverse sorting in QuickList
@@ -672,7 +672,7 @@ These are things I want to add, but I don't yet know how to do so.
    * More code cleanup and documentation of functions and classes
    * Reworked frame skipping, can now play in reverse when active, and should work better with slow playback
 
-## 0.93
+### 0.93
    * Added seconds offset and seconds position display to edit panel
    * Added 'compact' edit strip panel, displays more information in a smaller space than the original
    * Added categories to panels
@@ -683,7 +683,6 @@ These are things I want to add, but I don't yet know how to do so.
       * New 'Delete' operator - can ripple delete, and can remove children, New ripple delete shortcut - Alt-Delete and Alt-X
       * New 'Meta Make' operator - automatically adds child strips to new metastrip
       * New strip importer operator - has some new features and will auto-parent and auto-generate proxies
-
    * Replaced the sequencer Strip and Add menus so they can use the custom operators, also new option to simplify strip menu by removing some items
    * New ripple cut shortcuts - Alt-K will ripple trim the strip based on which side the mouse is on
    * Minimized continuous function handler, only needs to detect new strips and renames now
