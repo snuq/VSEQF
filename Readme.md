@@ -151,3 +151,79 @@ Parenting relationships are show in the timeline view for the active sequence, a
 These settings can also be found in the Quick Functions Settings menu.
 
 
+## QuickList
+Displays a list of loaded sequences and allows you to change various settings.
+
+Can be found in the sequence editor properties panel on the QuickList tab.
+
+* __Display__
+
+   Changes the details that are displayed for each sequence:  
+
+   Settings
+
+   * Adds an extra area for editing the length, position, and proxy settings of each sequence.
+
+   Parenting
+
+   * Adds an extra area that displays children of each sequence.
+   
+   Tags
+   
+   * Adds an extra area that displays tags for each sequence.
+
+* __Select/Deselect All Sequences__
+
+   Like pressing the 'a' key in the sequencer, this will toggle the selection of all sequences.
+
+* __Sort by__
+   Reorders the list based on timeline position, title, or length.  Click the small arrow to change the sorting order.
+
+Settings For Each Sequence:
+
+* __Eye Icon__
+
+   Mutes/unmutes sequence.
+
+* __Padlock Icon__
+
+   Locks/unlocks sequence.
+
+* __Sequence Type Button__
+
+   Allows selecting and deselecting the sequence.
+
+* __Sequence Title__
+
+   Allows editing of sequence name.
+
+* __Len__
+
+   See the sequence length in HH:MM:SS:FF format, and adjust the length.
+
+* __Pos__
+
+   See the sequence position in HH:MM:SS:FF, and adjust the position.
+
+* __Proxy settings (Only visible when 'Settings' display is enabled)__
+
+   Enable/disable proxy and sizes.  
+
+* __Sub-Sequences (Only visible on meta sequences)__
+
+   Displays sequences inside the meta sequence.
+
+* __Tags (Only visible if 'Tags' display is enabled)__
+
+   A list of tags for this sequence is shown.  
+   Click the tag to select all sequences with this tag.
+   Click the 'X' next to the tag to remove it from this sequence.
+
+* __Children (Only visible if 'Parenting' display is enabled)__
+
+   The child sequences will be displayed here.  
+   Click the 'X' next to a child sequence to remove it from this sequence's children.
+
+If a sequence is an effect, and it is applied to another sequence, it will be indented and placed below it's parent.
+
+If QuickList is in Position sorting mode, up and down arrows will be displayed next to each strip, these can be used to swap position of a strip with the previous or next strip in the timeline.  If parenting is enabled, this will ignore child strips.  This may cause unpredictable behavior if strips are highly layered, it is best used on a very linear timeline.
