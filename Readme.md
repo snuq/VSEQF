@@ -325,7 +325,7 @@ Can be found in the sequence editor properties panel.
 
       Process the entire meta strip as one strip, and replace it with a single rendered strip.
 
-###Render Presets
+### Render Presets
 Preset render settings for various types of strips.  Each type has a 'Scene Setting' option that will simply use the render settings of the current scene.
 
 * __Opaque Strips__
