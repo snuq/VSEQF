@@ -124,6 +124,54 @@ The different menu types are:
 
 
 
+## QuickThreePoint
+__Warning: This is very much alpha, it will likely change quite a bit in future versions, and may even be removed and put into another addon.__  
+To use this properly, your screen layout should have a file browser area, a movies clip editor area, and at least one sequencer area.  __This function may not work correctly if all these areas are not present.__  
+
+When a video file is selected in the file browser, a new panel is added to the tools panel, '3 Point Edit'. The 'Import To Clip Editor' button will load the selected video file into the clip editor area.  
+The clip editor now has a new panel in the properties panel, '3 Point Edit'.  
+
+To use the following options, the clip does not need to have been loaded via the filebrowser button, any movie clip will work.  
+
+* __Set In/Out__
+
+   A graphic overlay will be created in the clip editor allowing for easy setting of the in and out points of the current clip. Drag the top arrow to set the left ('in') point, and the lower arrow to set the right ('out') point.  
+   While in this mode, press the spacebar to play/pause the video.  
+   Left click anywhere else, or press enter to confirm the changes.  
+   Right click or press escape to cancel the changes.  
+
+* __In frame, Out frame, Length__
+
+   The set in frame, or frames to be cut from the beginning (and timecode)  
+   The set out frame, or frames to be cut from the end (and timecode)  
+   The length the imported clip will be  
+
+* __Import At Cursor__
+
+   Basic import into the sequencer timeline at the current cursor location.  
+   No other sequences will be moved.  
+
+* __Replace Active Sequence__
+
+   If an active sequence is in the VSE, it will be deleted and replaced by the imported sequence.  
+   Sequences after the replaced one will be moved forward or back to accommodate the length of the new sequence.  
+   If the active sequence is a movie with a child sound sequence that is the same length and origin file, it will be replaced as well.  
+   All parent data will be changed to reflect the new sequence.  
+
+* __Insert At Cursor__
+
+   The new sequence will be placed at the cursor location, and all trailing sequences will be moved forward by the length of the new sequence.  
+
+* __Cut Insert At Cursor__
+
+   Similar to Insert At Cursor, but all sequences will be cut before inserting, ensuring that nothing overlaps the new sequence.  
+
+* __Import At End__
+
+   Places the new sequence at the end of the timeline.  
+
+
+
 ## QuickFades
 Enables one-click adding or changing a fade-in or fade-out.  
 Also enables one-click crossfading between multiple strips.

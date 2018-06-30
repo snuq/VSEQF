@@ -15,10 +15,7 @@
 #  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
 # ##### END GPL LICENSE BLOCK #####
-#
-#
-#
-#
+
 """
 Known Issues:
    Sometimes undo pushing breaks... not sure what's going on there
@@ -1172,16 +1169,27 @@ class VSEQFThreePointImport(bpy.types.Operator):
                 movie_sequence.channel = active_strip.channel
                 frame_start = active_strip.frame_final_start - frame_in
                 move_forward = offset - active_strip.frame_final_duration
+                children = find_children(active_strip)
+                if active_strip.type == 'MOVIE':
+                    original_filepath = active_strip.filepath
+                else:
+                    original_filepath = None
                 if move_forward > 0:
                     move_frame = active_strip.frame_final_start
                 else:
                     move_frame = active_strip.frame_final_end
                 bpy.ops.sequencer.select_all(override, action='DESELECT')
                 active_strip.select = True
+                for child in children:
+                    if child.type == 'SOUND' and child.sound.filepath == original_filepath and child.frame_final_start == active_strip.frame_final_start and child.frame_start == active_strip.frame_start and child.frame_final_end == active_strip.frame_final_end:
+                        child.select = True
+                        children.remove(child)
+                        break
                 bpy.ops.sequencer.delete(override)
                 if move_forward != 0:
                     bpy.ops.vseqf.cut(use_frame=True, frame=move_frame, type='INSERT_ONLY', use_insert=True, insert=move_forward, use_all=True, all=True)
-
+                for child in children:
+                    child.parent = movie_sequence.name
             elif self.type == 'end':
                 import_pos = find_sequences_end(sequences)
                 frame_start = import_pos - frame_in
@@ -1197,13 +1205,19 @@ class VSEQFThreePointImport(bpy.types.Operator):
             movie_sequence.frame_offset_start = frame_in  #crashing blender in replace mode???
             movie_sequence.frame_offset_end = frame_out
             movie_sequence.frame_start = frame_start
+            bpy.ops.sequencer.select_all(override, action='DESELECT')
+            movie_sequence.select = True
             if sound_sequence:
+                sound_sequence.select = True
+                channel = sound_sequence.channel
                 sound_sequence.frame_offset_start = frame_in
                 #sound_sequence.frame_offset_end = frame_out
                 sound_sequence.frame_start = frame_start
                 sound_sequence.frame_final_end = movie_sequence.frame_final_end
+                sound_sequence.channel = channel
                 if context.scene.vseqf.autoparent:
                     sound_sequence.parent = movie_sequence.name
+
             return {'FINISHED'}
         else:
             return {'CANCELLED'}
@@ -1228,6 +1242,8 @@ class VSEQFThreePointOperator(bpy.types.Operator):
     out_frame = 2
     start_frame = 0
     original_scene = None
+    last_in = -1
+    last_out = -1
 
     def update_pos(self, context, mouse_x, mouse_y):
         self.mouse_x = mouse_x
@@ -1294,6 +1310,8 @@ class VSEQFThreePointOperator(bpy.types.Operator):
                 self.editing_out = False
 
         elif event.type in {'RIGHTMOUSE', 'ESC'}:
+            self.clip.import_frame_in = self.last_in
+            self.clip.import_frame_out = self.last_out
             self.finish_modal(context)
             return {'FINISHED'}
 
@@ -1311,6 +1329,8 @@ class VSEQFThreePointOperator(bpy.types.Operator):
         if space.type == 'CLIP_EDITOR':
             self.start_frame = context.scene.frame_current
             self.clip = context.space_data.clip
+            self.last_in = self.clip.import_frame_in
+            self.last_out = self.clip.import_frame_out
             if self.clip.import_frame_in == -1:
                 self.in_frame = 1
                 self.clip.import_frame_in = 1
