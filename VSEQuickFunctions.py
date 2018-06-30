@@ -1872,6 +1872,19 @@ class VSEQFSelectGrab(bpy.types.Operator):
         for sequence in selected_sequences:
             self.selected.append([sequence, sequence.select_left_handle, sequence.select_right_handle])
         bpy.ops.sequencer.select('INVOKE_DEFAULT')
+        active = current_active(context)
+        if active and active.type == 'MOVIE':
+            #look for a clip editor area and set the active clip to the selected sequence if one exists that shares the same source.
+            newclip = None
+            for clip in bpy.data.movieclips:
+                if os.path.normpath(bpy.path.abspath(clip.filepath)) == os.path.normpath(bpy.path.abspath(active.filepath)):
+                    newclip = clip
+                    break
+            if newclip:
+                for area in context.screen.areas:
+                    if area.type == 'CLIP_EDITOR':
+                        area.spaces[0].clip = newclip
+
         if context.scene.vseqf.select_children:
             to_select = []
             for sequence in selected_sequences:
