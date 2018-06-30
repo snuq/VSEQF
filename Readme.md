@@ -129,8 +129,8 @@ __Warning: This is very much alpha, it will likely change quite a bit in future 
 To use this properly, your screen layout should have a file browser area, a movies clip editor area, and at least one sequencer area.  __This function may not work correctly if all these areas are not present.__  
 
 When a video file is selected in the file browser, a new panel is added to the tools panel, '3 Point Edit'. The 'Import To Clip Editor' button will load the selected video file into the clip editor area.  
-The clip editor now has a new panel in the properties panel, '3 Point Edit'.  
 
+The clip editor now has a new panel in the properties panel, '3 Point Edit'.  
 To use the following options, the clip does not need to have been loaded via the filebrowser button, any movie clip will work.  
 
 * __Set In/Out__
