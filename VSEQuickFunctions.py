@@ -68,11 +68,12 @@ from bpy_extras.io_utils import ImportHelper
 bl_info = {
     "name": "VSE Quick Functions",
     "description": "Improves functionality of the sequencer by adding new menus and functions for snapping, adding fades, zooming, sequence parenting, ripple editing, playback speed, and more.",
-    "author": "Hudson Barkley (Snu)",
+    "author": "Hudson Barkley (Snu/snuq/Aritodo)",
     "version": (0, 9, 3),
     "blender": (2, 79, 0),
     "location": "Sequencer Panels; Sequencer Menus; Sequencer S, F, Z, Ctrl-P, Shift-P, Alt-M, Alt-K Shortcuts",
-    "wiki_url": "https://wiki.blender.org/index.php/User:Snu/Extensions:2.6/Py/Scripts/Sequencer/VSEQuickFunctions",
+    "wiki_url": "https://github.com/snuq/VSEQF",
+    "tracker_url": "https://github.com/snuq/VSEQF/issues",
     "category": "Sequencer"
 }
 vseqf_draw_handler = None
@@ -1031,6 +1032,9 @@ class VSEQFThreePointBrowserPanel(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
+        prefs = get_prefs()
+        if not prefs.threepoint:
+            return False
         params = context.space_data.params
         selected_file = params.filename
         if selected_file:
@@ -1080,6 +1084,9 @@ class VSEQFThreePointPanel(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
+        prefs = get_prefs()
+        if not prefs.threepoint:
+            return False
         if context.space_data.clip:
             return True
         else:
@@ -1406,6 +1413,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
     pos_y = 0
     ripple = False
     ripple_pop = False
+    can_pop = False
     alt_pressed = False
     view2d = None
     prefs = None
@@ -1469,38 +1477,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
             return True
         return False
 
-    def modal(self, context, event):
-        if event.type == 'TIMER':
-            pass
-        if event.alt:
-            self.alt_pressed = True
-        else:
-            if self.alt_pressed:
-                if len(self.grabbed_sequences) == 1:
-                    self.alt_pressed = False
-                    if self.ripple and self.ripple_pop:
-                        self.ripple = False
-                        self.ripple_pop = False
-                    elif self.ripple:
-                        self.ripple_pop = True
-                    else:
-                        self.ripple = True
-                else:
-                    self.alt_pressed = False
-                    self.ripple = not self.ripple
-                    self.ripple_pop = False
-
-        pos_x = 0
-        pos_y = self.target_grab_sequence.channel
-        if self.target_grab_variable == 'frame_start':
-            pos_x = self.target_grab_sequence.frame_start
-        elif self.target_grab_variable == 'frame_final_start':
-            pos_x = self.target_grab_sequence.frame_final_start
-        elif self.target_grab_variable == 'frame_final_end':
-            pos_x = self.target_grab_sequence.frame_final_end
-        offset_x = pos_x - self.target_grab_start
-        offset_y = pos_y - self.target_grab_channel
-
+    def move_sequences(self, offset_x, offset_y, all=False):
         ripple_offset = 0
         ripple_start = self.sequences[0][1]
 
@@ -1535,40 +1512,56 @@ class VSEQFGrabAdd(bpy.types.Operator):
                             new_channel = seq[4]
                             new_start = sequence.frame_final_start
                             new_end = sequence.frame_final_end
+                            if sequence.frame_duration - sequence.frame_offset_start == 1:
+                                #sequence has been slipped beyond the right edges it can be, try to fix
+                                duration = seq[2] - seq[1]
+                                new_end = sequence.frame_final_start + duration
+                                sequence.frame_final_end = new_end
+                            if sequence.frame_duration - sequence.frame_offset_end == 1:
+                                #sequence has been slipped beyond the left edges it can be, try to fix
+                                duration = seq[2] - seq[1]
+                                new_start = sequence.frame_final_end - duration
+                                sequence.frame_final_start = new_start
                             while sequencer_area_filled(new_start, new_end, new_channel, new_channel, [sequence]):
                                 new_channel = new_channel + 1
                             sequence.channel = new_channel
                     else:
                         if seq[9]:
-                            #this sequence has a parent that is being moved
+                            #this sequence has a parent that may be moved
                             new_start = seq[1]
                             new_end = seq[2]
                             new_pos = seq[3]
                             if sequence.parent in self.grabbed_names:
-                                #this sequence's parent is selected, might need to adjust the handles
+                                #this sequence's parent is selected
                                 parent_data = self.find_by_name(sequence.parent)
                                 parent = parent_data[0]
-                                parent_channel_offset = parent.channel - parent_data[4]
-                                new_channel = seq[4] + parent_channel_offset
-                                if parent_data[3] != parent.frame_start:
-                                    #parent was moved, move child too
-                                    offset = parent.frame_start - parent_data[3]
-                                    new_pos = new_pos + offset
-                                    new_start = new_start + offset
-                                    new_end = new_end + offset
-                                if parent_data[1] == seq[1] and parent_data[1] != parent.frame_final_start:
-                                    #parent sequence's left edge was changed, child's edge should match it
-                                    new_start = parent.frame_final_start
-                                if parent_data[2] == seq[2] and parent_data[2] != parent.frame_final_end:
-                                    #parent sequence's right edge was changed, child's edge should match it
-                                    new_end = parent.frame_final_end
+                                #new_channel = seq[4] + (parent_data[0].channel - parent_data[4])
+                                new_channel = seq[4] + offset_y
+                                if self.ripple and seq[1] > ripple_start:
+                                    seq[8] = True
+                                    new_pos = new_pos + ripple_offset
+                                    new_start = new_start + ripple_offset
+                                    new_end = new_end + ripple_offset
+                                else:
+                                    if parent_data[3] != parent.frame_start:
+                                        #parent was moved, move child too
+                                        offset = parent.frame_start - parent_data[3]
+                                        new_pos = new_pos + offset
+                                        new_start = new_start + offset
+                                        new_end = new_end + offset
+                                    if parent_data[0].select_left_handle and parent_data[1] == seq[1]:
+                                        #parent sequence's left edge was changed, child's edge should match it
+                                        new_start = parent.frame_final_start
+                                    if parent_data[0].select_right_handle and parent_data[2] == seq[2]:
+                                        #parent sequence's right edge was changed, child's edge should match it
+                                        new_end = parent.frame_final_end
                             else:
                                 #this is a child of a child, just move it the same amount that the grab is moved
                                 new_channel = seq[4] + offset_y
                                 new_start = seq[1] + offset_x
                                 new_end = seq[2] + offset_x
                                 new_pos = seq[3] + offset_x
-
+                            #if new_end != sequence.frame_final_end or new_start != sequence.frame_final_start:
                             while sequencer_area_filled(new_start, new_end, new_channel, new_channel, [sequence]):
                                 new_channel = new_channel + 1
                             sequence.channel = new_channel
@@ -1577,24 +1570,25 @@ class VSEQFGrabAdd(bpy.types.Operator):
                             sequence.frame_final_end = new_end
                         else:
                             #unparented, unselected sequences - need to ripple if enabled
-                            if self.ripple and (seq[1] > ripple_start):
+                            if self.ripple and (seq[1] >= ripple_start):
                                 seq[8] = True
                                 new_channel = seq[4]
                                 while sequencer_area_filled(seq[1] + ripple_offset, seq[2] + ripple_offset, new_channel, new_channel, [sequence]):
                                     new_channel = new_channel + 1
                                 sequence.channel = new_channel
                                 sequence.frame_start = seq[3] + ripple_offset
-                            elif seq[8]:
-                                sequence.frame_start = seq[3]
-                                new_channel = seq[4]
-                                new_start = seq[1]
-                                new_end = seq[2]
-                                while sequencer_area_filled(new_start, new_end, new_channel, new_channel, [sequence]):
-                                    new_channel = new_channel + 1
-                                sequence.channel = new_channel
-                                if sequence.frame_start == seq[3] and sequence.channel == seq[4]:
-                                    #unfortunately, there seems to be a limitation in blender preventing me from putting the strip back where it should be... keep trying until the grabbed strips are out of the way.
-                                    seq[8] = False
+                    if seq[8] and not self.ripple:
+                        #fix sequence locations when ripple is disabled
+                        new_channel = seq[4]
+                        new_start = seq[1]
+                        new_end = seq[2]
+                        while sequencer_area_filled(new_start, new_end, new_channel, new_channel, [sequence]):
+                            new_channel = new_channel + 1
+                        sequence.channel = new_channel
+                        sequence.frame_start = seq[3]
+                        if sequence.frame_start == seq[3] and sequence.channel == seq[4]:
+                            #unfortunately, there seems to be a limitation in blender preventing me from putting the strip back where it should be... keep trying until the grabbed strips are out of the way.
+                            seq[8] = False
                 else:
                     #effect strip, just worry about changing the channel if it belongs to a selected sequence
                     input_1 = sequence.input_1
@@ -1617,8 +1611,46 @@ class VSEQFGrabAdd(bpy.types.Operator):
                     if new_channel is not False:
                         sequence.channel = new_channel
 
+    def modal(self, context, event):
+        if event.type == 'TIMER':
+            pass
+        if event.alt:
+            self.alt_pressed = True
+        else:
+            if self.alt_pressed:
+                if self.can_pop:
+                    self.alt_pressed = False
+                    if self.ripple and self.ripple_pop:
+                        self.ripple = False
+                        self.ripple_pop = False
+                    elif self.ripple:
+                        self.ripple_pop = True
+                    else:
+                        self.ripple = True
+                else:
+                    self.alt_pressed = False
+                    self.ripple = not self.ripple
+                    self.ripple_pop = False
+
+        pos_x = 0
+        pos_y = self.target_grab_sequence.channel
+        if self.target_grab_variable == 'frame_start':
+            pos_x = self.target_grab_sequence.frame_start
+        elif self.target_grab_variable == 'frame_final_start':
+            pos_x = self.target_grab_sequence.frame_final_start
+        elif self.target_grab_variable == 'frame_final_end':
+            pos_x = self.target_grab_sequence.frame_final_end
+        offset_x = pos_x - self.target_grab_start
+        if self.target_grab_sequence.select_left_handle or self.target_grab_sequence.select_right_handle:
+            offset_y = 0
+        else:
+            offset_y = pos_y - self.target_grab_channel
+
+        self.move_sequences(offset_x, offset_y)
+
         if event.type in {'LEFTMOUSE', 'RET'}:
             self.remove_draw_handler()
+            self.move_sequences(offset_x, offset_y, all=True)  #check sequences one last time, just to be sure
             for seq in self.sequences:
                 sequence = seq[0]
                 if self.prefs.fades:
@@ -1683,7 +1715,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
         selected_sequences = current_selected(context)
         for seq in selected_sequences:
             if vseqf_parenting():
-                if not seq.select_left_handle or seq.select_right_handle:
+                if not (seq.select_left_handle or seq.select_right_handle):
                     to_move = get_recursive(seq, to_move)
                 else:
                     to_move.append(seq)
@@ -1696,13 +1728,15 @@ class VSEQFGrabAdd(bpy.types.Operator):
             sequence_data = self.get_sequence_data(seq)
             if seq in to_move:
                 sequence_data[9] = True
-            self.sequences.append(sequence_data)
             if seq.select:
                 self.grabbed_names.append(seq.name)
                 self.grabbed_sequences.append(sequence_data)
+            else:
+                self.sequences.append(sequence_data)
         self._timer = context.window_manager.event_timer_add(0.01, context.window)
         self.sequences.sort(key=lambda x: x[1])
         self.grabbed_sequences.sort(key=lambda x: x[1])
+        self.sequences = self.grabbed_sequences + self.sequences  #ensure that the grabbed sequences are processed first to prevent issues with ripple
         grabbed_left = False
         grabbed_right = False
         grabbed_center = False
@@ -1734,6 +1768,10 @@ class VSEQFGrabAdd(bpy.types.Operator):
         if not self.target_grab_sequence:
             #nothing selected... is this possible?
             return {'CANCELLED'}
+        if len(self.grabbed_sequences) == 1 and not (self.grabbed_sequences[0][0].select_left_handle or self.grabbed_sequences[0][0].select_right_handle):
+            self.can_pop = True
+        else:
+            self.can_pop = False
         context.window_manager.modal_handler_add(self)
         args = (self, context)
         self._handle = bpy.types.SpaceSequenceEditor.draw_handler_add(vseqf_grab_draw, args, 'WINDOW', 'POST_PIXEL')
@@ -1872,18 +1910,20 @@ class VSEQFSelectGrab(bpy.types.Operator):
         for sequence in selected_sequences:
             self.selected.append([sequence, sequence.select_left_handle, sequence.select_right_handle])
         bpy.ops.sequencer.select('INVOKE_DEFAULT')
-        active = current_active(context)
-        if active and active.type == 'MOVIE':
-            #look for a clip editor area and set the active clip to the selected sequence if one exists that shares the same source.
-            newclip = None
-            for clip in bpy.data.movieclips:
-                if os.path.normpath(bpy.path.abspath(clip.filepath)) == os.path.normpath(bpy.path.abspath(active.filepath)):
-                    newclip = clip
-                    break
-            if newclip:
-                for area in context.screen.areas:
-                    if area.type == 'CLIP_EDITOR':
-                        area.spaces[0].clip = newclip
+        prefs = get_prefs()
+        if prefs.threepoint:
+            active = current_active(context)
+            if active and active.type == 'MOVIE':
+                #look for a clip editor area and set the active clip to the selected sequence if one exists that shares the same source.
+                newclip = None
+                for clip in bpy.data.movieclips:
+                    if os.path.normpath(bpy.path.abspath(clip.filepath)) == os.path.normpath(bpy.path.abspath(active.filepath)):
+                        newclip = clip
+                        break
+                if newclip:
+                    for area in context.screen.areas:
+                        if area.type == 'CLIP_EDITOR':
+                            area.spaces[0].clip = newclip
 
         if context.scene.vseqf.select_children:
             to_select = []
@@ -5611,6 +5651,9 @@ class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
     edit = bpy.props.BoolProperty(
         name="Enable Compact Edit Panel",
         default=False)
+    threepoint = bpy.props.BoolProperty(
+        name="Enable Quick Three Point",
+        default=True)
 
     def draw(self, context):
         del context
@@ -5624,6 +5667,7 @@ class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
         layout.prop(self, "tags")
         layout.prop(self, "cuts")
         layout.prop(self, "edit")
+        layout.prop(self, "threepoint")
 
 
 class VSEQFTempSettings(object):
@@ -5654,6 +5698,9 @@ class VSEQFTempSettings(object):
         default=True)
     edit = bpy.props.BoolProperty(
         name="Enable Compact Edit Panel",
+        default=True)
+    threepoint = bpy.props.BoolProperty(
+        name="Enable Quick Three Point",
         default=True)
 
 
