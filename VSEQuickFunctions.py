@@ -26,6 +26,7 @@ Known Issues:
        Blenders python api.
 
 Future Possibilities:
+   special tags with time index and length, displayed in overlay as clip markers
    Ripple insert... need to think about how to do this, but I want it!
    Copy/paste wrapper that copies strip animation data
    Some kind of audio-only export to reaper (export blender timeline to EDL?)
@@ -106,6 +107,12 @@ def get_vse_position(context):
     left, bottom = view.region_to_view(0, 0)
     right, top = view.region_to_view(width, height)
     return [left, right, bottom, top]
+
+
+def redraw_sequencers():
+    for area in bpy.context.screen.areas:
+        if area.type == 'SEQUENCE_EDITOR':
+            area.tag_redraw()
 
 
 def effect_children(sequence, to_check):
@@ -2751,7 +2758,7 @@ class VSEQFQuickFadesSet(bpy.types.Operator):
             else:
                 fades(sequence=sequence, mode='set', direction=self.type, fade_length=context.scene.vseqf.fade)
 
-        context.area.tag_redraw()
+        redraw_sequencers()
         return{'FINISHED'}
 
 
@@ -2781,7 +2788,7 @@ class VSEQFQuickFadesClear(bpy.types.Operator):
                     fades(sequence=sequence, mode='clear', direction=self.direction, fade_length=context.scene.vseqf.fade)
                 sequence.blend_alpha = 1
 
-        context.area.tag_redraw()
+        redraw_sequencers()
         self.direction = 'both'
         self.active_only = False
         return{'FINISHED'}
@@ -3106,7 +3113,7 @@ class VSEQFQuickParents(bpy.types.Operator):
                     clear_parent(sequence)
                 if self.action == 'clear_children':
                     clear_children(sequence)
-        context.area.tag_redraw()
+        redraw_sequencers()
         return {'FINISHED'}
 
 
@@ -3128,7 +3135,7 @@ class VSEQFQuickParentsClear(bpy.types.Operator):
             if sequence.name == self.strip:
                 clear_parent(sequence)
                 break
-        context.area.tag_redraw()
+        redraw_sequencers()
         return {'FINISHED'}
 
 
@@ -3281,6 +3288,8 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
         if not sequencer:
             context.scene.sequence_editor_create()
         bpy.ops.ed.undo_push()
+        old_snap_new_end = context.scene.vseqf.snap_new_end
+        context.scene.vseqf.snap_new_end = False  #disable this so the continuous function doesnt do weird stuff while importing this
         selected = current_selected(context)
         active = current_active(context)
         end_frame = self.find_end_frame(current_sequences(context))
@@ -3296,6 +3305,7 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
             frame = self.start_frame
         all_imported = []
         to_parent = []
+        last_frame = context.scene.frame_current
         if self.type == 'MOVIE':
             for file in self.files:
                 filename = os.path.join(dirname, file.name)
@@ -3358,8 +3368,14 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
             bpy.ops.sequencer.select_all(action='DESELECT')
             for sequence in all_imported:
                 sequence.select = True
-        if self.autoproxy and self.autogenerateproxy:
+        if self.autoproxy and self.autogenerateproxy and not context.scene.vseqf.build_proxy:
             bpy.ops.sequencer.rebuild_proxy('INVOKE_DEFAULT')
+        for file in all_imported:
+            if file.frame_final_end > last_frame:
+                last_frame = file.frame_final_end
+        if old_snap_new_end:
+            context.scene.frame_current = last_frame
+        context.scene.vseqf.snap_new_end = old_snap_new_end
         return {'FINISHED'}
 
 
@@ -4970,7 +4986,7 @@ class VSEQFCut(bpy.types.Operator):
         #determine all sequences available to cut
         to_cut_temp = []
         for sequence in sequences:
-            if not sequence.lock and under_cursor(sequence, self.frame) and (not hasattr(sequence, 'input_1')):
+            if not sequence.lock and (under_cursor(sequence, self.frame) or self.type == 'UNCUT') and (not hasattr(sequence, 'input_1')):
                 if self.all:
                     to_cut_temp.append(sequence)
                 elif sequence.select:
@@ -4978,9 +4994,10 @@ class VSEQFCut(bpy.types.Operator):
                     if vseqf_parenting():
                         children = get_recursive(sequence, [])
                         for child in children:
-                            if not child.lock and under_cursor(child, self.frame) and (not hasattr(child, 'input_1')) and child not in to_cut_temp:
+                            if not child.lock and (not hasattr(child, 'input_1')) and child not in to_cut_temp:
                                 to_cut_temp.append(child)
-        #remove any sequences that are children of other selected sequences, and find the ripple amount
+
+        #find the ripple amount
         ripple_amount = 0
         for sequence in to_cut_temp:
             if side == 'LEFT':
@@ -5053,6 +5070,8 @@ class VSEQFCut(bpy.types.Operator):
                 if active and left == active and side != 'BOTH':
                     to_active = right
         fix_effects(cut_pairs, sequences)
+
+        #fix parenting of cut sequences
         for cut_pair in cut_pairs:
             left, right = cut_pair
             if right:
@@ -5851,11 +5870,30 @@ class SEQUENCER_MT_add(bpy.types.Menu):
 
 
 #Register properties, operators, menus and shortcuts
+classes = (SEQUENCER_MT_add, SEQUENCER_MT_strip, VSEQFAddZoom, VSEQFClearZooms, VSEQFCompactEdit, VSEQFContextCursor,
+           VSEQFContextMarker, VSEQFContextNone, VSEQFContextSequence, VSEQFContextSequenceLeft,
+           VSEQFContextSequenceRight, VSEQFCut, VSEQFDelete, VSEQFDeleteConfirm, VSEQFDeleteRippleConfirm,
+           VSEQFFollow, VSEQFGrab, VSEQFGrabAdd, VSEQFImport, VSEQFMarkerPreset, VSEQFMeta, VSEQFQuickBatchRender,
+           VSEQFQuickBatchRenderPanel, VSEQFQuickCutsMenu, VSEQFQuickCutsPanel, VSEQFQuickFadesClear,
+           VSEQFQuickFadesCross, VSEQFQuickFadesMenu, VSEQFQuickFadesPanel, VSEQFQuickFadesSet, VSEQFQuickListDown,
+           VSEQFQuickListPanel, VSEQFQuickListSelect, VSEQFQuickListUp, VSEQFQuickMarkerDelete, VSEQFQuickMarkerJump,
+           VSEQFQuickMarkerList, VSEQFQuickMarkerMove, VSEQFQuickMarkerPresetList, VSEQFQuickMarkerRename,
+           VSEQFQuickMarkersAddPreset, VSEQFQuickMarkersMenu, VSEQFQuickMarkersPanel, VSEQFQuickMarkersPlace,
+           VSEQFQuickMarkersRemovePreset, VSEQFQuickParents, VSEQFQuickParentsClear, VSEQFQuickParentsMenu,
+           VSEQFQuickSnaps, VSEQFQuickSnapsMenu, VSEQFQuickTagList, VSEQFQuickTagListAll, VSEQFQuickTagsAdd,
+           VSEQFQuickTagsClear, VSEQFQuickTagsMenu, VSEQFQuickTagsPanel, VSEQFQuickTagsRemove, VSEQFQuickTagsRemoveFrom,
+           VSEQFQuickTagsSelect, VSEQFQuickTimeline, VSEQFQuickTimelineMenu, VSEQFQuickZoomPreset,
+           VSEQFQuickZoomPresetMenu, VSEQFQuickZooms, VSEQFQuickZoomsMenu, VSEQFRemoveZoom, VSEQFSelectGrab,
+           VSEQFSettingsMenu, VSEQFTags, VSEQFThreePointBrowserPanel, VSEQFThreePointImport,
+           VSEQFThreePointImportToClip, VSEQFThreePointOperator, VSEQFThreePointPanel, VSEQFZoomPreset, VSEQFSetting)
+
+
 def register():
     bpy.utils.register_class(VSEQuickFunctionSettings)
 
-    #Register operators
-    bpy.utils.register_module(__name__)
+    #Register classes
+    for cls in classes:
+        bpy.utils.register_class(cls)
 
     bpy.types.SEQUENCER_PT_edit.append(edit_panel)
     global vseqf_draw_handler
@@ -5960,6 +5998,7 @@ def unregister():
     for handler in handlers:
         if " frame_step " in str(handler):
             handlers.remove(handler)
+    handlers = bpy.app.handlers.scene_update_post
     for handler in handlers:
         if " vseqf_continuous " in str(handler):
             handlers.remove(handler)
@@ -5968,8 +6007,9 @@ def unregister():
     except RuntimeError:
         pass
 
-    #Unregister operators
-    bpy.utils.unregister_module(__name__)
+    #Unregister classes
+    for cls in reversed(classes):
+        bpy.utils.unregister_class(cls)
 
 
 if __name__ == "__main__":
