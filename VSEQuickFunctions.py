@@ -849,7 +849,7 @@ def vseqf_continuous(scene):
         except:
             return
         new_sequences = []
-        new_end = 1
+        new_end = scene.frame_current
         build_proxies = False
         for sequence in sequences:
             if sequence.new:
@@ -874,7 +874,7 @@ def vseqf_continuous(scene):
                 sequence.last_name = sequence.name
         if new_sequences:
             for sequence in new_sequences:
-                if sequence.frame_final_end > new_end:
+                if sequence.type not in ['ADJUSTMENT', 'TEXT', 'COLOR', 'MULTICAM'] and sequence.frame_final_end > new_end:
                     new_end = sequence.frame_final_end
                 if vseqf_parenting() and vseqf.autoparent:
                     #autoparent
@@ -3593,14 +3593,14 @@ def swap_sequence(first, second):
 
     end_frame = find_sequences_end(current_sequences(bpy.context))
     first_forward_offset = end_frame - first.frame_final_start
-    first_offset = second.frame_final_start - first.frame_final_start
+    first_offset = second.frame_final_duration
     new_first_final_start = first.frame_final_start + first_offset
     new_first_final_end = first.frame_final_end + first_offset
     new_first_start_forward = first.frame_start + first_forward_offset
     new_first_start = first.frame_start + first_offset
     first_channel_offset = second.channel - first.channel
     new_first_channel = first.channel + first_channel_offset
-    while sequencer_area_filled(new_first_final_start, new_first_final_end, new_first_channel, new_first_channel, [second]):
+    while sequencer_area_filled(new_first_final_start, new_first_final_end, new_first_channel, new_first_channel, [second, first]):
         new_first_channel = new_first_channel + 1
 
     second_offset = first.frame_final_start - second.frame_final_start
@@ -3609,7 +3609,7 @@ def swap_sequence(first, second):
     new_second_start = second.frame_start + second_offset
     second_channel_offset = first.channel - second.channel
     new_second_channel = second.channel + second_channel_offset
-    while sequencer_area_filled(new_second_final_start, new_second_final_end, new_second_channel, new_second_channel, [first]):
+    while sequencer_area_filled(new_second_final_start, new_second_final_end, new_second_channel, new_second_channel, [first, second]):
         new_second_channel = new_second_channel + 1
 
     first.frame_start = new_first_start_forward
@@ -3617,6 +3617,7 @@ def swap_sequence(first, second):
     second.frame_start = new_second_start
     second.channel = new_second_channel
     first.frame_start = new_first_start
+    to_check = []
     if vseqf_parenting():
         first_children = get_recursive(first, [])
         second_children = get_recursive(second, [])
@@ -3626,20 +3627,28 @@ def swap_sequence(first, second):
                 new_pos = child.frame_start + first_offset
                 new_end = child.frame_final_end + first_offset
                 new_channel = child.channel + first_channel_offset
+                to_check.append([child, new_channel])
                 while sequencer_area_filled(new_start, new_end, new_channel, new_channel, [child]):
                     new_channel = new_channel + 1
                 child.frame_start = new_pos
                 child.channel = new_channel
+                child.frame_start = new_pos
         for child in second_children:
             if child != second:
                 new_start = child.frame_final_start + second_offset
                 new_pos = child.frame_start + second_offset
                 new_end = child.frame_final_end + second_offset
                 new_channel = child.channel + second_channel_offset
+                to_check.append([child, new_channel])
                 while sequencer_area_filled(new_start, new_end, new_channel, new_channel, [child]):
                     new_channel = new_channel + 1
                 child.frame_start = new_pos
                 child.channel = new_channel
+                child.frame_start = new_pos
+        for check in to_check:
+            child, channel = check
+            if not sequencer_area_filled(child.frame_final_start, child.frame_final_end, channel, channel, []):
+                child.channel = channel
 
 
 class VSEQFQuickListPanel(bpy.types.Panel):
