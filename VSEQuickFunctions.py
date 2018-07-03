@@ -1519,16 +1519,17 @@ class VSEQFGrabAdd(bpy.types.Operator):
                             new_channel = seq[4]
                             new_start = sequence.frame_final_start
                             new_end = sequence.frame_final_end
-                            if sequence.frame_duration - sequence.frame_offset_start == 1:
-                                #sequence has been slipped beyond the right edges it can be, try to fix
-                                duration = seq[2] - seq[1]
-                                new_end = sequence.frame_final_start + duration
-                                sequence.frame_final_end = new_end
-                            if sequence.frame_duration - sequence.frame_offset_end == 1:
-                                #sequence has been slipped beyond the left edges it can be, try to fix
-                                duration = seq[2] - seq[1]
-                                new_start = sequence.frame_final_end - duration
-                                sequence.frame_final_start = new_start
+                            if sequence.select_left_handle and sequence.select_right_handle and sequence.type in ['MOVIE', 'SCENE', 'MOVIECLIP']:
+                                if sequence.frame_duration - sequence.frame_offset_start == 1:
+                                    #sequence has been slipped beyond the right edges it can be, try to fix
+                                    duration = seq[2] - seq[1]
+                                    new_end = sequence.frame_final_start + duration
+                                    sequence.frame_final_end = new_end
+                                if sequence.frame_duration - sequence.frame_offset_end == 1:
+                                    #sequence has been slipped beyond the left edges it can be, try to fix
+                                    duration = seq[2] - seq[1]
+                                    new_start = sequence.frame_final_end - duration
+                                    sequence.frame_final_start = new_start
                             while sequencer_area_filled(new_start, new_end, new_channel, new_channel, [sequence]):
                                 new_channel = new_channel + 1
                             sequence.channel = new_channel
