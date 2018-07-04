@@ -920,6 +920,7 @@ def vseqf_continuous(scene):
 
 
 def vseqf_draw():
+    prefs = get_prefs()
     active_strip = current_active(bpy.context)
     if not active_strip:
         return
@@ -948,7 +949,8 @@ def vseqf_draw():
     if active_top != 12000:
         fade_height = channel_px / 20
         text_size = 10
-        if active_width > text_size * 6:
+        #display fades
+        if prefs.fades and active_width > text_size * 6:
             if active_left != 12000:
                 if active_pos_x == 12000:
                     active_pos_x = int(active_left + (active_width / 2))
@@ -966,7 +968,7 @@ def vseqf_draw():
                     fadeout_width = active_width * fadeout_percent
                     draw_rect(active_right - fadeout_width, active_top - (fade_height * 2), fadeout_width, fade_height, color=(.5, .5, 1, .75))
                     draw_text(active_right - (text_size * 4), active_top, text_size, 'Out: '+str(fadeout))
-        if active_pos_x != 12000:
+        if prefs.parenting and active_pos_x != 12000:
             if active_pos_y == 12000:
                 active_pos_y = int(active_top - (channel_px / 2))
             children = find_children(active_strip)
@@ -1533,7 +1535,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
                             while sequencer_area_filled(new_start, new_end, new_channel, new_channel, [sequence]):
                                 new_channel = new_channel + 1
                             sequence.channel = new_channel
-                    else:
+                    else:  #not selected
                         if seq[9]:
                             #this sequence has a parent that may be moved
                             new_start = seq[1]
@@ -1719,10 +1721,11 @@ class VSEQFGrabAdd(bpy.types.Operator):
         self.sequences = []
         self.grabbed_sequences = []
         self.grabbed_names = []
+        parenting = vseqf_parenting()
         to_move = []
         selected_sequences = current_selected(context)
         for seq in selected_sequences:
-            if vseqf_parenting():
+            if parenting:
                 if not (seq.select_left_handle or seq.select_right_handle):
                     to_move = get_recursive(seq, to_move)
                 else:
@@ -1734,7 +1737,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
         sequences = current_sequences(context)
         for seq in sequences:
             sequence_data = self.get_sequence_data(seq)
-            if seq in to_move:
+            if parenting and seq in to_move:
                 sequence_data[9] = True
             if seq.select:
                 self.grabbed_names.append(seq.name)
@@ -2048,6 +2051,7 @@ class VSEQFContextSequence(bpy.types.Menu):
     bl_label = "Operations On Sequence"
 
     def draw(self, context):
+        prefs = get_prefs()
         strip = current_active(context)
         selected = current_selected(context)
         layout = self.layout
@@ -2057,11 +2061,14 @@ class VSEQFContextSequence(bpy.types.Menu):
             layout.label('Active Sequence:')
             layout.prop(strip, 'mute')
             layout.prop(strip, 'lock')
-            layout.menu('vseqf.quicktags_menu')
+            if prefs.tags:
+                layout.menu('vseqf.quicktags_menu')
         if selected:
             layout.separator()
-            layout.menu('vseqf.quickcuts_menu')
-            layout.menu('vseqf.quickparents_menu')
+            if prefs.cuts:
+                layout.menu('vseqf.quickcuts_menu')
+            if prefs.parenting:
+                layout.menu('vseqf.quickparents_menu')
             layout.operator('sequencer.duplicate_move', text='Duplicate')
             layout.operator('vseqf.grab', text='Grab/Move')
 
@@ -3024,7 +3031,7 @@ class VSEQFQuickParentsMenu(bpy.types.Menu):
     """Pop-up menu for QuickParents, displays parenting operators, and relationships"""
     bl_idname = "vseqf.quickparents_menu"
     bl_label = "Quick Parents"
-    
+
     @classmethod
     def poll(cls, context):
         del context
@@ -3511,13 +3518,14 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                             self.type = 'begin_to_cursor'
                         if self.type != 'begin_to_cursor':
                             #fix child edges
-                            for child in children:
-                                if child.frame_final_start == original_left:
-                                    to_check.append([child, child.frame_start, child.frame_final_start, child.frame_final_end])
-                                    child.frame_final_start = sequence.frame_final_start
-                                if child.frame_final_end == original_right:
-                                    to_check.append([child, child.frame_start, child.frame_final_start, child.frame_final_end])
-                                    child.frame_final_end = sequence.frame_final_end
+                            if parenting:
+                                for child in children:
+                                    if child.frame_final_start == original_left:
+                                        to_check.append([child, child.frame_start, child.frame_final_start, child.frame_final_end])
+                                        child.frame_final_start = sequence.frame_final_start
+                                    if child.frame_final_end == original_right:
+                                        to_check.append([child, child.frame_start, child.frame_final_start, child.frame_final_end])
+                                        child.frame_final_end = sequence.frame_final_end
 
                     if self.type == 'begin_to_cursor':
                         offset = sequence.frame_final_start - sequence.frame_start
@@ -3546,24 +3554,26 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                         else:
                             self.report({'WARNING'}, 'No Next Sequence Found')
                     if moved != 0:
-                        children = get_recursive(sequence, [])
-                        for child in children:
-                            if child != sequence:
-                                child.frame_start = child.frame_start + moved
+                        if parenting:
+                            children = get_recursive(sequence, [])
+                            for child in children:
+                                if child != sequence:
+                                    child.frame_start = child.frame_start + moved
             #fix fades
-            for check in to_check:
-                sequence, old_pos, old_start, old_end = check
-                if old_pos == sequence.frame_start:
-                    if old_start != sequence.frame_final_start:
-                        # fix fade in
-                        fade_in = fades(sequence, mode='detect', direction='in', fade_low_point_frame=old_start)
-                        if fade_in > 0:
-                            fades(sequence, mode='set', direction='in', fade_length=fade_in)
-                    if old_end != sequence.frame_final_end:
-                        # fix fade out
-                        fade_out = fades(sequence, mode='detect', direction='out', fade_low_point_frame=old_end)
-                        if fade_out > 0:
-                            fades(sequence, mode='set', direction='out', fade_length=fade_out)
+            if prefs.fades:
+                for check in to_check:
+                    sequence, old_pos, old_start, old_end = check
+                    if old_pos == sequence.frame_start:
+                        if old_start != sequence.frame_final_start:
+                            # fix fade in
+                            fade_in = fades(sequence, mode='detect', direction='in', fade_low_point_frame=old_start)
+                            if fade_in > 0:
+                                fades(sequence, mode='set', direction='in', fade_length=fade_in)
+                        if old_end != sequence.frame_final_end:
+                            # fix fade out
+                            fade_out = fades(sequence, mode='detect', direction='out', fade_low_point_frame=old_end)
+                            if fade_out > 0:
+                                fades(sequence, mode='set', direction='out', fade_length=fade_out)
         return{'FINISHED'}
 
 
@@ -4610,6 +4620,22 @@ def populate_tags(sequences=False, tags=False):
 class VSEQFQuickTagsMenu(bpy.types.Menu):
     bl_idname = 'vseqf.quicktags_menu'
     bl_label = "Tags"
+
+    @classmethod
+    def poll(cls, context):
+        #Check if panel is disabled
+        if __name__ in context.user_preferences.addons:
+            prefs = context.user_preferences.addons[__name__].preferences
+        else:
+            prefs = VSEQFTempSettings()
+
+        #Check for sequences
+        if not context.sequences or not context.scene.sequence_editor:
+            return False
+        if len(context.sequences) > 0 and context.scene.sequence_editor.active_strip:
+            return prefs.tags
+        else:
+            return False
 
     def draw(self, context):
         layout = self.layout
