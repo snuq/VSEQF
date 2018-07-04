@@ -3434,6 +3434,7 @@ class VSEQFQuickSnaps(bpy.types.Operator):
     def execute(self, context):
         bpy.ops.ed.undo_push()
         #Set up variables needed for operator
+        prefs = get_prefs()
         selected = current_selected(context)
         scene = context.scene
         active = current_active(context)
@@ -3472,9 +3473,11 @@ class VSEQFQuickSnaps(bpy.types.Operator):
             else:
                 previous = None
                 next_seq = None
+            to_check = []
             for sequence in to_snap:
                 if not hasattr(sequence, 'input_1'):
                     moved = 0
+                    to_check.append([sequence, sequence.frame_start, sequence.frame_final_start, sequence.frame_final_end])
                     if self.type == 'selection_to_cursor':
                         children = find_children(sequence)
                         original_left = sequence.frame_final_start
@@ -3507,10 +3510,13 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                         else:
                             self.type = 'begin_to_cursor'
                         if self.type != 'begin_to_cursor':
+                            #fix child edges
                             for child in children:
                                 if child.frame_final_start == original_left:
+                                    to_check.append([child, child.frame_start, child.frame_final_start, child.frame_final_end])
                                     child.frame_final_start = sequence.frame_final_start
                                 if child.frame_final_end == original_right:
+                                    to_check.append([child, child.frame_start, child.frame_final_start, child.frame_final_end])
                                     child.frame_final_end = sequence.frame_final_end
 
                     if self.type == 'begin_to_cursor':
@@ -3544,6 +3550,20 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                         for child in children:
                             if child != sequence:
                                 child.frame_start = child.frame_start + moved
+            #fix fades
+            for check in to_check:
+                sequence, old_pos, old_start, old_end = check
+                if old_pos == sequence.frame_start:
+                    if old_start != sequence.frame_final_start:
+                        # fix fade in
+                        fade_in = fades(sequence, mode='detect', direction='in', fade_low_point_frame=old_start)
+                        if fade_in > 0:
+                            fades(sequence, mode='set', direction='in', fade_length=fade_in)
+                    if old_end != sequence.frame_final_end:
+                        # fix fade out
+                        fade_out = fades(sequence, mode='detect', direction='out', fade_low_point_frame=old_end)
+                        if fade_out > 0:
+                            fades(sequence, mode='set', direction='out', fade_length=fade_out)
         return{'FINISHED'}
 
 
