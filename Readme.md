@@ -5,7 +5,7 @@ If you find this, or any of my other addons useful, consider donating:
 
 PayPal | Bitcoin
 ------ | -------
-[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=XHRXZBQ3LGLH6) | 1JnX9ZFsvUaMp13YiQgr9V36EbTE2SA8tz  ![Bitcoin Donate QR Code](http://www.snuq.com/snu-bitcoin-address.png) |
+[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=XHRXZBQ3LGLH6) | ![Bitcoin Donate QR Code](http://www.snuq.com/snu-bitcoin-address.png)  1JnX9ZFsvUaMp13YiQgr9V36EbTE2SA8tz
 
 ## Sequence Editor Additions
 The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' operators have been added to, this enables:
