@@ -2,8 +2,8 @@
 
 This script is designed to make Blender's VSE easier to use by implementing features often found in other video editors, or features that I find useful as a video editor.  
 If you find this, or any of my other addons useful, consider donating:  
-Paypal: [![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=XHRXZBQ3LGLH6)  
-Bitcoin: 1JnX9ZFsvUaMp13YiQgr9V36EbTE2SA8tz ![Bitcoin Donate QR Code](http://www.snuq.com/snu-bitcoin-address.png)
+PayPal | Bitcoin
+[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=XHRXZBQ3LGLH6) | 1JnX9ZFsvUaMp13YiQgr9V36EbTE2SA8tz  ![Bitcoin Donate QR Code](http://www.snuq.com/snu-bitcoin-address.png)
 
 ## Sequence Editor Additions
 The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' operators have been added to, this enables:
