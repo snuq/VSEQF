@@ -5954,7 +5954,7 @@ def register():
     bpy.types.SEQUENCER_PT_edit.append(edit_panel)
     global vseqf_draw_handler
     if vseqf_draw_handler:
-        bpy.types.SpaceSequencEditor.draw_handler_remove(vseqf_draw_handler, 'WINDOW')
+        bpy.types.SpaceSequenceEditor.draw_handler_remove(vseqf_draw_handler, 'WINDOW')
     vseqf_draw_handler = bpy.types.SpaceSequenceEditor.draw_handler_add(vseqf_draw, (), 'WINDOW', 'POST_PIXEL')
 
     #Add menus
