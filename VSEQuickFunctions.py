@@ -837,6 +837,8 @@ class VSEQFCompactEdit(bpy.types.Panel):
 #Functions related to continuous update
 @persistent
 def vseqf_continuous(scene):
+    if bpy.context.screen.scene != scene:
+        return
     vseqf = scene.vseqf
     if vseqf.last_frame != scene.frame_current:
         #scene frame was changed, assume nothing else happened
@@ -2080,6 +2082,8 @@ def frame_step(scene):
     Argument:
         scene: the current Scene"""
 
+    if bpy.context.screen.scene != scene:
+        return
     step = scene.vseqf.step
     difference = scene.frame_current - scene.vseqf.last_frame
     if difference < 0:
