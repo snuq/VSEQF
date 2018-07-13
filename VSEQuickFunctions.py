@@ -299,6 +299,7 @@ def draw_text(x, y, size, text, color=(1.0, 1.0, 1.0, 1.0)):
     blf.draw(font_id, text)
 
 
+
 def find_crossfade(sequences, first_sequence, second_sequence):
     for sequence in sequences:
         if hasattr(sequence, 'input_1') and hasattr(sequence, 'input_2'):
