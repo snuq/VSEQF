@@ -837,7 +837,7 @@ class VSEQFCompactEdit(bpy.types.Panel):
 #Functions related to continuous update
 @persistent
 def vseqf_continuous(scene):
-    if bpy.context.screen.scene != scene:
+    if not bpy.context.screen or bpy.context.screen.scene != scene:
         return
     vseqf = scene.vseqf
     if vseqf.last_frame != scene.frame_current:
