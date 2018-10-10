@@ -17,7 +17,13 @@
 # ##### END GPL LICENSE BLOCK #####
 
 """
+2.8 update notes: https://wiki.blender.org/wiki/User:NBurn/2.80_Python_API_Changes
+   scene_update_post handler has been removed, need a new way to run the continous function, or hope it is added back?
+   any time variable types are set (ie, variable = Class()), the ':' is used now (variable: Class())
+   bgl is gone? how to draw overlays now?
+
 Known Issues:
+   shift-s not working properly with multiple clip edges selected
    Sometimes undo pushing breaks... not sure what's going on there
    Uncut does not work on movieclip type sequences... there appears to be no way of getting the sequence's source file.
    Cancelling a grab while playing back will cause the cursor to jump back to where it was when the grab started.
@@ -26,10 +32,12 @@ Known Issues:
        Blenders python api.
 
 Future Possibilities:
+   Add dption where dragging the in or out point of a clip will snap the cursor to that edge for easy preview.
+   way to drag over an area of a strip and have it cut out or ripple-cut out
+   add variables to 3point panel for minutes/seconds/frames for in/out
    special tags with time index and length, displayed in overlay as clip markers
    Ripple insert... need to think about how to do this, but I want it!
    Copy/paste wrapper that copies strip animation data
-   Some kind of audio-only export to reaper (export blender timeline to EDL?)
 
 Changelog:
 0.93
@@ -53,6 +61,9 @@ Changelog:
    The new cut operator now fixes effect sequence chains - it will duplicate single input effects (such as speed control) to the newly cut sequence, and it will fix crossfades that should be applied to the right cut sequence.  See https://developer.blender.org/T50877 for more info on the bug.
    Now can save and recall zoom levels in the vse.  No way to do vertical (channel) zooms yet tho...
    Right-click context menu option added, hold right click to activate it.  Options will differ depending on what is clicked on - cursor, sequence, sequence handles, markers, empty area
+
+0.94 (In progress)
+   Frame skipping now works with reverse playback as well, and fixed poor behavior.
 """
 
 
@@ -842,7 +853,8 @@ def vseqf_continuous(scene):
     vseqf = scene.vseqf
     if vseqf.last_frame != scene.frame_current:
         #scene frame was changed, assume nothing else happened
-        vseqf.last_frame = scene.frame_current
+        pass
+        #vseqf.last_frame = scene.frame_current
     else:
         #something in the scene was changed by the user, figure out what
         try:
@@ -2086,25 +2098,19 @@ def frame_step(scene):
         return
     step = scene.vseqf.step
     difference = scene.frame_current - scene.vseqf.last_frame
-    if difference < 0:
-        step = 0
-    if step == 0:
-        #no frame skipping
-        scene.vseqf.last_frame = scene.frame_current
-    if step == 1:
-        #if the step is 1, only one frame in every 3 will be skipped
-        if difference >= 3:
-            scene.frame_current = scene.frame_current + int(difference/3)
-            scene.vseqf.last_frame = scene.frame_current
-    if step == 2:
-        #if the step is 2, every other frame is skipped
-        if difference >= 2:
-            scene.frame_current = scene.frame_current + int(difference/2)
-            scene.vseqf.last_frame = scene.frame_current
-    if step > 2:
-        #if the step is greater than 2, (step-2) frames will be skipped per frame
-        scene.frame_current = scene.frame_current + (step - 2)
-        scene.vseqf.last_frame = scene.frame_current
+    if difference == -1 or difference == 1:
+        if step == 1:
+            #Skip every 4th frame
+            if scene.frame_current % 4 == 0:
+                scene.frame_current = scene.frame_current + difference
+        if step == 2:
+            #Skip every 3rd frame
+            if scene.frame_current % 3 == 0:
+                scene.frame_current = scene.frame_current + difference
+        if step > 2:
+            #Skip step - 1 frames
+            scene.frame_current = scene.frame_current + (difference * (step - 1))
+    scene.vseqf.last_frame = scene.frame_current
 
 
 def draw_quickspeed_header(self, context):
