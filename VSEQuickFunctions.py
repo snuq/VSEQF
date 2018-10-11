@@ -2096,7 +2096,7 @@ def frame_step(scene):
 
     if bpy.context.screen.scene != scene:
         return
-    step = scene.vseqf.step
+    step = abs(scene.vseqf.step) - 1
     difference = scene.frame_current - scene.vseqf.last_frame
     if difference == -1 or difference == 1:
         if step == 1:
@@ -5679,8 +5679,8 @@ class VSEQFSetting(bpy.types.PropertyGroup):
     step = bpy.props.IntProperty(
         name="Frame Step",
         default=0,
-        min=0,
-        max=6)
+        min=-7,
+        max=7)
     skip_index = bpy.props.IntProperty(
         default=0)
 
