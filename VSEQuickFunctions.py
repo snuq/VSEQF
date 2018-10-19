@@ -26,15 +26,11 @@ Known Issues:
    shift-s not working properly with multiple clip edges selected
    Sometimes undo pushing breaks... not sure what's going on there
    Uncut does not work on movieclip type sequences... there appears to be no way of getting the sequence's source file.
-   Cancelling a grab while playing back will cause the cursor to jump back to where it was when the grab started.
-       Unfortunately, I can't fix this due to a bug in blender.
    Right now the script cannot apply a vertical zoom level, as far as I can tell this is missing functionality in
        Blenders python api.
 
 Future Possibilities:
-   Add dption where dragging the in or out point of a clip will snap the cursor to that edge for easy preview.
    way to drag over an area of a strip and have it cut out or ripple-cut out
-   add variables to 3point panel for minutes/seconds/frames for in/out
    special tags with time index and length, displayed in overlay as clip markers
    Ripple insert... need to think about how to do this, but I want it!
    Copy/paste wrapper that copies strip animation data
@@ -64,6 +60,12 @@ Changelog:
 
 0.94 (In progress)
    Frame skipping now works with reverse playback as well, and fixed poor behavior.
+   Added QuickShortcuts - timeline and sequence movement using the numpad.  Thanks to tintwotin for the ideas!
+   Added option to snap cursor to a dragged edge (if only one is grabbed)
+   Many improvements to Quick3Point interface
+
+Todo before release:
+    update readme: add QuickShortcuts, snap to grabbed edge
 """
 
 
@@ -89,6 +91,8 @@ bl_info = {
     "category": "Sequencer"
 }
 vseqf_draw_handler = None
+
+right_click_time = 0.5
 
 
 #Miscellaneous Functions
@@ -361,7 +365,7 @@ def under_cursor(sequence, frame):
     Arguments:
         sequence: VSE sequence object to check
         frame: Integer, the frame number
-    
+
     Returns: True or False"""
     if sequence.frame_final_start < frame and sequence.frame_final_end > frame:
         return True
@@ -1009,7 +1013,204 @@ def vseqf_draw():
                 draw_line(active_pos_x, active_pos_y, pixel_x, pixel_y, 2, color=(1.0, 1.0, 1.0, 0.2))
 
 
+#Functions and classes related to QuickShortcuts
+def nudge_selected(frame=0, channel=0):
+    """Moves the selected sequences by a given amount, ignoring parenting."""
+
+    for sequence in bpy.context.selected_sequences:
+        oldframe = sequence.frame_start
+        if frame:
+            if sequence.select_left_handle or sequence.select_right_handle:
+                if sequence.select_left_handle:
+                    sequence.frame_final_start = sequence.frame_final_start + frame
+                if sequence.select_right_handle:
+                    sequence.frame_final_end = sequence.frame_final_end + frame
+            else:
+                newframe = sequence.frame_start + frame
+                sequence.frame_start = newframe
+                oldframe = newframe
+        if channel:
+            newchannel = sequence.channel + channel
+            if newchannel > 0:
+                sequence.channel = newchannel
+                sequence.frame_start = oldframe
+
+
+def find_marker(frame, direction):
+    """Attempts to find a marker in the given direction.
+    'direction' must be 'next' or 'previous'.
+    returns a marker object, or None if none found.
+    """
+
+    return_marker = None
+    best_delta = None
+    for marker in bpy.context.scene.timeline_markers:
+        if direction == 'next':
+            if marker.frame > frame:
+                delta = marker.frame - frame
+                if best_delta is None or delta < best_delta:
+                    best_delta = delta
+                    return_marker = marker
+        else:
+            if marker.frame < frame:
+                delta = frame - marker.frame
+                if best_delta is None or delta < best_delta:
+                    best_delta = delta
+                    return_marker = marker
+    return return_marker
+
+
+def find_edge(frame, direction):
+    """Attemts to find the closest sequence edge in the given direction.
+    'direction' must be 'next' or 'previous'.
+    returns a frame number, or None if none found.
+    """
+
+    new_frame = None
+    best_delta = None
+    for sequence in bpy.context.scene.sequence_editor.sequences:
+        edges = [sequence.frame_final_start, sequence.frame_final_end]
+        for edge in edges:
+            if direction == 'next':
+                if edge > frame:
+                    delta = edge - frame
+                    if best_delta is None or delta < best_delta:
+                        best_delta = delta
+                        new_frame = edge
+            else:
+                if edge < frame:
+                    delta = frame - edge
+                    if best_delta is None or delta < best_delta:
+                        best_delta = delta
+                        new_frame = edge
+    return new_frame
+
+
+class VSEQFQuickShortcutsNudge(bpy.types.Operator):
+    bl_idname = 'vseqf.nudge_selected'
+    bl_label = 'Move the selected sequences'
+
+    direction = bpy.props.EnumProperty(name='Direction', items=[("UP", "Up", "", 1), ("DOWN", "Down", "", 2), ("LEFT", "Left", "", 3), ("RIGHT", "Right", "", 4), ("LEFT-M", "Left Medium", "", 5), ("RIGHT-M", "Right Medium", "", 6), ("LEFT-L", "Left Large", "", 7), ("RIGHT-L", "Right Large", "", 8)])
+
+    def execute(self, context):
+        bpy.ops.ed.undo_push()
+        render = context.scene.render
+        second = int(round(render.fps / render.fps_base))
+        if self.direction == 'UP':
+            nudge_selected(channel=1)
+        elif self.direction == 'DOWN':
+            nudge_selected(channel=-1)
+        elif self.direction == 'LEFT':
+            nudge_selected(frame=-1)
+        elif self.direction == 'LEFT-M':
+            nudge_selected(frame=0 - int(round(second/2)))
+        elif self.direction == 'LEFT-L':
+            nudge_selected(frame=0 - second)
+        elif self.direction == 'RIGHT':
+            nudge_selected(frame=1)
+        elif self.direction == 'RIGHT-M':
+            nudge_selected(frame=int(round(second/2)))
+        elif self.direction == 'RIGHT-L':
+            nudge_selected(frame=second)
+        return{'FINISHED'}
+
+
+class VSEQFQuickShortcutsSpeed(bpy.types.Operator):
+    bl_idname = 'vseqf.change_speed'
+    bl_label = 'Raise or lower playback speed'
+
+    speed_change = bpy.props.EnumProperty(name='Type', items=[("UP", "Up", "", 1), ("DOWN", "Down", "", 2)])
+
+    def execute(self, context):
+        if self.speed_change == 'UP':
+            if not context.screen.is_animation_playing:
+                bpy.ops.screen.animation_play()
+                context.scene.vseqf.step = 1
+            elif context.scene.vseqf.step == 0:
+                bpy.ops.screen.animation_play()
+            elif context.scene.vseqf.step < 7:
+                context.scene.vseqf.step = context.scene.vseqf.step + 1
+        elif self.speed_change == 'DOWN':
+            if not context.screen.is_animation_playing:
+                bpy.ops.screen.animation_play(reverse=True)
+                context.scene.vseqf.step = -1
+            elif context.scene.vseqf.step == 0:
+                bpy.ops.screen.animation_play()
+            elif context.scene.vseqf.step > -7:
+                context.scene.vseqf.step = context.scene.vseqf.step - 1
+        if context.screen.is_animation_playing and context.scene.vseqf.step == 0:
+            bpy.ops.screen.animation_play()
+        return{'FINISHED'}
+
+
+class VSEQFQuickShortcutsSkip(bpy.types.Operator):
+    bl_idname = 'vseqf.skip_timeline'
+    bl_label = 'Skip timeline location'
+
+    type = bpy.props.EnumProperty(name='Type', items=[("NEXTSECOND", "One Second Forward", "", 1), ("LASTSECOND", "One Second Backward", "", 2), ("NEXTEDGE", "Next Clip Edge", "", 3), ("LASTEDGE", "Last Clip Edge", "", 4), ("LASTMARKER", "Last Marker", "", 5), ("NEXTMARKER", "Next Marker", "", 6)])
+
+    def execute(self, context):
+        bpy.ops.ed.undo_push()
+        second_frames = int(round(context.scene.render.fps / context.scene.render.fps_base))
+        if self.type == "NEXTSECOND":
+            context.scene.frame_current = context.scene.frame_current + second_frames
+        elif self.type == "LASTSECOND":
+            context.scene.frame_current = context.scene.frame_current - second_frames
+        elif self.type == "NEXTEDGE":
+            edge = find_edge(context.scene.frame_current, direction='next')
+            if edge is not None:
+                context.scene.frame_current = edge
+        elif self.type == "LASTEDGE":
+            edge = find_edge(context.scene.frame_current, direction='previous')
+            if edge is not None:
+                context.scene.frame_current = edge
+        elif self.type == "LASTMARKER":
+            marker = find_marker(context.scene.frame_current, direction='previous')
+            if marker:
+                context.scene.frame_current = marker.frame
+        elif self.type == "NEXTMARKER":
+            marker = find_marker(context.scene.frame_current, direction='next')
+            if marker:
+                context.scene.frame_current = marker.frame
+        return{'FINISHED'}
+
+
+class VSEQFQuickShortcutsResetPlay(bpy.types.Operator):
+    bl_idname = 'vseqf.reset_playback'
+    bl_label = 'Reset playback to normal speed and play'
+
+    direction = bpy.props.EnumProperty(name='Direction', items=[("FORWARD", "Forward", "", 1), ("BACKWARD", "Backward", "", 2)])
+
+    def execute(self, context):
+        if self.direction == 'BACKWARD':
+            context.scene.vseqf.step = 0
+            bpy.ops.screen.animation_play(reverse=True)
+        else:
+            context.scene.vseqf.step = 0
+            bpy.ops.screen.animation_play()
+        return{'FINISHED'}
+
+
 #Functions and classes related to threepoint editing
+def update_clip_import(self, context):
+    #todo: prevent values from being extended past sequence bounds
+    fps = round(context.scene.render.fps / context.scene.render.fps_base)
+    if self.import_frames_in >= fps:
+        self.import_frames_in = 0
+        self.import_seconds_in = self.import_seconds_in + 1
+    if self.import_seconds_in >= 60:
+        self.import_seconds_in = 0
+        self.import_minutes_in = self.import_minutes_in + 1
+    self.import_frame_in = (self.import_minutes_in * 60 * fps) + (self.import_seconds_in * fps) + self.import_frames_in
+    if self.import_frames_length >= fps:
+        self.import_frames_length = 0
+        self.import_seconds_length = self.import_seconds_length + 1
+    if self.import_seconds_length >= 60:
+        self.import_seconds_length = 0
+        self.import_minutes_length = self.import_minutes_length + 1
+    self.import_frame_length = (self.import_minutes_length * 60 * fps) + (self.import_seconds_length * fps) + self.import_frames_length
+
+
 def three_point_draw_callback(self, context):
     colorfg = (1.0, 1.0, 1.0, 1.0)
     colorbg = (0.1, 0.1, 0.1, 1.0)
@@ -1045,13 +1246,14 @@ def three_point_draw_callback(self, context):
         out_text_x = 0 + half_scale
     else:
         out_text_x = out_x + half_scale
-    draw_text(out_text_x, height - double_scale + 2, scale - 2, "Out: "+str(self.out_frame), colorfg)
+    draw_text(out_text_x, height - double_scale + 2, scale - 2, "Length: "+str(self.out_frame - self.in_frame), colorfg)
 
 
 class VSEQFThreePointBrowserPanel(bpy.types.Panel):
-    bl_label = "3 Point Edit"
+    bl_label = "3Point Edit"
     bl_space_type = 'FILE_BROWSER'
     bl_region_type = 'TOOLS'
+    bl_category = "Quick 3Point"
 
     @classmethod
     def poll(cls, context):
@@ -1123,17 +1325,25 @@ class VSEQFThreePointPanel(bpy.types.Panel):
         row.operator('vseqf.threepoint_modal_operator', text='Set In/Out')
         fps = context.scene.render.fps / context.scene.render.fps_base
         row = layout.row()
-        if clip.import_frame_in != -1:
-            row.label("In: "+str(clip.import_frame_in)+' ('+timecode_from_frames(clip.import_frame_in-1, fps)+')')
+        if clip.import_settings.import_frame_in != -1:
+            row.label("In: "+str(clip.import_settings.import_frame_in)+' ('+timecode_from_frames(clip.import_settings.import_frame_in, fps)+')')
         else:
             row.label("In: Not Set")
         row = layout.row()
-        if clip.import_frame_out != -1:
-            row.label("Out: "+str(clip.import_frame_out)+' ('+timecode_from_frames(clip.import_frame_out-1, fps)+')')
-        else:
-            row.label("Out: Not Set")
+        col = row.column(align=True)
+        col.prop(clip.import_settings, 'import_minutes_in', text='Minutes In')
+        col.prop(clip.import_settings, 'import_seconds_in', text='Seconds In')
+        col.prop(clip.import_settings, 'import_frames_in', text='Frames In')
         row = layout.row()
-        row.label("Length: "+timecode_from_frames(clip.import_frame_out - clip.import_frame_in + 1, fps))
+        col = row.column(align=True)
+        col.prop(clip.import_settings, 'import_minutes_length', text='Minutes Length')
+        col.prop(clip.import_settings, 'import_seconds_length', text='Seconds Length')
+        col.prop(clip.import_settings, 'import_frames_length', text='Frames Length')
+        row = layout.row()
+        if clip.import_settings.import_frame_length != -1:
+            row.label("Length: "+str(clip.import_settings.import_frame_length)+' ('+timecode_from_frames(clip.import_settings.import_frame_length, fps)+')')
+        else:
+            row.label("Length Not Set")
         row = layout.row()
         row.operator('vseqf.threepoint_import', text='Import At Cursor').type = 'cursor'
         row = layout.row()
@@ -1148,7 +1358,7 @@ class VSEQFThreePointPanel(bpy.types.Panel):
 
 class VSEQFThreePointImport(bpy.types.Operator):
     bl_idname = "vseqf.threepoint_import"
-    bl_label = "Imports a movie clip into the VSE as a movie strip"
+    bl_label = "Imports a movie clip into the VSE as a movie sequence"
 
     type = bpy.props.StringProperty()
 
@@ -1187,10 +1397,16 @@ class VSEQFThreePointImport(bpy.types.Operator):
                         sound_sequence = seq
             if not movie_sequence:
                 return {'CANCELLED'}
-            frame_in = clip.import_frame_in - 1
-            frame_out = clip.frame_duration - clip.import_frame_out
+            if clip.import_settings.import_frame_in == -1:
+                frame_in = 0
+            else:
+                frame_in = clip.import_settings.import_frame_in
+            if clip.import_settings.import_frame_length == -1:
+                frame_length = clip.frame_duration
+            else:
+                frame_length = clip.import_settings.import_frame_length
             import_pos = context.scene.frame_current
-            offset = clip.import_frame_out - clip.import_frame_in + 1
+            offset = clip.import_settings.import_frame_length
             if self.type == 'replace':
                 if not active_strip:
                     return {'CANCELLED'}
@@ -1233,7 +1449,7 @@ class VSEQFThreePointImport(bpy.types.Operator):
                 frame_start = import_pos - frame_in
             context.scene.sequence_editor.active_strip = movie_sequence
             movie_sequence.frame_offset_start = frame_in  #crashing blender in replace mode???
-            movie_sequence.frame_offset_end = frame_out
+            movie_sequence.frame_final_duration = frame_length
             movie_sequence.frame_start = frame_start
             bpy.ops.sequencer.select_all(override, action='DESELECT')
             movie_sequence.select = True
@@ -1241,10 +1457,10 @@ class VSEQFThreePointImport(bpy.types.Operator):
                 sound_sequence.select = True
                 channel = sound_sequence.channel
                 sound_sequence.frame_offset_start = frame_in
-                #sound_sequence.frame_offset_end = frame_out
+                #sound_sequence.frame_offset_end = frame_length
+                sound_sequence.channel = channel
                 sound_sequence.frame_start = frame_start
                 sound_sequence.frame_final_end = movie_sequence.frame_final_end
-                sound_sequence.channel = channel
                 if context.scene.vseqf.autoparent:
                     sound_sequence.parent = movie_sequence.name
 
@@ -1264,7 +1480,7 @@ class VSEQFThreePointOperator(bpy.types.Operator):
     mouse_x = 0
     mouse_y = 0
     editing_in = False
-    editing_out = False
+    editing_length = False
     in_percent = 0
     out_percent = 1
     clip = None
@@ -1273,7 +1489,21 @@ class VSEQFThreePointOperator(bpy.types.Operator):
     start_frame = 0
     original_scene = None
     last_in = -1
-    last_out = -1
+    last_length = -1
+
+    def update_import_values(self, context):
+        fps = round(context.scene.render.fps / context.scene.render.fps_base)
+        settings = self.clip.import_settings
+        remainder, frames_in = divmod(settings.import_frame_in, fps)
+        minutes_in, seconds_in = divmod(remainder, 60)
+        remainder, frames_length = divmod(settings.import_frame_length, fps)
+        minutes_length, seconds_length = divmod(remainder, 60)
+        settings.import_frames_in = frames_in
+        settings.import_seconds_in = seconds_in
+        settings.import_minutes_in = minutes_in
+        settings.import_frames_length = frames_length
+        settings.import_seconds_length = seconds_length
+        settings.import_minutes_length = minutes_length
 
     def update_pos(self, context, mouse_x, mouse_y):
         self.mouse_x = mouse_x
@@ -1290,21 +1520,22 @@ class VSEQFThreePointOperator(bpy.types.Operator):
             if percent > self.out_percent:
                 percent = self.out_percent
             self.in_percent = percent
-            self.in_frame = int(round(clip_length * self.in_percent)) + 1
+            self.in_frame = int(round(clip_length * self.in_percent))
             if self.in_frame >= self.out_frame:
-                self.in_frame = self.in_frame - 1
-            context.scene.frame_current = self.in_frame
-            clip.import_frame_in = self.in_frame
+                self.in_frame = self.out_frame - 1
+            context.scene.frame_current = self.in_frame + 1
+            clip.import_settings.import_frame_in = self.in_frame
+            clip.import_settings.import_frame_length = self.out_frame - self.in_frame
             context.scene.frame_start = self.in_frame
-        elif self.editing_out:
+        elif self.editing_length:
             if percent < self.in_percent:
                 percent = self.in_percent
             self.out_percent = percent
             self.out_frame = int(round(clip_length * self.out_percent))
             if self.out_frame <= self.in_frame:
-                self.out_frame = self.out_frame + 1
-            context.scene.frame_current = self.out_frame
-            clip.import_frame_out = self.out_frame
+                self.out_frame = self.in_frame + 1
+            context.scene.frame_current = self.out_frame - 1
+            clip.import_settings.import_frame_length = self.out_frame - self.in_frame
             context.scene.frame_end = self.out_frame
 
     def modal(self, context, event):
@@ -1315,6 +1546,7 @@ class VSEQFThreePointOperator(bpy.types.Operator):
         if event.type == 'MOUSEMOVE':
             if self.mouse_down:
                 self.update_pos(context, event.mouse_region_x, event.mouse_region_y)
+                self.update_import_values(context)
 
         elif event.type == 'LEFTMOUSE':
             if event.value == 'PRESS':
@@ -1326,7 +1558,7 @@ class VSEQFThreePointOperator(bpy.types.Operator):
                         self.editing_in = True
                         self.update_pos(context, event.mouse_region_x, event.mouse_region_y)
                     elif event.mouse_region_y < height - self.scale and event.mouse_region_y > height - (self.scale * 2):
-                        self.editing_out = True
+                        self.editing_length = True
                         self.update_pos(context, event.mouse_region_x, event.mouse_region_y)
                     else:
                         self.finish_modal(context)
@@ -1337,11 +1569,11 @@ class VSEQFThreePointOperator(bpy.types.Operator):
             elif event.value == 'RELEASE':
                 self.mouse_down = False
                 self.editing_in = False
-                self.editing_out = False
+                self.editing_length = False
 
         elif event.type in {'RIGHTMOUSE', 'ESC'}:
-            self.clip.import_frame_in = self.last_in
-            self.clip.import_frame_out = self.last_out
+            self.clip.import_settings.import_frame_in = self.last_in
+            self.clip.import_settings.import_frame_length = self.last_length
             self.finish_modal(context)
             return {'FINISHED'}
 
@@ -1351,6 +1583,7 @@ class VSEQFThreePointOperator(bpy.types.Operator):
         bpy.types.SpaceClipEditor.draw_handler_remove(self._handle, 'WINDOW')
         bpy.ops.scene.delete()
         context.screen.scene = self.original_scene
+        self.update_import_values(context)
         #context.scene.frame_current = self.start_frame
 
     def invoke(self, context, event):
@@ -1359,25 +1592,26 @@ class VSEQFThreePointOperator(bpy.types.Operator):
         if space.type == 'CLIP_EDITOR':
             self.start_frame = context.scene.frame_current
             self.clip = context.space_data.clip
-            self.last_in = self.clip.import_frame_in
-            self.last_out = self.clip.import_frame_out
-            if self.clip.import_frame_in == -1:
-                self.in_frame = 1
-                self.clip.import_frame_in = 1
+            self.last_in = self.clip.import_settings.import_frame_in
+            self.last_length = self.clip.import_settings.import_frame_length
+            if self.clip.import_settings.import_frame_in == -1:
+                self.in_frame = 0
+                self.clip.import_settings.import_frame_in = 0
                 self.in_percent = 0
             else:
-                self.in_frame = self.clip.import_frame_in
+                self.in_frame = self.clip.import_settings.import_frame_in
                 if self.clip.frame_duration > self.in_frame:
                     self.in_percent = self.in_frame / self.clip.frame_duration
                 else:
                     self.in_percent = 0
-            if self.clip.import_frame_out == -1:
+            if self.clip.import_settings.import_frame_length == -1:
                 self.out_frame = self.clip.frame_duration
-                self.clip.import_frame_out = self.out_frame
+                self.clip.import_settings.import_frame_length = self.out_frame - self.in_frame
             else:
-                self.out_frame = self.clip.import_frame_out
+                self.out_frame = self.clip.import_settings.import_frame_length + self.in_frame
                 if self.clip.frame_duration >= self.out_frame:
                     self.out_percent = self.out_frame / self.clip.frame_duration
+            self.update_import_values(context)
             self.original_scene = context.scene
             bpy.ops.scene.new(type='EMPTY')
             context.scene.name = 'ThreePoint Temp'
@@ -1385,11 +1619,11 @@ class VSEQFThreePointOperator(bpy.types.Operator):
             clip = context.space_data.clip
             filepath = bpy.path.abspath(clip.filepath)
             context.scene.sequence_editor_create()
-            preview_clip = context.scene.sequence_editor.sequences.new_movie(name='ThreePoint Temp', filepath=filepath, channel=1, frame_start=1)
-            preview_sound = context.scene.sequence_editor.sequences.new_sound(name='ThreePoint Temp Sound', filepath=filepath, channel=2, frame_start=1)
+            context.scene.sequence_editor.sequences.new_movie(name='ThreePoint Temp', filepath=filepath, channel=1, frame_start=1)
+            context.scene.sequence_editor.sequences.new_sound(name='ThreePoint Temp Sound', filepath=filepath, channel=2, frame_start=1)
             context.scene.frame_start = self.in_frame
             context.scene.frame_end = self.out_frame
-            context.scene.frame_current = self.in_frame
+            context.scene.frame_current = self.in_frame + 1
             args = (self, context)
             self._handle = bpy.types.SpaceClipEditor.draw_handler_add(three_point_draw_callback, args, 'WINDOW', 'POST_PIXEL')
             context.window_manager.modal_handler_add(self)
@@ -1444,6 +1678,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
     _handle = None
     cancelled = False
     start_frame = 0
+    snap_edge = None
 
     def find_by_name(self, name):
         #finds the sequence data matching the given name.
@@ -1656,6 +1891,12 @@ class VSEQFGrabAdd(bpy.types.Operator):
                     self.ripple = not self.ripple
                     self.ripple_pop = False
 
+        if self.snap_edge:
+            if self.snap_edge == 'left':
+                frame = self.grabbed_sequences[0][0].frame_final_start
+            else:
+                frame = self.grabbed_sequences[0][0].frame_final_end - 1
+            context.scene.frame_current = frame
         pos_x = 0
         pos_y = self.target_grab_sequence.channel
         if self.target_grab_variable == 'frame_start':
@@ -1689,17 +1930,23 @@ class VSEQFGrabAdd(bpy.types.Operator):
                         fade_out = fades(sequence, mode='detect', direction='out', fade_low_point_frame=seq[2])
                         if fade_out > 0:
                             fades(sequence, mode='set', direction='out', fade_length=fade_out)
+            if not context.screen.is_animation_playing and self.snap_edge:
+                context.scene.frame_current = self.start_frame
             return {'FINISHED'}
 
         elif event.type in {'RIGHTMOUSE', 'ESC'}:
             #cancel movement and put everything back
             if not self.cancelled:
                 self.cancelled = True
-                frame = context.scene.frame_current
+                current_frame = context.scene.frame_current
                 bpy.ops.ed.undo()
-                if frame != self.start_frame:
-                    #context.scene.frame_current = frame  #unfortunately, this makes blender spaz out and get stuck on the frame...
-                    pass
+                if not context.screen.is_animation_playing:
+                    context.scene.frame_current = self.start_frame
+                else:
+                    if context.scene.frame_current != current_frame:
+                        bpy.ops.screen.animation_play()
+                        context.scene.frame_current = current_frame
+                        bpy.ops.screen.animation_play()
                 self.remove_draw_handler()
             return {'CANCELLED'}
 
@@ -1790,6 +2037,16 @@ class VSEQFGrabAdd(bpy.types.Operator):
                 self.target_grab_sequence = grabbed_left
                 self.target_grab_start = grabbed_left.frame_final_start
                 self.target_grab_channel = grabbed_left.channel
+        self.snap_edge = None
+        if len(self.grabbed_sequences) == 1:
+            #only one sequence grabbed
+            if (grabbed_right and not grabbed_left) or (grabbed_left and not grabbed_right):
+                #Only one edge grabbed, use cursor snap to edge mode
+                if not context.screen.is_animation_playing and context.scene.vseqf.snap_cursor_to_edge:
+                    if grabbed_right:
+                        self.snap_edge = 'right'
+                    else:
+                        self.snap_edge = 'left'
         if not self.target_grab_sequence:
             #nothing selected... is this possible?
             return {'CANCELLED'}
@@ -1851,7 +2108,7 @@ class VSEQFSelectGrab(bpy.types.Operator):
         region = context.region
         view = region.view2d
         distance_multiplier = 15
-        if context.scene.vseqf.context and run_time > 0.33:
+        if context.scene.vseqf.context and run_time > right_click_time:
             location = view.region_to_view(event.mouse_region_x, event.mouse_region_y)
             click_frame, click_channel = location
             self.restore_selected()
@@ -4118,7 +4375,7 @@ class VSEQFQuickMarkersMenu(bpy.types.Menu):
 
     def draw(self, context):
         del context
-        scene = bpy.context.scene   
+        scene = bpy.context.scene
         vseqf = scene.vseqf
         layout = self.layout
         for marker in vseqf.marker_presets:
@@ -5476,6 +5733,7 @@ class VSEQFSettingsMenu(bpy.types.Menu):
         scene = context.scene
         layout.prop(scene.vseqf, 'simplify_menus')
         layout.prop(scene.vseqf, 'grab_multiselect')
+        layout.prop(scene.vseqf, 'snap_cursor_to_edge')
         layout.prop(scene.vseqf, 'snap_new_end')
         layout.prop(scene.vseqf, 'context')
         if prefs.parenting:
@@ -5508,6 +5766,39 @@ class VSEQFZoomPreset(bpy.types.PropertyGroup):
     top = bpy.props.FloatProperty(name="Top Visible Channel", default=5.0)
 
 
+class VSEQFQuick3PointValues(bpy.types.PropertyGroup):
+    import_frame_in = bpy.props.IntProperty(
+        default=-1,
+        min=-1)
+    import_frame_length = bpy.props.IntProperty(
+        default=-1,
+        min=-1)
+    import_minutes_in = bpy.props.IntProperty(
+        default=0,
+        min=0,
+        update=update_clip_import)
+    import_seconds_in = bpy.props.IntProperty(
+        default=0,
+        min=0,
+        update=update_clip_import)
+    import_frames_in = bpy.props.IntProperty(
+        default=0,
+        min=0,
+        update=update_clip_import)
+    import_minutes_length = bpy.props.IntProperty(
+        default=0,
+        min=0,
+        update=update_clip_import)
+    import_seconds_length = bpy.props.IntProperty(
+        default=0,
+        min=0,
+        update=update_clip_import)
+    import_frames_length = bpy.props.IntProperty(
+        default=0,
+        min=0,
+        update=update_clip_import)
+
+
 class VSEQFSetting(bpy.types.PropertyGroup):
     """Property group to store most VSEQF settings.  This will be assigned to scene.vseqf"""
     context = bpy.props.BoolProperty(
@@ -5528,7 +5819,7 @@ class VSEQFSetting(bpy.types.PropertyGroup):
     audio_settings_menu = bpy.props.EnumProperty(
         name="Audio Render Setting",
         default='FLAC',
-        #mp3 export seems to be broken currently, (exports as extremely loud distorted garbage) so "('MP3', 'MP3 File', '', 3), " is removed for now
+        #mp3 export seems to be broken currently, (exports as extremely loud distorted garbage) so "('MP3', 'MP3 File', '', 4), " is removed for now
         items=[('FLAC', 'FLAC Audio', '', 1), ('WAV', 'WAV File', '', 2), ('OGG', 'OGG File', '', 3)])
 
     simplify_menus = bpy.props.BoolProperty(
@@ -5569,7 +5860,7 @@ class VSEQFSetting(bpy.types.PropertyGroup):
         update=start_follow)
     grab_multiselect = bpy.props.BoolProperty(
         name="Grab Multiple With Right-Click",
-        default=True,
+        default=False,
         description="Allows the right-click drag grab to work with multiple strips.")
 
     children = bpy.props.BoolProperty(
@@ -5704,6 +5995,9 @@ class VSEQFSetting(bpy.types.PropertyGroup):
     snap_new_end = bpy.props.BoolProperty(
         name='Snap Cursor To End Of New Sequences',
         default=False)
+    snap_cursor_to_edge = bpy.props.BoolProperty(
+        name='Snap Cursor When Dragging Edges',
+        default=True)
 
 
 class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
@@ -5951,7 +6245,9 @@ classes = (SEQUENCER_MT_add, SEQUENCER_MT_strip, VSEQFAddZoom, VSEQFClearZooms, 
            VSEQFQuickTagsSelect, VSEQFQuickTimeline, VSEQFQuickTimelineMenu, VSEQFQuickZoomPreset,
            VSEQFQuickZoomPresetMenu, VSEQFQuickZooms, VSEQFQuickZoomsMenu, VSEQFRemoveZoom, VSEQFSelectGrab,
            VSEQFSettingsMenu, VSEQFTags, VSEQFThreePointBrowserPanel, VSEQFThreePointImport,
-           VSEQFThreePointImportToClip, VSEQFThreePointOperator, VSEQFThreePointPanel, VSEQFZoomPreset, VSEQFSetting)
+           VSEQFThreePointImportToClip, VSEQFThreePointOperator, VSEQFThreePointPanel, VSEQFZoomPreset,
+           VSEQFQuickShortcutsNudge, VSEQFQuickShortcutsSpeed, VSEQFQuickShortcutsSkip, VSEQFQuickShortcutsResetPlay,
+           VSEQFQuick3PointValues, VSEQFSetting)
 
 
 def register():
@@ -5979,8 +6275,7 @@ def register():
     bpy.types.Sequence.parent = bpy.props.StringProperty()
     bpy.types.Sequence.tags = bpy.props.CollectionProperty(type=VSEQFTags)
     bpy.types.Scene.vseqf = bpy.props.PointerProperty(type=VSEQFSetting)
-    bpy.types.MovieClip.import_frame_in = bpy.props.IntProperty(default=-1)
-    bpy.types.MovieClip.import_frame_out = bpy.props.IntProperty(default=-1)
+    bpy.types.MovieClip.import_settings = bpy.props.PointerProperty(type=VSEQFQuick3PointValues)
     bpy.types.Sequence.new = bpy.props.BoolProperty(default=True)
     bpy.types.Sequence.last_name = bpy.props.StringProperty()
 
@@ -6029,6 +6324,77 @@ def register():
     keymapdelete4 = keymapitems.new('wm.call_menu', 'DEL', 'PRESS', alt=True)
     keymapdelete4.properties.name = 'vseqf.delete_ripple_menu'
 
+    #QuickShortcuts Shortcuts
+    keymapitems.new('vseqf.cut', 'NUMPAD_0', 'PRESS')
+    keymapitem = keymapitems.new('vseqf.cut', 'NUMPAD_0', 'PRESS', alt=True)
+    keymapitem.properties.type = 'RIPPLE'
+
+    #Numpad: basic movement and playback
+    keymapitem = keymapitems.new('screen.frame_offset', 'NUMPAD_1', 'PRESS')
+    keymapitem.properties.delta = -1
+    keymapitem = keymapitems.new('screen.frame_offset', 'NUMPAD_3', 'PRESS')
+    keymapitem.properties.delta = 1
+    keymapitem = keymapitems.new('vseqf.change_speed', 'NUMPAD_4', 'PRESS')
+    keymapitem.properties.speed_change = 'DOWN'
+    keymapitem = keymapitems.new('vseqf.change_speed', 'NUMPAD_6', 'PRESS')
+    keymapitem.properties.speed_change = 'UP'
+    keymapitem = keymapitems.new('vseqf.skip_timeline', 'NUMPAD_7', 'PRESS')
+    keymapitem.properties.type = 'LASTSECOND'
+    keymapitem = keymapitems.new('vseqf.skip_timeline', 'NUMPAD_9', 'PRESS')
+    keymapitem.properties.type = 'NEXTSECOND'
+    keymapitems.new('vseqf.reset_playback', 'NUMPAD_5', 'PRESS')
+
+    #Numpad + Ctrl: Advanced movement/jumps
+    keymapitem = keymapitems.new('screen.keyframe_jump', 'NUMPAD_1', 'PRESS', ctrl=True)
+    keymapitem.properties.next = False
+    keymapitem = keymapitems.new('screen.keyframe_jump', 'NUMPAD_3', 'PRESS', ctrl=True)
+    keymapitem.properties.next = True
+    keymapitem = keymapitems.new('vseqf.skip_timeline', 'NUMPAD_4', 'PRESS', ctrl=True)
+    keymapitem.properties.type = 'LASTEDGE'
+    keymapitem = keymapitems.new('vseqf.skip_timeline', 'NUMPAD_6', 'PRESS', ctrl=True)
+    keymapitem.properties.type = 'NEXTEDGE'
+    keymapitem = keymapitems.new('vseqf.skip_timeline', 'NUMPAD_7', 'PRESS', ctrl=True)
+    keymapitem.properties.type = 'LASTMARKER'
+    keymapitem = keymapitems.new('vseqf.skip_timeline', 'NUMPAD_9', 'PRESS', ctrl=True)
+    keymapitem.properties.type = 'NEXTMARKER'
+
+    #Numpad + Alt: Move selected strips
+    keymapitem = keymapitems.new('vseqf.nudge_selected', 'NUMPAD_1', 'PRESS', alt=True)
+    keymapitem.properties.direction = 'LEFT'
+    keymapitem = keymapitems.new('vseqf.nudge_selected', 'NUMPAD_3', 'PRESS', alt=True)
+    keymapitem.properties.direction = 'RIGHT'
+    keymapitem = keymapitems.new('vseqf.nudge_selected', 'NUMPAD_4', 'PRESS', alt=True)
+    keymapitem.properties.direction = 'LEFT-M'
+    keymapitem = keymapitems.new('vseqf.nudge_selected', 'NUMPAD_6', 'PRESS', alt=True)
+    keymapitem.properties.direction = 'RIGHT-M'
+    keymapitem = keymapitems.new('vseqf.nudge_selected', 'NUMPAD_7', 'PRESS', alt=True)
+    keymapitem.properties.direction = 'LEFT-L'
+    keymapitem = keymapitems.new('vseqf.nudge_selected', 'NUMPAD_9', 'PRESS', alt=True)
+    keymapitem.properties.direction = 'RIGHT-L'
+    keymapitem = keymapitems.new('vseqf.nudge_selected', 'NUMPAD_2', 'PRESS', alt=True)
+    keymapitem.properties.direction = 'DOWN'
+    keymapitem = keymapitems.new('vseqf.nudge_selected', 'NUMPAD_8', 'PRESS', alt=True)
+    keymapitem.properties.direction = 'UP'
+    keymapitems.new('vseqf.grab', 'NUMPAD_5', 'PRESS', alt=True)
+
+    #Numpad + Shift: Zoom viewport
+    keymapitem = keymapitems.new('vseqf.quickzooms', 'NUMPAD_1', 'PRESS', shift=True)
+    keymapitem.properties.area = '2'
+    keymapitem = keymapitems.new('vseqf.quickzooms', 'NUMPAD_2', 'PRESS', shift=True)
+    keymapitem.properties.area = '10'
+    keymapitem = keymapitems.new('vseqf.quickzooms', 'NUMPAD_3', 'PRESS', shift=True)
+    keymapitem.properties.area = '30'
+    keymapitem = keymapitems.new('vseqf.quickzooms', 'NUMPAD_4', 'PRESS', shift=True)
+    keymapitem.properties.area = '60'
+    keymapitem = keymapitems.new('vseqf.quickzooms', 'NUMPAD_5', 'PRESS', shift=True)
+    keymapitem.properties.area = '120'
+    keymapitem = keymapitems.new('vseqf.quickzooms', 'NUMPAD_6', 'PRESS', shift=True)
+    keymapitem.properties.area = '300'
+    keymapitem = keymapitems.new('vseqf.quickzooms', 'NUMPAD_7', 'PRESS', shift=True)
+    keymapitem.properties.area = '600'
+    keymapitems.new('sequencer.view_selected', 'NUMPAD_8', 'PRESS', shift=True)
+    keymapitems.new('sequencer.view_all', 'NUMPAD_9', 'PRESS', shift=True)
+
     #Register handler
     handlers = bpy.app.handlers.frame_change_post
     for handler in handlers:
@@ -6056,7 +6422,7 @@ def unregister():
     #Remove shortcuts
     keymapitems = bpy.context.window_manager.keyconfigs.addon.keymaps['Sequencer'].keymap_items
     for keymapitem in keymapitems:
-        if (keymapitem.type == 'Z') | (keymapitem.type == 'F') | (keymapitem.type == 'S') | (keymapitem.type == 'G') | (keymapitem.type == 'RIGHTMOUSE') | (keymapitem.type == 'K') | (keymapitem.type == 'E') | (keymapitem.type == 'X') | (keymapitem.type == 'DEL') | (keymapitem.type == 'M'):
+        if (keymapitem.type == 'Z') | (keymapitem.type == 'F') | (keymapitem.type == 'S') | (keymapitem.type == 'G') | (keymapitem.type == 'RIGHTMOUSE') | (keymapitem.type == 'K') | (keymapitem.type == 'E') | (keymapitem.type == 'X') | (keymapitem.type == 'DEL') | (keymapitem.type == 'M') | (keymapitem.type == 'NUMPAD_0') | (keymapitem.type == 'NUMPAD_1') | (keymapitem.type == 'NUMPAD_2') | (keymapitem.type == 'NUMPAD_3') | (keymapitem.type == 'NUMPAD_4') | (keymapitem.type == 'NUMPAD_5') | (keymapitem.type == 'NUMPAD_6') | (keymapitem.type == 'NUMPAD_7') | (keymapitem.type == 'NUMPAD_8') | (keymapitem.type == 'NUMPAD_9'):
             keymapitems.remove(keymapitem)
 
     #Remove handlers for modal operators
