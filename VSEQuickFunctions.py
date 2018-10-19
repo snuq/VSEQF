@@ -1679,6 +1679,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
     cancelled = False
     start_frame = 0
     snap_edge = None
+    snap_edge_sequence = None
 
     def find_by_name(self, name):
         #finds the sequence data matching the given name.
@@ -1893,9 +1894,9 @@ class VSEQFGrabAdd(bpy.types.Operator):
 
         if self.snap_edge:
             if self.snap_edge == 'left':
-                frame = self.grabbed_sequences[0][0].frame_final_start
+                frame = self.snap_edge_sequence.frame_final_start
             else:
-                frame = self.grabbed_sequences[0][0].frame_final_end - 1
+                frame = self.snap_edge_sequence.frame_final_end - 1
             context.scene.frame_current = frame
         pos_x = 0
         pos_y = self.target_grab_sequence.channel
@@ -2038,12 +2039,19 @@ class VSEQFGrabAdd(bpy.types.Operator):
                 self.target_grab_start = grabbed_left.frame_final_start
                 self.target_grab_channel = grabbed_left.channel
         self.snap_edge = None
+        self.snap_edge_sequence = None
         if len(self.grabbed_sequences) == 1:
+            self.snap_edge_sequence = self.grabbed_sequences[0][0]
+        active_sequence = current_active(context)
+        if active_sequence:
+            if active_sequence.select:
+                self.snap_edge_sequence = active_sequence
+        if self.snap_edge_sequence:
             #only one sequence grabbed
-            if (grabbed_right and not grabbed_left) or (grabbed_left and not grabbed_right):
+            if (self.snap_edge_sequence.select_right_handle and not self.snap_edge_sequence.select_left_handle) or (self.snap_edge_sequence.select_left_handle and not self.snap_edge_sequence.select_right_handle):
                 #Only one edge grabbed, use cursor snap to edge mode
                 if not context.screen.is_animation_playing and context.scene.vseqf.snap_cursor_to_edge:
-                    if grabbed_right:
+                    if self.snap_edge_sequence.select_right_handle:
                         self.snap_edge = 'right'
                     else:
                         self.snap_edge = 'left'
