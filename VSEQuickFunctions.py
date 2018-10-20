@@ -61,7 +61,7 @@ Changelog:
 0.94 (In progress)
    Frame skipping now works with reverse playback as well, and fixed poor behavior.
    Added QuickShortcuts - timeline and sequence movement using the numpad.  Thanks to tintwotin for the ideas!
-   Added option to snap cursor to a dragged edge if one edge is grabbed, if two are grabbed, the right edge will be set to the ghost frame.
+   Added option to snap cursor to a dragged edge if one edge is grabbed, if two are grabbed, the second edge will be set to the overlay frame.
    Many improvements to Quick3Point interface
    Fixed a bug that would cause slipped sequences to jump around.
 
