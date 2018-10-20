@@ -61,8 +61,9 @@ Changelog:
 0.94 (In progress)
    Frame skipping now works with reverse playback as well, and fixed poor behavior.
    Added QuickShortcuts - timeline and sequence movement using the numpad.  Thanks to tintwotin for the ideas!
-   Added option to snap cursor to a dragged edge (if only one is grabbed)
+   Added option to snap cursor to a dragged edge if one edge is grabbed, if two are grabbed, the right edge will be set to the ghost frame.
    Many improvements to Quick3Point interface
+   Fixed a bug that would cause slipped sequences to jump around.
 
 Todo before release:
     update readme: add QuickShortcuts, snap to grabbed edge
@@ -1678,8 +1679,11 @@ class VSEQFGrabAdd(bpy.types.Operator):
     _handle = None
     cancelled = False
     start_frame = 0
+    start_overlay_frame = 0
     snap_edge = None
     snap_edge_sequence = None
+    secondary_snap_edge = None
+    secondary_snap_edge_sequence = None
 
     def find_by_name(self, name):
         #finds the sequence data matching the given name.
@@ -1784,7 +1788,12 @@ class VSEQFGrabAdd(bpy.types.Operator):
                                     sequence.frame_final_start = new_start
                             while sequencer_area_filled(new_start, new_end, new_channel, new_channel, [sequence]):
                                 new_channel = new_channel + 1
+                            old_channel = sequence.channel
+                            old_position = sequence.frame_start
                             sequence.channel = new_channel
+                            #fix sequence position, sometimes can get spazzed out when slipping
+                            if new_channel != old_channel:
+                                sequence.frame_start = old_position
                     else:  #not selected
                         if seq[9]:
                             #this sequence has a parent that may be moved
@@ -1892,12 +1901,19 @@ class VSEQFGrabAdd(bpy.types.Operator):
                     self.ripple = not self.ripple
                     self.ripple_pop = False
 
-        if self.snap_edge:
-            if self.snap_edge == 'left':
-                frame = self.snap_edge_sequence.frame_final_start
-            else:
-                frame = self.snap_edge_sequence.frame_final_end - 1
-            context.scene.frame_current = frame
+        if context.scene.vseqf.snap_cursor_to_edge:
+            if self.snap_edge:
+                if self.snap_edge == 'left':
+                    frame = self.snap_edge_sequence.frame_final_start
+                else:
+                    frame = self.snap_edge_sequence.frame_final_end - 1
+                context.scene.frame_current = frame
+                if self.secondary_snap_edge:
+                    if self.secondary_snap_edge == 'left':
+                        overlay_frame = self.secondary_snap_edge_sequence.frame_final_start
+                    else:
+                        overlay_frame = self.secondary_snap_edge_sequence.frame_final_end - 1
+                    context.scene.sequence_editor.overlay_frame = overlay_frame - frame
         pos_x = 0
         pos_y = self.target_grab_sequence.channel
         if self.target_grab_variable == 'frame_start':
@@ -1933,6 +1949,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
                             fades(sequence, mode='set', direction='out', fade_length=fade_out)
             if not context.screen.is_animation_playing and self.snap_edge:
                 context.scene.frame_current = self.start_frame
+                context.scene.sequence_editor.overlay_frame = self.start_overlay_frame
             return {'FINISHED'}
 
         elif event.type in {'RIGHTMOUSE', 'ESC'}:
@@ -1943,6 +1960,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
                 bpy.ops.ed.undo()
                 if not context.screen.is_animation_playing:
                     context.scene.frame_current = self.start_frame
+                    context.scene.sequence_editor.overlay_frame = self.start_overlay_frame
                 else:
                     if context.scene.frame_current != current_frame:
                         bpy.ops.screen.animation_play()
@@ -1972,6 +1990,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
 
     def invoke(self, context, event):
         self.start_frame = context.scene.frame_current
+        self.start_overlay_frame = context.scene.sequence_editor.overlay_frame
         bpy.ops.ed.undo_push()
         self.cancelled = False
         self.prefs = get_prefs()
@@ -2038,23 +2057,58 @@ class VSEQFGrabAdd(bpy.types.Operator):
                 self.target_grab_sequence = grabbed_left
                 self.target_grab_start = grabbed_left.frame_final_start
                 self.target_grab_channel = grabbed_left.channel
+
+        #Determine the snap edges
         self.snap_edge = None
         self.snap_edge_sequence = None
-        if len(self.grabbed_sequences) == 1:
-            self.snap_edge_sequence = self.grabbed_sequences[0][0]
-        active_sequence = current_active(context)
-        if active_sequence:
-            if active_sequence.select:
-                self.snap_edge_sequence = active_sequence
-        if self.snap_edge_sequence:
-            #only one sequence grabbed
-            if (self.snap_edge_sequence.select_right_handle and not self.snap_edge_sequence.select_left_handle) or (self.snap_edge_sequence.select_left_handle and not self.snap_edge_sequence.select_right_handle):
-                #Only one edge grabbed, use cursor snap to edge mode
-                if not context.screen.is_animation_playing and context.scene.vseqf.snap_cursor_to_edge:
-                    if self.snap_edge_sequence.select_right_handle:
-                        self.snap_edge = 'right'
-                    else:
-                        self.snap_edge = 'left'
+        self.secondary_snap_edge = None
+        self.secondary_snap_edge_sequence = None
+        #Determine number of selected edges in grabbed sequences:
+        selected_edges = []
+        for sequence_data in self.grabbed_sequences:
+            if sequence_data[6]:
+                selected_edges.append([sequence_data[0], 'left'])
+            if sequence_data[7]:
+                selected_edges.append([sequence_data[0], 'right'])
+        if len(selected_edges) == 1:
+            #only one edge is grabbed, snap to it
+            self.snap_edge_sequence = selected_edges[0][0]
+            self.snap_edge = selected_edges[0][1]
+        elif len(selected_edges) == 2:
+            #two sequence edges are selected
+            #if one sequence is active, make that primary
+            active = current_active(context)
+            if selected_edges[0][0] == active:
+                self.snap_edge = selected_edges[0][1]
+                self.snap_edge_sequence = selected_edges[0][0]
+                self.secondary_snap_edge = selected_edges[1][1]
+                self.secondary_snap_edge_sequence = selected_edges[1][0]
+            elif selected_edges[1][0] == active:
+                    self.snap_edge = selected_edges[1][1]
+                    self.snap_edge_sequence = selected_edges[1][0]
+                    self.secondary_snap_edge = selected_edges[0][1]
+                    self.secondary_snap_edge_sequence = selected_edges[0][0]
+            else:
+                #neither sequence is active, make leftmost primary, rightmost secondary
+                if selected_edges[0][1] == 'left':
+                    first_frame = selected_edges[0][0].frame_final_start
+                else:
+                    first_frame = selected_edges[0][0].frame_final_end
+                if selected_edges[1][1] == 'left':
+                    second_frame = selected_edges[1][0].frame_final_start
+                else:
+                    second_frame = selected_edges[1][0].frame_final_end
+                if first_frame <= second_frame:
+                    self.snap_edge = selected_edges[0][1]
+                    self.snap_edge_sequence = selected_edges[0][0]
+                    self.secondary_snap_edge = selected_edges[1][1]
+                    self.secondary_snap_edge_sequence = selected_edges[1][0]
+                else:
+                    self.snap_edge = selected_edges[1][1]
+                    self.snap_edge_sequence = selected_edges[1][0]
+                    self.secondary_snap_edge = selected_edges[0][1]
+                    self.secondary_snap_edge_sequence = selected_edges[0][0]
+
         if not self.target_grab_sequence:
             #nothing selected... is this possible?
             return {'CANCELLED'}
