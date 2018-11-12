@@ -64,9 +64,23 @@ Changelog:
    Added option to snap cursor to a dragged edge if one edge is grabbed, if two are grabbed, the second edge will be set to the overlay frame.
    Many improvements to Quick3Point interface
    Fixed a bug that would cause slipped sequences to jump around.
+   Split Quick Batch Render off into its own addon
+   Fixed bug where adjusting the left edge of single images would cause odd behavior
+   Significant improvements to cursor following
 
 Todo before release:
+    new feature: display length of active sequence under it
+    shift-s snapping doesnt work with child strips if the parent is being snapped too
+    add the ability to ripple cut beyond the edge of the selected strips to ADD to the clip
+    ripple delete has issues with multiple selected strips if they are all the same length (and children?)
+    ripple delete doesnt delete children
+    if neither side of parent/child is visible, relationship lines are not visible
+    stop using undos if at all possible, they cause waveforms to need to be regenerated
     update readme: add QuickShortcuts, snap to grabbed edge
+    fix nudge not moving children
+    check and improve tooltips on all buttons, make sure shortcuts are listed
+    think about splitting some panels into their own/other tabs (maybe an 'edits' tab?)
+    Look into adding a visual offset on the active audio sequence, showing how far out of sync it is from it's video parent
 """
 
 
@@ -669,44 +683,6 @@ def timecode_from_frames(frame, fps, levels=0, subsecond_type='miliseconds'):
     if negative:
         time_text = '-'+time_text
     return time_text
-
-
-def copy_curves(copy_from, copy_to, scene_from, scene_to):
-    """Copies animation curves from one sequence to another, this is needed since the copy operator doesn't do this...
-    Arguments:
-        copy_from: VSE Sequence object to copy from
-        copy_to: VSE Sequence object to copy to
-        scene_from: scene that copy_from is in
-        scene_to: scene that copy_to is in"""
-    if hasattr(scene_from.animation_data, 'action'):
-        scene_to.animation_data_create()
-        scene_to.animation_data.action = bpy.data.actions.new(name=scene_to.name+'Action')
-        for fcurve in scene_from.animation_data.action.fcurves:
-            path = fcurve.data_path
-            path_start = path.split('[', 1)[0]
-            path_end = path.split(']')[-1]
-            test_path = path_start+'["'+copy_from.name+'"]'+path_end
-            if path == test_path:
-                new_path = path_start+'["'+copy_to.name+'"]'+path_end
-                new_curve = scene_to.animation_data.action.fcurves.new(data_path=new_path)
-                new_curve.extrapolation = fcurve.extrapolation
-                new_curve.mute = fcurve.mute
-                #copy keyframe points to new_curve
-                for keyframe in fcurve.keyframe_points:
-                    new_curve.keyframe_points.add()
-                    new_keyframe = new_curve.keyframe_points[-1]
-                    new_keyframe.type = keyframe.type
-                    new_keyframe.amplitude = keyframe.amplitude
-                    new_keyframe.back = keyframe.back
-                    new_keyframe.co = keyframe.co
-                    new_keyframe.easing = keyframe.easing
-                    new_keyframe.handle_left = keyframe.handle_left
-                    new_keyframe.handle_left_type = keyframe.handle_left_type
-                    new_keyframe.handle_right = keyframe.handle_right
-                    new_keyframe.handle_right_type = keyframe.handle_right_type
-                    new_keyframe.interpolation = keyframe.interpolation
-                    new_keyframe.period = keyframe.period
-                new_curve.update()
 
 
 class VSEQFCompactEdit(bpy.types.Panel):
@@ -1768,8 +1744,12 @@ class VSEQFGrabAdd(bpy.types.Operator):
                                     ripple_offset = seq[2] - sequence.frame_final_end
                                     ripple_offset = 0 - ripple_offset
                         elif sequence.select_left_handle and not sequence.select_right_handle:
-                            #fix sequence left handle ripple position when not rippled
-                            sequence.frame_start = seq[3]
+                            #fix sequence left handle ripple position when ripple disabled
+                            if sequence.type == 'IMAGE' and sequence.frame_duration == 1:
+                                #single images behave differently
+                                sequence.frame_final_end = seq[2]
+                            else:
+                                sequence.frame_start = seq[3]
                         if sequence.select_left_handle or sequence.select_right_handle:
                             #make sequences that are having the handles adjusted behave better
                             new_channel = seq[4]
@@ -1901,7 +1881,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
                     self.ripple = not self.ripple
                     self.ripple_pop = False
 
-        if context.scene.vseqf.snap_cursor_to_edge:
+        if context.scene.vseqf.snap_cursor_to_edge and not context.screen.is_animation_playing:
             if self.snap_edge:
                 if self.snap_edge == 'left':
                     frame = self.snap_edge_sequence.frame_final_start
@@ -2078,18 +2058,18 @@ class VSEQFGrabAdd(bpy.types.Operator):
             #two sequence edges are selected
             #if one sequence is active, make that primary
             active = current_active(context)
-            if selected_edges[0][0] == active:
+            if selected_edges[0][0] == active and selected_edges[1][0] != active:
                 self.snap_edge = selected_edges[0][1]
                 self.snap_edge_sequence = selected_edges[0][0]
                 self.secondary_snap_edge = selected_edges[1][1]
                 self.secondary_snap_edge_sequence = selected_edges[1][0]
-            elif selected_edges[1][0] == active:
+            elif selected_edges[1][0] == active and selected_edges[0][0] != active:
                     self.snap_edge = selected_edges[1][1]
                     self.snap_edge_sequence = selected_edges[1][0]
                     self.secondary_snap_edge = selected_edges[0][1]
                     self.secondary_snap_edge_sequence = selected_edges[0][0]
             else:
-                #neither sequence is active, make leftmost primary, rightmost secondary
+                #neither sequence is active, or both are the same sequence, make rightmost primary, leftmost secondary
                 if selected_edges[0][1] == 'left':
                     first_frame = selected_edges[0][0].frame_final_start
                 else:
@@ -2098,7 +2078,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
                     second_frame = selected_edges[1][0].frame_final_start
                 else:
                     second_frame = selected_edges[1][0].frame_final_end
-                if first_frame <= second_frame:
+                if first_frame > second_frame:
                     self.snap_edge = selected_edges[0][1]
                     self.snap_edge_sequence = selected_edges[0][0]
                     self.secondary_snap_edge = selected_edges[1][1]
@@ -2469,6 +2449,8 @@ def zoom_custom(begin, end, bottom=None, top=None, preroll=True):
         top: The topmost visible channel
         preroll: If true, add a buffer before the beginning"""
 
+    del bottom  #Add in someday...
+    del top     #Add in someday...
     scene = bpy.context.scene
     selected = []
 
@@ -2694,26 +2676,29 @@ class VSEQFFollow(bpy.types.Operator):
     bl_label = "Center the playcursor"
     region = None
     view = None
+    cursor_target = 0
 
     _timer = None
 
     def modal(self, context, event):
-        region = self.region
         view = self.view
         if not context.scene.vseqf.follow:
             return {'CANCELLED'}
+        if event.type == 'LEFTMOUSE' and context.screen.is_animation_playing:
+            old_x = self.view.view_to_region(context.scene.frame_current, 0, clip=False)[0]
+            new_x = event.mouse_region_x
+            delta_x = new_x - old_x
+            self.cursor_target = self.cursor_target + delta_x
 
         if event.type == 'TIMER':
-            override = context.copy()
-            override['region'] = self.region
-            override['view2d'] = self.view
-            cursor_target = round(region.width / 4)
-            cursor_location = (view.view_to_region(context.scene.frame_current, 0, clip=False))[0]
-            if cursor_location != 12000:
-                offset = (cursor_target - cursor_location)
-                bpy.ops.view2d.pan(override, deltax=-offset)
-        #if event.type in {'RIGHTMOUSE', 'ESC'}:
-        #    return {'CANCELLED'}
+            if context.screen.is_animation_playing:
+                override = context.copy()
+                override['region'] = self.region
+                override['view2d'] = self.view
+                cursor_location = view.view_to_region(context.scene.frame_current, 0, clip=False)[0]
+                if cursor_location != 12000:
+                    offset = (self.cursor_target - cursor_location)
+                    bpy.ops.view2d.pan(override, deltax=-offset)
         return {'PASS_THROUGH'}
 
     def invoke(self, context, event):
@@ -2725,9 +2710,17 @@ class VSEQFFollow(bpy.types.Operator):
                 self.view = region.view2d
         if self.region is None or self.view is None:
             return {'CANCELLED'}
-        self._timer = context.window_manager.event_timer_add(0.5, context.window)
+        self.recalculate_target(context)
+        self._timer = context.window_manager.event_timer_add(0.25, context.window)
         context.window_manager.modal_handler_add(self)
         return {'RUNNING_MODAL'}
+
+    def recalculate_target(self, context):
+        cursor_location = self.view.view_to_region(context.scene.frame_current, 0, clip=True)[0]
+        if cursor_location == 12000:
+            self.cursor_target = round(self.region.width / 4)
+        else:
+            self.cursor_target = cursor_location
 
 
 #Functions and classes related to QuickFades
@@ -4522,401 +4515,6 @@ class VSEQFQuickMarkersAddPreset(bpy.types.Operator):
         return {'FINISHED'}
 
 
-#Functions and classes related to Quick Batch Render
-def batch_render_complete_handler(scene):
-    """Handler called when each element of a batch render is completed"""
-
-    scene.vseqf.batch_rendering = False
-    handlers = bpy.app.handlers.render_complete
-    for handler in handlers:
-        if "batch_render_complete_handler" in str(handler):
-            handlers.remove(handler)
-
-
-def batch_render_cancel_handler(scene):
-    """Handler called when the user cancels a render that is part of a batch render"""
-
-    scene.vseqf.batch_rendering_cancel = True
-    handlers = bpy.app.handlers.render_cancel
-    for handler in handlers:
-        if "batch_render_cancel_handler" in str(handler):
-            handlers.remove(handler)
-
-
-class VSEQFQuickBatchRenderPanel(bpy.types.Panel):
-    """Panel for displaying QuickBatchRender settings and operators"""
-
-    bl_label = "Quick Batch Render"
-    bl_space_type = 'SEQUENCE_EDITOR'
-    bl_region_type = 'UI'
-    bl_category = "Strip"
-
-    @classmethod
-    def poll(cls, context):
-        #Check if panel is disabled
-        if __name__ in context.user_preferences.addons:
-            prefs = context.user_preferences.addons[__name__].preferences
-        else:
-            prefs = VSEQFTempSettings()
-
-        #Check for sequences
-        if not context.sequences:
-            return False
-        if len(context.sequences) > 0:
-            return prefs.batch
-        else:
-            return False
-
-    def draw(self, context):
-        scene = context.scene
-        vseqf = scene.vseqf
-
-        layout = self.layout
-        row = layout.row()
-        row.operator('vseqf.quickbatchrender', text='Batch Render')
-        row = layout.row()
-        row.prop(vseqf, 'batch_render_directory')
-        row = layout.row()
-        row.prop(vseqf, 'batch_selected', toggle=True)
-        row = layout.row()
-        row.prop(vseqf, 'batch_effects', toggle=True)
-        row.prop(vseqf, 'batch_audio', toggle=True)
-        row = layout.row()
-        row.prop(vseqf, 'batch_meta')
-        box = layout.box()
-        row = box.row()
-        row.label("Render Presets:")
-        row = box.row()
-        row.prop(vseqf, 'video_settings_menu', text='Opaque Strips')
-        row = box.row()
-        row.prop(vseqf, 'transparent_settings_menu', text='Transparent Strips')
-        row = box.row()
-        row.prop(vseqf, 'audio_settings_menu', text='Audio Strips')
-
-
-class VSEQFQuickBatchRender(bpy.types.Operator):
-    """Modal operator that runs a batch render on all sequences in the timeline"""
-
-    bl_idname = 'vseqf.quickbatchrender'
-    bl_label = 'VSEQF Quick Batch Render'
-    bl_description = 'Renders out sequences in the timeline to a folder and reimports them.'
-
-    _timer = None
-
-    rendering = bpy.props.BoolProperty(default=False)
-    renders = []
-    rendering_sequence = None
-    rendering_scene = None
-    original_scene = None
-    file = bpy.props.StringProperty('')
-    total_renders = bpy.props.IntProperty(0)
-    total_frames = bpy.props.IntProperty(0)
-    audio_frames = bpy.props.IntProperty(0)
-    rendering_scene_name = ''
-
-    def set_render_settings(self, scene, setting, transparent):
-        """Applies a render setting preset to a given scene
-
-        Arguments:
-            scene: Scene object to apply the settings to
-            setting: String, the setting preset name to apply.  Accepts values in the vseqf setting 'video_settings_menu'
-            transparent: Boolean, whether this scene should be set up to render transparency or not"""
-
-        pixels = scene.render.resolution_x * scene.render.resolution_y * (scene.render.resolution_percentage / 100)
-        if setting == 'DEFAULT':
-            if transparent:
-                scene.render.image_settings.color_mode = 'RGBA'
-            else:
-                scene.render.image_settings.color_mode = 'RGB'
-        elif setting == 'AVIJPEG':
-            scene.render.image_settings.file_format = 'AVI_JPEG'
-            scene.render.image_settings.color_mode = 'RGB'
-            scene.render.image_settings.quality = 95
-        elif setting == 'H264':
-            #Blender 2.79 will change this setting, so this is to ensure backwards compatibility
-            try:
-                scene.render.image_settings.file_format = 'H264'
-            except:
-                scene.render.image_settings.file_format = 'FFMPEG'
-            scene.render.image_settings.color_mode = 'RGB'
-            scene.render.ffmpeg.format = 'MPEG4'
-            kbps = int(pixels/230)
-            maxkbps = kbps*1.2
-            scene.render.ffmpeg.maxrate = maxkbps
-            scene.render.ffmpeg.video_bitrate = kbps
-            scene.render.ffmpeg.audio_codec = 'NONE'
-        elif setting == 'JPEG':
-            scene.render.image_settings.file_format = 'JPEG'
-            scene.render.image_settings.color_mode = 'RGB'
-            scene.render.image_settings.quality = 95
-        elif setting == 'PNG':
-            scene.render.image_settings.file_format = 'PNG'
-            if transparent:
-                scene.render.image_settings.color_mode = 'RGBA'
-            else:
-                scene.render.image_settings.color_mode = 'RGB'
-            scene.render.image_settings.color_depth = '8'
-            scene.render.image_settings.compression = 90
-        elif setting == 'TIFF':
-            scene.render.image_settings.file_format = 'TIFF'
-            if transparent:
-                scene.render.image_settings.color_mode = 'RGBA'
-            else:
-                scene.render.image_settings.color_mode = 'RGB'
-            scene.render.image_settings.color_depth = '16'
-            scene.render.image_settings.tiff_codec = 'DEFLATE'
-        elif setting == 'EXR':
-            scene.render.image_settings.file_format = 'OPEN_EXR'
-            if transparent:
-                scene.render.image_settings.color_mode = 'RGBA'
-            else:
-                scene.render.image_settings.color_mode = 'RGB'
-            scene.render.image_settings.color_depth = '32'
-            scene.render.image_settings.exr_codec = 'ZIP'
-
-    def render_sequence(self, sequence):
-        """Begins rendering process: creates a temporary scene, sets it up, copies the sequence to the temporary scene, and begins rendering
-        Arguments:
-            sequence: VSE Sequence object to begin rendering"""
-
-        self.rendering = True
-        self.rendering_sequence = sequence
-        self.original_scene = bpy.context.scene
-        bpy.ops.sequencer.select_all(action='DESELECT')
-        sequence.select = True
-        bpy.ops.sequencer.copy()
-
-        #create a temporary scene
-        bpy.ops.scene.new(type='EMPTY')
-        self.rendering_scene = bpy.context.scene
-        self.rendering_scene_name = self.rendering_scene.name
-
-        #copy sequence to new scene and set up scene
-        bpy.ops.sequencer.paste()
-        temp_sequence = self.rendering_scene.sequence_editor.sequences[0]
-        copy_curves(sequence, temp_sequence, self.original_scene, self.rendering_scene)
-        self.rendering_scene.frame_start = temp_sequence.frame_final_start
-        self.rendering_scene.frame_end = temp_sequence.frame_final_end - 1
-        filename = sequence.name
-        if self.original_scene.vseqf.batch_render_directory:
-            path = self.original_scene.vseqf.batch_render_directory
-        else:
-            path = self.rendering_scene.render.filepath
-        self.rendering_scene.render.filepath = os.path.join(path, filename)
-
-        #render
-        if sequence.type != 'SOUND':
-            if sequence.blend_type in ['OVER_DROP', 'ALPHA_OVER']:
-                transparent = True
-                setting = self.original_scene.vseqf.transparent_settings_menu
-            else:
-                transparent = False
-                setting = self.original_scene.vseqf.video_settings_menu
-            self.set_render_settings(self.rendering_scene, setting, transparent)
-
-            if not self.original_scene.vseqf.batch_effects:
-                temp_sequence.modifiers.clear()
-            self.file = self.rendering_scene.render.frame_path(frame=1)
-            bpy.ops.render.render('INVOKE_DEFAULT', animation=True)
-            self.rendering_scene.vseqf.batch_rendering = True
-            if 'batch_render_complete_handler' not in str(bpy.app.handlers.render_complete):
-                bpy.app.handlers.render_complete.append(batch_render_complete_handler)
-            if 'batch_render_cancel_handler' not in str(bpy.app.handlers.render_cancel):
-                bpy.app.handlers.render_cancel.append(batch_render_cancel_handler)
-            if self._timer:
-                bpy.context.window_manager.event_timer_remove(self._timer)
-            self._timer = bpy.context.window_manager.event_timer_add(1, bpy.context.window)
-        else:
-            audio_format = self.original_scene.vseqf.audio_settings_menu
-            if audio_format == 'FLAC':
-                extension = '.flac'
-                container = 'FLAC'
-                codec = 'FLAC'
-            elif audio_format == 'MP3':
-                extension = '.mp3'
-                container = 'MP3'
-                codec = 'MP3'
-            elif audio_format == 'OGG':
-                extension = '.ogg'
-                container = 'OGG'
-                codec = 'VORBIS'
-            else:  #audio_format == 'WAV'
-                extension = '.wav'
-                container = 'WAV'
-                codec = 'PCM'
-            bpy.ops.sound.mixdown(filepath=self.rendering_scene.render.filepath+extension, format='S16', bitrate=192, container=container, codec=codec)
-            self.file = self.rendering_scene.render.filepath+extension
-            self.rendering_scene.vseqf.batch_rendering = False
-            if self._timer:
-                bpy.context.window_manager.event_timer_remove(self._timer)
-            self._timer = bpy.context.window_manager.event_timer_add(1, bpy.context.window)
-
-    def copy_settings(self, sequence, new_sequence):
-        """Copies the needed settings from the original sequence to the newly imported sequence
-        Arguments:
-            sequence: VSE Sequence, the original
-            new_sequence: VSE Sequence, the sequence to copy the settings to"""
-
-        new_sequence.lock = sequence.lock
-        new_sequence.parent = sequence.parent
-        new_sequence.blend_alpha = sequence.blend_alpha
-        new_sequence.blend_type = sequence.blend_type
-        if new_sequence.type != 'SOUND':
-            new_sequence.alpha_mode = sequence.alpha_mode
-
-    def finish_render(self):
-        """Finishes the process of rendering a sequence by replacing the original sequence, and deleting the temporary scene"""
-        bpy.context.screen.scene = self.rendering_scene
-        try:
-            bpy.ops.render.view_cancel()
-        except:
-            pass
-        if self.rendering_sequence.type != 'SOUND':
-            file_format = self.rendering_scene.render.image_settings.file_format
-            if file_format in ['AVI_JPEG', 'AVI_RAW', 'FRAMESERVER', 'H264', 'FFMPEG', 'THEORA', 'XVID']:
-                #delete temporary scene
-                bpy.ops.scene.delete()
-                bpy.context.screen.scene = self.original_scene
-                new_sequence = self.original_scene.sequence_editor.sequences.new_movie(name=self.rendering_sequence.name+' rendered', filepath=self.file, channel=self.rendering_sequence.channel, frame_start=self.rendering_sequence.frame_final_start)
-            else:
-                files = []
-                for frame in range(2, self.rendering_scene.frame_end):
-                    files.append(os.path.split(self.rendering_scene.render.frame_path(frame=frame))[1])
-                #delete temporary scene
-                bpy.ops.scene.delete()
-                bpy.context.screen.scene = self.original_scene
-                new_sequence = self.original_scene.sequence_editor.sequences.new_image(name=self.rendering_sequence.name+' rendered', filepath=self.file, channel=self.rendering_sequence.channel, frame_start=self.rendering_sequence.frame_final_start)
-                for file in files:
-                    new_sequence.elements.append(file)
-        else:
-            #delete temporary scene
-            bpy.ops.scene.delete()
-            bpy.context.screen.scene = self.original_scene
-
-            new_sequence = self.original_scene.sequence_editor.sequences.new_sound(name=self.rendering_sequence.name+' rendered', filepath=self.file, channel=self.rendering_sequence.channel, frame_start=self.rendering_sequence.frame_final_start)
-        #replace sequence
-        bpy.ops.sequencer.select_all(action='DESELECT')
-        self.copy_settings(self.rendering_sequence, new_sequence)
-        self.rendering_sequence.select = True
-        new_sequence.select = True
-        self.original_scene.sequence_editor.active_strip = self.rendering_sequence
-
-        for other_sequence in self.original_scene.sequence_editor.sequences_all:
-            if hasattr(other_sequence, 'input_1'):
-                if other_sequence.input_1 == self.rendering_sequence:
-                    other_sequence.input_1 = new_sequence
-            if hasattr(other_sequence, 'input_2'):
-                if other_sequence.input_2 == self.rendering_sequence:
-                    other_sequence.input_2 = new_sequence
-        if not self.original_scene.vseqf.batch_effects:
-            bpy.ops.sequencer.strip_modifier_copy(type='REPLACE')
-
-        new_sequence.select = False
-        bpy.ops.sequencer.delete()
-
-    def next_render(self):
-        """Starts rendering the next sequence in the list"""
-
-        sequence = self.renders.pop(0)
-        print('rendering '+sequence.name)
-        self.render_sequence(sequence)
-
-    def modal(self, context, event):
-        """Main modal function, handles the render list"""
-
-        if not self.rendering_scene:
-            if self._timer:
-                context.window_manager.event_timer_remove(self._timer)
-                self._timer = None
-            return {'CANCELLED'}
-        if not bpy.data.scenes.get(self.rendering_scene_name, False):
-            #the user deleted the rendering scene, uh-oh... blender will crash now.
-            if self._timer:
-                context.window_manager.event_timer_remove(self._timer)
-                self._timer = None
-            return {'CANCELLED'}
-        if event.type == 'TIMER':
-            if not self.rendering_scene.vseqf.batch_rendering:
-                if self._timer:
-                    context.window_manager.event_timer_remove(self._timer)
-                    self._timer = None
-                self.finish_render()
-                if len(self.renders) > 0:
-                    self.next_render()
-                    self.report({'INFO'}, "Rendered "+str(self.total_renders - len(self.renders))+" out of "+str(self.total_renders)+" files.  "+str(self.total_frames)+" frames total.")
-                else:
-                    return {'FINISHED'}
-
-            return {'PASS_THROUGH'}
-        if self.rendering_scene.vseqf.batch_rendering_cancel:
-            if self._timer:
-                context.window_manager.event_timer_remove(self._timer)
-                self._timer = None
-            self.renders.clear()
-            try:
-                bpy.ops.render.view_cancel()
-            except:
-                pass
-            try:
-                self.rendering_scene.user_clear()
-                bpy.data.scenes.remove(self.rendering_scene)
-                context.screen.scene = self.original_scene
-                context.screen.scene.update()
-                context.window_manager.update_tag()
-            except:
-                pass
-            return {'CANCELLED'}
-        return {'PASS_THROUGH'}
-
-    def invoke(self, context, event):
-        """Called when the batch render is initialized.  Sets up variables and begins the rendering process."""
-
-        del event
-        context.window_manager.modal_handler_add(self)
-        self.rendering = False
-        oldscene = context.scene
-        vseqf = oldscene.vseqf
-        name = oldscene.name + ' Batch Render'
-        bpy.ops.scene.new(type='FULL_COPY')
-        newscene = context.scene
-        newscene.name = name
-
-        if vseqf.batch_meta == 'SUBSTRIPS':
-            old_sequences = newscene.sequence_editor.sequences_all
-        else:
-            old_sequences = newscene.sequence_editor.sequences
-
-        #queue up renders
-        self.total_frames = 0
-        self.audio_frames = 0
-        self.renders = []
-        for sequence in old_sequences:
-            if (vseqf.batch_selected and sequence.select) or not vseqf.batch_selected:
-                if sequence.type == 'MOVIE' or sequence.type == 'IMAGE' or sequence.type == 'MOVIECLIP':
-                    #standard video or image sequence
-                    self.renders.append(sequence)
-                    self.total_frames = self.total_frames + sequence.frame_final_duration
-                elif sequence.type == 'SOUND':
-                    #audio sequence
-                    if vseqf.batch_audio:
-                        self.renders.append(sequence)
-                        self.audio_frames = self.audio_frames + sequence.frame_final_duration
-                elif sequence.type == 'META':
-                    #meta sequence
-                    if vseqf.batch_meta == 'SINGLESTRIP':
-                        self.renders.append(sequence)
-                        self.total_frames = self.total_frames + sequence.frame_final_duration
-                else:
-                    #other sequence type, not handled
-                    pass
-        self.total_renders = len(self.renders)
-        if self.total_renders > 0:
-            self.next_render()
-            return {'RUNNING_MODAL'}
-        else:
-            return {'CANCELLED'}
-
-
 #Functions and classes related to QuickTags
 def populate_selected_tags():
     vseqf = bpy.context.scene.vseqf
@@ -5870,51 +5468,11 @@ class VSEQFSetting(bpy.types.PropertyGroup):
     last_frame = bpy.props.IntProperty(
         name="Last Scene Frame",
         default=1)
-    video_settings_menu = bpy.props.EnumProperty(
-        name="Video Render Setting",
-        default='DEFAULT',
-        items=[('DEFAULT', 'Scene Settings', '', 1), ('AVIJPEG', 'AVI JPEG', '', 2), ('H264', 'H264 Video', '', 3), ('JPEG', 'JPEG Sequence', '', 4), ('PNG', 'PNG Sequence', '', 5), ('TIFF', 'TIFF Sequence', '', 6), ('EXR', 'Open EXR Sequence', '', 7)])
-    transparent_settings_menu = bpy.props.EnumProperty(
-        name="Transparent Video Render Setting",
-        default='DEFAULT',
-        items=[('DEFAULT', 'Scene Settings', '', 1), ('AVIJPEG', 'AVI JPEG (No Transparency)', '', 2), ('H264', 'H264 Video (No Transparency)', '', 3), ('JPEG', 'JPEG Sequence (No Transparency)', '', 4), ('PNG', 'PNG Sequence', '', 5), ('TIFF', 'TIFF Sequence', '', 6), ('EXR', 'Open EXR Sequence', '', 7)])
-    audio_settings_menu = bpy.props.EnumProperty(
-        name="Audio Render Setting",
-        default='FLAC',
-        #mp3 export seems to be broken currently, (exports as extremely loud distorted garbage) so "('MP3', 'MP3 File', '', 4), " is removed for now
-        items=[('FLAC', 'FLAC Audio', '', 1), ('WAV', 'WAV File', '', 2), ('OGG', 'OGG File', '', 3)])
 
     simplify_menus = bpy.props.BoolProperty(
         name="Simplify Sequencer Menus",
         default=True,
         description="Remove some items from the sequencer menus that require mouse input or are less useful.")
-
-    batch_render_directory = bpy.props.StringProperty(
-        name="Render Directory",
-        default='./',
-        description="Folder to batch render strips to.",
-        subtype='DIR_PATH')
-    batch_selected = bpy.props.BoolProperty(
-        name="Render Only Selected",
-        default=False)
-    batch_effects = bpy.props.BoolProperty(
-        name="Render Modifiers",
-        default=True,
-        description="If active, this will render modifiers to the export, if deactivated, modifiers will be copied.")
-    batch_audio = bpy.props.BoolProperty(
-        name="Render Audio",
-        default=True,
-        description="If active, this will render audio strips to a new file, if deactivated, audio strips will be copied over.")
-    batch_meta = bpy.props.EnumProperty(
-        name="Render Meta Strips",
-        default='SINGLESTRIP',
-        items=[('SINGLESTRIP', 'Single Strip', '', 1), ('SUBSTRIPS', 'Individual Substrips', '', 2), ('IGNORE', 'Ignore', '', 3)])
-    batch_rendering = bpy.props.BoolProperty(
-        name="Currently Rendering File",
-        default=False)
-    batch_rendering_cancel = bpy.props.BoolProperty(
-        name="Canceled A Render",
-        default=False)
 
     follow = bpy.props.BoolProperty(
         name="Cursor Following",
@@ -6080,9 +5638,6 @@ class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
     markers = bpy.props.BoolProperty(
         name="Enable Quick Markers",
         default=True)
-    batch = bpy.props.BoolProperty(
-        name="Enable Quick Batch Render",
-        default=False)
     tags = bpy.props.BoolProperty(
         name="Enable Quick Tags",
         default=True)
@@ -6104,7 +5659,6 @@ class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
         layout.prop(self, "list")
         layout.prop(self, "proxy")
         layout.prop(self, "markers")
-        layout.prop(self, "batch")
         layout.prop(self, "tags")
         layout.prop(self, "cuts")
         layout.prop(self, "edit")
@@ -6127,9 +5681,6 @@ class VSEQFTempSettings(object):
         default=True)
     markers = bpy.props.BoolProperty(
         name="Enable Quick Markers",
-        default=True)
-    batch = bpy.props.BoolProperty(
-        name="Enable Quick Batch Render",
         default=True)
     tags = bpy.props.BoolProperty(
         name="Enable Quick Tags",
@@ -6295,8 +5846,8 @@ class SEQUENCER_MT_add(bpy.types.Menu):
 classes = (SEQUENCER_MT_add, SEQUENCER_MT_strip, VSEQFAddZoom, VSEQFClearZooms, VSEQFCompactEdit, VSEQFContextCursor,
            VSEQFContextMarker, VSEQFContextNone, VSEQFContextSequence, VSEQFContextSequenceLeft,
            VSEQFContextSequenceRight, VSEQFCut, VSEQFDelete, VSEQFDeleteConfirm, VSEQFDeleteRippleConfirm,
-           VSEQFFollow, VSEQFGrab, VSEQFGrabAdd, VSEQFImport, VSEQFMarkerPreset, VSEQFMeta, VSEQFQuickBatchRender,
-           VSEQFQuickBatchRenderPanel, VSEQFQuickCutsMenu, VSEQFQuickCutsPanel, VSEQFQuickFadesClear,
+           VSEQFFollow, VSEQFGrab, VSEQFGrabAdd, VSEQFImport, VSEQFMarkerPreset, VSEQFMeta, VSEQFQuickCutsMenu,
+           VSEQFQuickCutsPanel, VSEQFQuickFadesClear,
            VSEQFQuickFadesCross, VSEQFQuickFadesMenu, VSEQFQuickFadesPanel, VSEQFQuickFadesSet, VSEQFQuickListDown,
            VSEQFQuickListPanel, VSEQFQuickListSelect, VSEQFQuickListUp, VSEQFQuickMarkerDelete, VSEQFQuickMarkerJump,
            VSEQFQuickMarkerList, VSEQFQuickMarkerMove, VSEQFQuickMarkerPresetList, VSEQFQuickMarkerRename,
