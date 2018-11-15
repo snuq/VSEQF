@@ -69,15 +69,16 @@ Changelog:
    Significant improvements to cursor following
 
 Todo before release:
-    new feature: display length of active sequence under it
-    shift-s snapping doesnt work with child strips if the parent is being snapped too
-    add the ability to ripple cut beyond the edge of the selected strips to ADD to the clip
-    ripple delete has issues with multiple selected strips if they are all the same length (and children?)
-    ripple delete doesnt delete children
-    if neither side of parent/child is visible, relationship lines are not visible
+    3point - doesnt stop properly when escape is pressed while setting in/out
+    3point - add more shortcuts (rewind/fforward)
+    3point - doesnt respect snap cursor to end of sequence setting
+    3point - maximize clip editor when setting in/out?
+    3point - allow dragging along timeline at bottom
+    add: display length of active sequence under it
+    add: ability to ripple cut beyond the edge of the selected strips to ADD to the clip
+    bug: if neither side of parent/child is visible, relationship lines are not visible
     stop using undos if at all possible, they cause waveforms to need to be regenerated
     update readme: add QuickShortcuts, snap to grabbed edge
-    fix nudge not moving children
     check and improve tooltips on all buttons, make sure shortcuts are listed
     think about splitting some panels into their own/other tabs (maybe an 'edits' tab?)
     Look into adding a visual offset on the active audio sequence, showing how far out of sync it is from it's video parent
@@ -143,6 +144,29 @@ def redraw_sequencers():
     for area in bpy.context.screen.areas:
         if area.type == 'SEQUENCE_EDITOR':
             area.tag_redraw()
+
+
+def ripple_timeline(sequences, start_frame, ripple_amount, select_ripple=True):
+    """Moves all given sequences starting after the frame given as 'start_frame', by moving them forward by 'ripple_amount' frames.
+    'select_ripple' will select all sequences that were moved."""
+
+    to_change = []
+    print(start_frame)
+    print(ripple_amount)
+    print('')
+    for sequence in sequences:
+        if sequence.frame_final_end > start_frame - ripple_amount:
+            to_change.append([sequence, sequence.channel, sequence.frame_start + ripple_amount, True])
+    for seq in to_change:
+        sequence = seq[0]
+        sequence.channel = seq[1]
+        if not hasattr(sequence, 'input_1'):
+            sequence.frame_start = seq[2]
+        if select_ripple:
+            sequence.select = True
+        if (sequence.frame_start != seq[2] or sequence.channel != seq[1]) and seq[3]:
+            seq[3] = False
+            to_change.append(seq)
 
 
 def effect_children(sequence, to_check):
@@ -992,9 +1016,20 @@ def vseqf_draw():
 
 #Functions and classes related to QuickShortcuts
 def nudge_selected(frame=0, channel=0):
-    """Moves the selected sequences by a given amount, ignoring parenting."""
+    """Moves the selected sequences by a given amount."""
 
+    to_nudge = []
     for sequence in bpy.context.selected_sequences:
+        if vseqf_parenting():
+            children = get_recursive(sequence, [])
+            to_nudge.extend(children)
+        else:
+            to_nudge.append(sequence)
+    if channel > 0:
+        to_nudge.sort(key=lambda x: x.channel, reverse=True)
+    if channel < 0:
+        to_nudge.sort(key=lambda x: x.channel)
+    for sequence in to_nudge:
         oldframe = sequence.frame_start
         if frame:
             if sequence.select_left_handle or sequence.select_right_handle:
@@ -1745,8 +1780,8 @@ class VSEQFGrabAdd(bpy.types.Operator):
                                     ripple_offset = 0 - ripple_offset
                         elif sequence.select_left_handle and not sequence.select_right_handle:
                             #fix sequence left handle ripple position when ripple disabled
-                            if sequence.type == 'IMAGE' and sequence.frame_duration == 1:
-                                #single images behave differently
+                            if sequence.type not in ['MOVIE', 'SCENE', 'MOVIECLIP'] and sequence.frame_duration == 1:
+                                #single images and effects behave differently
                                 sequence.frame_final_end = seq[2]
                             else:
                                 sequence.frame_start = seq[3]
@@ -2228,12 +2263,12 @@ class VSEQFSelectGrab(bpy.types.Operator):
 
     def invoke(self, context, event):
         bpy.ops.ed.undo_push()
+        bpy.ops.sequencer.select('INVOKE_DEFAULT')
         self.start_time = time.time()
         self.selected = []
         selected_sequences = current_selected(context)
         for sequence in selected_sequences:
             self.selected.append([sequence, sequence.select_left_handle, sequence.select_right_handle])
-        bpy.ops.sequencer.select('INVOKE_DEFAULT')
         prefs = get_prefs()
         if prefs.threepoint:
             active = current_active(context)
@@ -2393,6 +2428,8 @@ def frame_step(scene):
     Argument:
         scene: the current Scene"""
 
+    if bpy.context.screen is None:  #sometimes this happens... no idea why...
+        return
     if bpy.context.screen.scene != scene:
         return
     step = abs(scene.vseqf.step) - 1
@@ -3789,7 +3826,7 @@ class VSEQFQuickSnaps(bpy.types.Operator):
             if parenting:
                 for sequence in sequences:
                     parent = find_parent(sequence)
-                    if not parent or parent not in selected:
+                    if not parent or (parent not in selected) or self.type == 'selection_to_cursor':
                         all_sequences.append(sequence)
                         if sequence.select:
                             to_snap.append(sequence)
@@ -3804,10 +3841,11 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                 next_seq = None
             to_check = []
             for sequence in to_snap:
+                snap_type = self.type
                 if not hasattr(sequence, 'input_1'):
                     moved = 0
                     to_check.append([sequence, sequence.frame_start, sequence.frame_final_start, sequence.frame_final_end])
-                    if self.type == 'selection_to_cursor':
+                    if snap_type == 'selection_to_cursor':
                         children = find_children(sequence)
                         original_left = sequence.frame_final_start
                         original_right = sequence.frame_final_end
@@ -3828,17 +3866,17 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                                     sequence.frame_final_start = frame
                         elif sequence.select_left_handle:
                             if frame >= sequence.frame_final_end:
-                                self.type = 'end_to_cursor'
+                                snap_type = 'end_to_cursor'
                             else:
                                 sequence.frame_final_start = frame
                         elif sequence.select_right_handle:
                             if frame <= sequence.frame_final_start:
-                                self.type = 'begin_to_cursor'
+                                snap_type = 'begin_to_cursor'
                             else:
                                 sequence.frame_final_end = frame
                         else:
-                            self.type = 'begin_to_cursor'
-                        if self.type != 'begin_to_cursor':
+                            snap_type = 'begin_to_cursor'
+                        if snap_type != 'begin_to_cursor':
                             #fix child edges
                             if parenting:
                                 for child in children:
@@ -3849,17 +3887,17 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                                         to_check.append([child, child.frame_start, child.frame_final_start, child.frame_final_end])
                                         child.frame_final_end = sequence.frame_final_end
 
-                    if self.type == 'begin_to_cursor':
+                    if snap_type == 'begin_to_cursor':
                         offset = sequence.frame_final_start - sequence.frame_start
                         new_start = (frame - offset)
                         moved = new_start - sequence.frame_start
                         sequence.frame_start = new_start
-                    if self.type == 'end_to_cursor':
+                    if snap_type == 'end_to_cursor':
                         offset = sequence.frame_final_start - sequence.frame_start
                         new_start = (frame - offset - sequence.frame_final_duration)
                         moved = new_start - sequence.frame_start
                         sequence.frame_start = new_start
-                    if self.type == 'sequence_to_previous':
+                    if snap_type == 'sequence_to_previous':
                         if previous:
                             offset = sequence.frame_final_start - sequence.frame_start
                             new_start = (previous.frame_final_end - offset)
@@ -3867,7 +3905,7 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                             sequence.frame_start = new_start
                         else:
                             self.report({'WARNING'}, 'No Previous Sequence Found')
-                    if self.type == 'sequence_to_next':
+                    if snap_type == 'sequence_to_next':
                         if next_seq:
                             offset = sequence.frame_final_start - sequence.frame_start
                             new_start = (next_seq.frame_final_start - offset - sequence.frame_final_duration)
@@ -4963,7 +5001,6 @@ class VSEQFCut(bpy.types.Operator):
         to_cut = []
         to_select = []
         to_active = None
-        to_change = []
         cut_pairs = []
 
         #determine all sequences available to cut
@@ -4982,6 +5019,7 @@ class VSEQFCut(bpy.types.Operator):
 
         #find the ripple amount
         ripple_amount = 0
+        ripple_frame = self.frame
         for sequence in to_cut_temp:
             if side == 'LEFT':
                 cut_amount = self.frame - sequence.frame_final_start
@@ -4990,6 +5028,10 @@ class VSEQFCut(bpy.types.Operator):
             to_cut.append(sequence)
             if cut_amount > ripple_amount:
                 ripple_amount = cut_amount
+        if side == 'LEFT':
+            ripple_frame = self.frame - ripple_amount
+        else:
+            ripple_frame = self.frame
 
         bpy.ops.sequencer.select_all(action='DESELECT')
         for sequence in to_cut:
@@ -5040,8 +5082,8 @@ class VSEQFCut(bpy.types.Operator):
                     cut_type = self.type
                 left, right = vseqf_cut(sequence=sequence, frame=self.frame, cut_type=cut_type)
                 cut_pairs.append([left, right])
-                if right and self.type == 'INSERT':
-                    to_change.append([right, right.channel, right.frame_start + context.scene.vseqf.quickcuts_insert, True])
+                #if right and self.type == 'INSERT':
+                #    to_change.append([right, right.channel, right.frame_start + context.scene.vseqf.quickcuts_insert, True])
             else:
                 to_select.append(sequence)
             if (side == 'LEFT' or side == 'BOTH') and left:
@@ -5063,6 +5105,7 @@ class VSEQFCut(bpy.types.Operator):
                     if parent_pair[1]:
                         right.parent = parent_pair[1].name
 
+        #ripple/insert
         if self.type == 'INSERT' or self.type == 'RIPPLE' or self.type == 'INSERT_ONLY':
             if self.type == 'RIPPLE':
                 insert = 0 - ripple_amount
@@ -5071,29 +5114,12 @@ class VSEQFCut(bpy.types.Operator):
                     insert = self.insert
                 else:
                     insert = context.scene.vseqf.quickcuts_insert
-            if not (self.type == 'INSERT' and not self.all):
-                to_change = []
-                sequences = current_sequences(context)
-                for sequence in sequences:
-                    if sequence.frame_final_start >= self.frame:
-                        #children = find_children(sequence)
-                        #for child in children:
-                        #    if child.frame_final_start < self.frame:
-                        #        child.frame_start = child.frame_start + insert
-                        to_change.append([sequence, sequence.channel, sequence.frame_start + insert, True])
+            sequences = current_sequences(context)
+            ripple_timeline(sequences, ripple_frame, insert)
         else:
             for sequence in to_select:
                 if sequence:
                     sequence.select = True
-        for seq in to_change:
-            sequence = seq[0]
-            sequence.channel = seq[1]
-            if not hasattr(sequence, 'input_1'):
-                sequence.frame_start = seq[2]
-            sequence.select = True
-            if (sequence.frame_start != seq[2] or sequence.channel != seq[1]) and seq[3]:
-                seq[3] = False
-                to_change.append(seq)
         if to_active:
             context.scene.sequence_editor.active_strip = to_active
         if side == 'LEFT':
@@ -5263,7 +5289,8 @@ class VSEQFDelete(bpy.types.Operator):
         for sequence in sequences:
             if sequence.frame_final_start < first_start:
                 first_start = sequence.frame_final_start
-            offset = sequence.frame_final_duration
+            offset = 0 - sequence.frame_final_duration
+            start_frame = sequence.frame_final_start
             end_frame = sequence.frame_final_end
             to_delete = [sequence]
             if vseqf_parenting() and context.scene.vseqf.delete_children:
@@ -5277,19 +5304,7 @@ class VSEQFDelete(bpy.types.Operator):
             bpy.ops.sequencer.delete()
             if self.ripple:
                 all_sequences = current_sequences(context)
-
-                #cache channels
-                update_sequences_data = []
-                for seq in all_sequences:
-                    update_sequences_data.append([seq, seq.channel])
-                for seq_data in update_sequences_data:
-                    seq, last_channel = seq_data
-                    #move sequences
-                    if seq.frame_final_start >= end_frame:
-                        seq.frame_start = seq.frame_start - offset
-                for seq_data in update_sequences_data:
-                    seq, last_channel = seq_data
-                    seq.channel = last_channel
+                ripple_timeline(all_sequences, start_frame, offset, select_ripple=False)
         if self.ripple:
             context.scene.frame_current = first_start
         self.reset()
