@@ -67,6 +67,8 @@ Changelog:
    Split Quick Batch Render off into its own addon
    Fixed bug where adjusting the left edge of single images would cause odd behavior
    Significant improvements to cursor following
+   Improvements to ripple behavior, fixed bugs relating to it as well
+   Improved marker grabbing behavior
 
 Todo before release:
     3point - doesnt stop properly when escape is pressed while setting in/out
@@ -2164,8 +2166,12 @@ class VSEQFSelectGrab(bpy.types.Operator):
 
     mouse_start_x = 0
     mouse_start_y = 0
+    mouse_start_region_x = 0
+    mouse_start_region_y = 0
     selected = []
     start_time = 0
+    marker_area_height = 40
+    marker_grab_distance = 100
     _timer = None
 
     def on_sequence(self, frame, channel, sequence):
@@ -2174,9 +2180,11 @@ class VSEQFSelectGrab(bpy.types.Operator):
         else:
             return False
 
-    def near_marker(self, context, frame, distance):
-        for marker in context.scene.timeline_markers:
-            if abs(marker.frame - frame) <= distance:
+    def near_marker(self, context, frame):
+        if context.scene.timeline_markers:
+            markers = sorted(context.scene.timeline_markers, key=lambda x: abs(x.frame - frame))
+            marker = markers[0]
+            if abs(marker.frame - frame) <= self.marker_grab_distance:
                 return marker
         return None
 
@@ -2198,15 +2206,16 @@ class VSEQFSelectGrab(bpy.types.Operator):
             shown_width = right - left
             frame_px = width / shown_width
             distance = distance_multiplier / frame_px
-            near_marker = self.near_marker(context, click_frame, distance)
 
             if abs(click_frame - context.scene.frame_current) <= distance:
                 #clicked on cursor
                 bpy.ops.wm.call_menu(name='vseqf.context_cursor')
-            elif near_marker:
-                #clicked on marker
-                context.scene.vseqf.current_marker_frame = near_marker.frame
-                bpy.ops.wm.call_menu(name='vseqf.context_marker')
+            elif event.mouse_region_y <= self.marker_area_height:
+                near_marker = self.near_marker(context, click_frame)
+                if near_marker:
+                    #clicked on marker
+                    context.scene.vseqf.current_marker_frame = near_marker.frame
+                    bpy.ops.wm.call_menu(name='vseqf.context_marker')
             elif active and self.on_sequence(click_frame, click_channel, active):
                 #clicked on sequence
                 active_size = active.frame_final_duration * frame_px
@@ -2227,17 +2236,13 @@ class VSEQFSelectGrab(bpy.types.Operator):
             if delta_x > move_target or delta_y > move_target:
                 if context.scene.vseqf.grab_multiselect:
                     self.restore_selected()
-                location = view.region_to_view(event.mouse_region_x, event.mouse_region_y)
+                #location = view.region_to_view(event.mouse_region_x, event.mouse_region_y)
+                location = view.region_to_view(self.mouse_start_region_x, self.mouse_start_region_y)
                 click_frame, click_channel = location
-                width = region.width
-                left, bottom = view.region_to_view(0, 0)
-                right, bottom = view.region_to_view(width, 0)
-                shown_width = right - left
-                frame_px = width / shown_width
-                distance = distance_multiplier / frame_px
-                near_marker = self.near_marker(context, click_frame, distance)
-                if near_marker:
-                    bpy.ops.vseqf.quickmarkers_move(frame=near_marker.frame)
+                near_marker = self.near_marker(context, click_frame)
+                if event.mouse_region_y <= self.marker_area_height:
+                    if near_marker:
+                        bpy.ops.vseqf.quickmarkers_move(frame=near_marker.frame)
                 else:
                     bpy.ops.vseqf.grab('INVOKE_DEFAULT')
                 return {'FINISHED'}
@@ -2263,7 +2268,8 @@ class VSEQFSelectGrab(bpy.types.Operator):
 
     def invoke(self, context, event):
         bpy.ops.ed.undo_push()
-        bpy.ops.sequencer.select('INVOKE_DEFAULT')
+        if event.mouse_region_y > self.marker_area_height:
+            bpy.ops.sequencer.select('INVOKE_DEFAULT')
         self.start_time = time.time()
         self.selected = []
         selected_sequences = current_selected(context)
@@ -2294,6 +2300,8 @@ class VSEQFSelectGrab(bpy.types.Operator):
                     seq.select_right_handle = sequence.select_right_handle
         self.mouse_start_x = event.mouse_x
         self.mouse_start_y = event.mouse_y
+        self.mouse_start_region_x = event.mouse_region_x
+        self.mouse_start_region_y = event.mouse_region_y
         self._timer = context.window_manager.event_timer_add(0.05, context.window)
         context.window_manager.modal_handler_add(self)
         return {'RUNNING_MODAL'}
