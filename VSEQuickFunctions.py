@@ -23,11 +23,9 @@
    bgl is gone? how to draw overlays now?
 
 Known Issues:
-   shift-s not working properly with multiple clip edges selected
    Sometimes undo pushing breaks... not sure what's going on there
    Uncut does not work on movieclip type sequences... there appears to be no way of getting the sequence's source file.
-   Right now the script cannot apply a vertical zoom level, as far as I can tell this is missing functionality in
-       Blenders python api.
+   Right now the script cannot apply a vertical zoom level, as far as I can tell this is missing functionality in Blenders python api.
 
 Future Possibilities:
    way to drag over an area of a strip and have it cut out or ripple-cut out
@@ -59,31 +57,26 @@ Changelog:
    Right-click context menu option added, hold right click to activate it.  Options will differ depending on what is clicked on - cursor, sequence, sequence handles, markers, empty area
 
 0.94 (In progress)
-   Frame skipping now works with reverse playback as well, and fixed poor behavior.
+   Frame skipping now works with reverse playback as well, and fixed poor behavior
    Added QuickShortcuts - timeline and sequence movement using the numpad.  Thanks to tintwotin for the ideas!
    Added option to snap cursor to a dragged edge if one edge is grabbed, if two are grabbed, the second edge will be set to the overlay frame.
    Many improvements to Quick3Point interface
-   Fixed a bug that would cause slipped sequences to jump around.
+   Fixed a bug that would cause slipped sequences to jump around
    Split Quick Batch Render off into its own addon
    Fixed bug where adjusting the left edge of single images would cause odd behavior
    Significant improvements to cursor following
    Improvements to ripple behavior, fixed bugs relating to it as well
-   Improved marker grabbing behavior.
+   Improved marker grabbing behavior
+   Improvements to Quick3Point
 
-Todo before release:
-    3point - doesnt stop properly when escape is pressed while setting in/out
-    3point - add more shortcuts (rewind/fforward)
-    3point - doesnt respect snap cursor to end of sequence setting
-    3point - maximize clip editor when setting in/out?
-    3point - allow dragging along timeline at bottom
-    add: display length of active sequence under it
-    add: ability to ripple cut beyond the edge of the selected strips to ADD to the clip
-    bug: if neither side of parent/child is visible, relationship lines are not visible
-    stop using undos if at all possible, they cause waveforms to need to be regenerated
-    update readme: add QuickShortcuts, snap to grabbed edge
-    check and improve tooltips on all buttons, make sure shortcuts are listed
-    think about splitting some panels into their own/other tabs (maybe an 'edits' tab?)
-    Look into adding a visual offset on the active audio sequence, showing how far out of sync it is from it's video parent
+Todo: check and improve tooltips on all buttons, make sure shortcuts are listed
+Todo: add: display length of active sequence under it
+Todo: add: ability to ripple cut beyond the edge of the selected strips to ADD to the clip
+Todo: add: Look into adding a visual offset on the active audio sequence, showing how far out of sync it is from it's video parent
+Todo: bug: if neither side of parent/child is visible, relationship lines are not visible
+Todo: bug: stop using undos if at all possible, they cause waveforms to need to be regenerated
+Todo: think about splitting some panels into their own/other tabs (maybe an 'edits' tab?)
+Todo: update readme: add QuickShortcuts, snap to grabbed edge
 """
 
 
@@ -1294,6 +1287,7 @@ class VSEQFThreePointBrowserPanel(bpy.types.Panel):
 class VSEQFThreePointImportToClip(bpy.types.Operator):
     bl_idname = "vseqf.threepoint_import_to_clip"
     bl_label = "Import Movie To Clip Editor"
+    bl_description = 'Creates a movieclip from the selected video file and sets any visible Movie Clip Editor area to display it'
 
     def execute(self, context):
         params = context.space_data.params
@@ -1326,10 +1320,11 @@ class VSEQFThreePointPanel(bpy.types.Panel):
         prefs = get_prefs()
         if not prefs.threepoint:
             return False
-        if context.space_data.clip:
-            return True
-        else:
-            return False
+        clip = context.space_data.clip
+        if clip:
+            if os.path.isfile(bpy.path.abspath(clip.filepath)):
+                return True
+        return False
 
     def draw(self, context):
         layout = self.layout
@@ -1474,9 +1469,12 @@ class VSEQFThreePointImport(bpy.types.Operator):
                 #sound_sequence.frame_offset_end = frame_length
                 sound_sequence.channel = channel
                 sound_sequence.frame_start = frame_start
-                sound_sequence.frame_final_end = movie_sequence.frame_final_end
+                if sound_sequence.frame_final_end > movie_sequence.frame_final_end:
+                    sound_sequence.frame_final_end = movie_sequence.frame_final_end
                 if context.scene.vseqf.autoparent:
                     sound_sequence.parent = movie_sequence.name
+            if context.scene.vseqf.snap_new_end:
+                context.scene.frame_current = movie_sequence.frame_final_end
 
             return {'FINISHED'}
         else:
@@ -1484,9 +1482,9 @@ class VSEQFThreePointImport(bpy.types.Operator):
 
 
 class VSEQFThreePointOperator(bpy.types.Operator):
-    """Controls the 3point editing functionality in the Clip Editor"""
     bl_idname = "vseqf.threepoint_modal_operator"
-    bl_label = "Controls the 3point editing functionality in the Clip Editor"
+    bl_label = "3Point Modal Operator"
+    bl_description = "Start the realtime 3point editing functionality in the Clip Editor"
 
     _handle = None
     scale = 20
@@ -1508,13 +1506,24 @@ class VSEQFThreePointOperator(bpy.types.Operator):
     def update_import_values(self, context):
         fps = round(context.scene.render.fps / context.scene.render.fps_base)
         settings = self.clip.import_settings
-        remainder, frames_in = divmod(settings.import_frame_in, fps)
+        if settings.import_frame_length != -1:
+            frame_length = settings.import_frame_length
+        else:
+            frame_length = self.clip.frame_duration
+        if settings.import_frame_in != -1:
+            frame_in = settings.import_frame_in
+        else:
+            frame_in = 0
+
+        remainder, frames_in = divmod(frame_in, fps)
         minutes_in, seconds_in = divmod(remainder, 60)
-        remainder, frames_length = divmod(settings.import_frame_length, fps)
+        remainder, frames_length = divmod(frame_length, fps)
         minutes_length, seconds_length = divmod(remainder, 60)
+
         settings.import_frames_in = frames_in
         settings.import_seconds_in = seconds_in
         settings.import_minutes_in = minutes_in
+
         settings.import_frames_length = frames_length
         settings.import_seconds_length = seconds_length
         settings.import_minutes_length = minutes_length
@@ -1563,27 +1572,31 @@ class VSEQFThreePointOperator(bpy.types.Operator):
                 self.update_import_values(context)
 
         elif event.type == 'LEFTMOUSE':
-            if event.value == 'PRESS':
-                self.mouse_down = True
-                height = context.region.height
-                width = context.region.width
-                if event.mouse_region_x > 0 and event.mouse_region_x < width:
-                    if event.mouse_region_y < height and event.mouse_region_y > height - self.scale:
-                        self.editing_in = True
-                        self.update_pos(context, event.mouse_region_x, event.mouse_region_y)
-                    elif event.mouse_region_y < height - self.scale and event.mouse_region_y > height - (self.scale * 2):
-                        self.editing_length = True
-                        self.update_pos(context, event.mouse_region_x, event.mouse_region_y)
+            if event.mouse_region_y < 20:
+                #click was at bottom of area on timeline, let the user scrub the timeline
+                return {'PASS_THROUGH'}
+            else:
+                if event.value == 'PRESS':
+                    self.mouse_down = True
+                    height = context.region.height
+                    width = context.region.width
+                    if event.mouse_region_x > 0 and event.mouse_region_x < width:
+                        if event.mouse_region_y < height and event.mouse_region_y > height - self.scale:
+                            self.editing_in = True
+                            self.update_pos(context, event.mouse_region_x, event.mouse_region_y)
+                        elif event.mouse_region_y < height - self.scale and event.mouse_region_y > height - (self.scale * 2):
+                            self.editing_length = True
+                            self.update_pos(context, event.mouse_region_x, event.mouse_region_y)
+                        else:
+                            self.finish_modal(context)
+                            return {'FINISHED'}
                     else:
                         self.finish_modal(context)
                         return {'FINISHED'}
-                else:
-                    self.finish_modal(context)
-                    return {'FINISHED'}
-            elif event.value == 'RELEASE':
-                self.mouse_down = False
-                self.editing_in = False
-                self.editing_length = False
+                elif event.value == 'RELEASE':
+                    self.mouse_down = False
+                    self.editing_in = False
+                    self.editing_length = False
 
         elif event.type in {'RIGHTMOUSE', 'ESC'}:
             self.clip.import_settings.import_frame_in = self.last_in
@@ -1594,6 +1607,8 @@ class VSEQFThreePointOperator(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
     def finish_modal(self, context):
+        if context.screen.is_animation_playing:
+            bpy.ops.screen.animation_play()
         bpy.types.SpaceClipEditor.draw_handler_remove(self._handle, 'WINDOW')
         bpy.ops.scene.delete()
         context.screen.scene = self.original_scene
@@ -1602,6 +1617,8 @@ class VSEQFThreePointOperator(bpy.types.Operator):
 
     def invoke(self, context, event):
         del event
+        if context.screen.is_animation_playing:
+            bpy.ops.screen.animation_play()
         space = context.space_data
         if space.type == 'CLIP_EDITOR':
             self.start_frame = context.scene.frame_current
