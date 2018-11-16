@@ -68,7 +68,7 @@ Changelog:
    Fixed bug where adjusting the left edge of single images would cause odd behavior
    Significant improvements to cursor following
    Improvements to ripple behavior, fixed bugs relating to it as well
-   Improved marker grabbing behavior
+   Improved marker grabbing behavior.
 
 Todo before release:
     3point - doesnt stop properly when escape is pressed while setting in/out
