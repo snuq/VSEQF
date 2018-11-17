@@ -68,15 +68,15 @@ Changelog:
    Improvements to ripple behavior, fixed bugs relating to it as well
    Improved marker grabbing behavior
    Improvements to Quick3Point
+   Added display of current strip length under center of strip
 
 Todo: check and improve tooltips on all buttons, make sure shortcuts are listed
-Todo: add: display length of active sequence under it
 Todo: add: ability to ripple cut beyond the edge of the selected strips to ADD to the clip
 Todo: add: Look into adding a visual offset on the active audio sequence, showing how far out of sync it is from it's video parent
-Todo: bug: if neither side of parent/child is visible, relationship lines are not visible
 Todo: bug: stop using undos if at all possible, they cause waveforms to need to be regenerated
 Todo: think about splitting some panels into their own/other tabs (maybe an 'edits' tab?)
 Todo: update readme: add QuickShortcuts, snap to grabbed edge
+Todo: look into updating the cursor based on context, maybe add icon under it, or add a 'help' area at bottom of vse
 """
 
 
@@ -107,6 +107,12 @@ right_click_time = 0.5
 
 
 #Miscellaneous Functions
+def get_fps(scene=None):
+    if scene is None:
+        scene = bpy.context.scene
+    return scene.render.fps / scene.render.fps_base
+
+
 def vseqf_parenting():
     prefs = get_prefs()
     if prefs.parenting and bpy.context.scene.vseqf.children:
@@ -423,9 +429,10 @@ def edit_panel(self, context):
     vseqf = scene.vseqf
     layout = self.layout
     row = layout.row()
-    row.label("Final Offset: "+timecode_from_frames(active_sequence.frame_offset_start, scene.render.fps)+" : "+timecode_from_frames(active_sequence.frame_offset_end, scene.render.fps))
+    fps = get_fps(scene)
+    row.label("Final Offset: "+timecode_from_frames(active_sequence.frame_offset_start, fps)+" : "+timecode_from_frames(active_sequence.frame_offset_end, fps))
     row = layout.row()
-    row.label("Final Start: "+timecode_from_frames(active_sequence.frame_final_start, scene.render.fps))
+    row.label("Final Start: "+timecode_from_frames(active_sequence.frame_final_start, fps))
 
     if prefs.fades:
         #display info about the fade in and out of the current sequence
@@ -734,7 +741,7 @@ class VSEQFCompactEdit(bpy.types.Panel):
         strip = current_active(context)
         vseqf = scene.vseqf
         layout = self.layout
-        fps = scene.render.fps / scene.render.fps_base
+        fps = get_fps(scene)
 
         row = layout.row()
         split = row.split(percentage=.8)
@@ -935,6 +942,8 @@ def vseqf_continuous(scene):
 
 def vseqf_draw():
     prefs = get_prefs()
+    colors = bpy.context.user_preferences.themes[0].user_interface
+    text_color = list(colors.wcol_text.text_sel)+[1]
     active_strip = current_active(bpy.context)
     if not active_strip:
         return
@@ -951,62 +960,63 @@ def vseqf_draw():
     channel_px = height / shown_height
     frame_px = width / shown_width
 
+    min_x = 25
+    max_x = width - 10
+    fps = get_fps()
     length = active_strip.frame_final_duration
+    length_timecode = timecode_from_frames(length, fps)
     active_x = active_strip.frame_final_start + (length / 2)
     active_y = active_strip.channel + 0.5
-    active_left, active_top = view.view_to_region(active_strip.frame_final_start, active_strip.channel+1)
-    active_right, active_top2 = view.view_to_region(active_strip.frame_final_end, active_strip.channel+1)
-    active_pos_x, active_pos_y = view.view_to_region(active_x, active_strip.channel + 0.5)
-    if active_top == 12000:
-        active_top = active_top2
+    active_left, active_top = view.view_to_region(active_strip.frame_final_start, active_strip.channel+1, clip=False)
+    active_right, active_bottom = view.view_to_region(active_strip.frame_final_end, active_strip.channel, clip=False)
+    active_pos_x, active_pos_y = view.view_to_region(active_x, active_strip.channel + 0.5, clip=False)
     active_width = length * frame_px
-    if active_top != 12000:
-        fade_height = channel_px / 20
-        text_size = 10
-        #display fades
-        if prefs.fades and active_width > text_size * 6:
-            if active_left != 12000:
-                if active_pos_x == 12000:
-                    active_pos_x = int(active_left + (active_width / 2))
-                fadein = int(fades(sequence=active_strip, mode='detect', direction='in'))
-                if fadein and length:
-                    fadein_percent = fadein / length
-                    draw_rect(active_left, active_top - (fade_height * 2), fadein_percent * active_width, fade_height, color=(.5, .5, 1, .75))
-                    draw_text(active_left, active_top, text_size, 'In: '+str(fadein))
-            if active_right != 12000:
-                if active_pos_x == 12000:
-                    active_pos_x = int(active_right - (active_width / 2))
-                fadeout = int(fades(sequence=active_strip, mode='detect', direction='out'))
-                if fadeout and length:
-                    fadeout_percent = fadeout / length
-                    fadeout_width = active_width * fadeout_percent
-                    draw_rect(active_right - fadeout_width, active_top - (fade_height * 2), fadeout_width, fade_height, color=(.5, .5, 1, .75))
-                    draw_text(active_right - (text_size * 4), active_top, text_size, 'Out: '+str(fadeout))
-        if prefs.parenting and active_pos_x != 12000:
-            if active_pos_y == 12000:
-                active_pos_y = int(active_top - (channel_px / 2))
-            children = find_children(active_strip)
-            parent = find_parent(active_strip)
-            if parent:
-                parent_x = parent.frame_final_start + (parent.frame_final_duration / 2)
-                parent_y = parent.channel + 0.5
-                distance_x = parent_x - active_x
-                distance_y = parent_y - active_y
-                pixel_x_distance = int(distance_x * frame_px)
-                pixel_y_distance = int(distance_y * channel_px)
-                pixel_x = active_pos_x + pixel_x_distance
-                pixel_y = active_pos_y + pixel_y_distance
-                draw_line(active_pos_x, active_pos_y, pixel_x, pixel_y, 2, color=(0.0, 0.0, 0.0, 0.2))
-            for child in children:
-                child_x = child.frame_final_start + (child.frame_final_duration / 2)
-                child_y = child.channel + 0.5
-                distance_x = child_x - active_x
-                distance_y = child_y - active_y
-                pixel_x_distance = int(distance_x * frame_px)
-                pixel_y_distance = int(distance_y * channel_px)
-                pixel_x = active_pos_x + pixel_x_distance
-                pixel_y = active_pos_y + pixel_y_distance
-                draw_line(active_pos_x, active_pos_y, pixel_x, pixel_y, 2, color=(1.0, 1.0, 1.0, 0.2))
+    fade_height = channel_px / 20
+    text_size = 10
+    strip_x = active_pos_x
+    if strip_x <= min_x and active_right > min_x:
+        strip_x = min_x
+    if strip_x >= max_x and active_left < max_x:
+        strip_x = max_x
+
+    draw_text(strip_x - (strip_x / width) * 40, active_bottom, text_size, '('+length_timecode+')', text_color)
+
+    #display fades
+    if prefs.fades and active_width > text_size * 6:
+        fadein = int(fades(sequence=active_strip, mode='detect', direction='in'))
+        if fadein and length:
+            fadein_percent = fadein / length
+            draw_rect(active_left, active_top - (fade_height * 2), fadein_percent * active_width, fade_height, color=(.5, .5, 1, .75))
+            draw_text(active_left, active_top, text_size, 'In: '+str(fadein), text_color)
+        fadeout = int(fades(sequence=active_strip, mode='detect', direction='out'))
+        if fadeout and length:
+            fadeout_percent = fadeout / length
+            fadeout_width = active_width * fadeout_percent
+            draw_rect(active_right - fadeout_width, active_top - (fade_height * 2), fadeout_width, fade_height, color=(.5, .5, 1, .75))
+            draw_text(active_right - (text_size * 4), active_top, text_size, 'Out: '+str(fadeout), text_color)
+    if prefs.parenting:
+        children = find_children(active_strip)
+        parent = find_parent(active_strip)
+        if parent:
+            parent_x = parent.frame_final_start + (parent.frame_final_duration / 2)
+            parent_y = parent.channel + 0.5
+            distance_x = parent_x - active_x
+            distance_y = parent_y - active_y
+            pixel_x_distance = int(distance_x * frame_px)
+            pixel_y_distance = int(distance_y * channel_px)
+            pixel_x = active_pos_x + pixel_x_distance
+            pixel_y = active_pos_y + pixel_y_distance
+            draw_line(strip_x, active_pos_y, pixel_x, pixel_y, 2, color=(0.0, 0.0, 0.0, 0.2))
+        for child in children:
+            child_x = child.frame_final_start + (child.frame_final_duration / 2)
+            child_y = child.channel + 0.5
+            distance_x = child_x - active_x
+            distance_y = child_y - active_y
+            pixel_x_distance = int(distance_x * frame_px)
+            pixel_y_distance = int(distance_y * channel_px)
+            pixel_x = active_pos_x + pixel_x_distance
+            pixel_y = active_pos_y + pixel_y_distance
+            draw_line(strip_x, active_pos_y, pixel_x, pixel_y, 2, color=(1.0, 1.0, 1.0, 0.2))
 
 
 #Functions and classes related to QuickShortcuts
@@ -1101,8 +1111,7 @@ class VSEQFQuickShortcutsNudge(bpy.types.Operator):
 
     def execute(self, context):
         bpy.ops.ed.undo_push()
-        render = context.scene.render
-        second = int(round(render.fps / render.fps_base))
+        second = int(round(get_fps(context.scene)))
         if self.direction == 'UP':
             nudge_selected(channel=1)
         elif self.direction == 'DOWN':
@@ -1158,7 +1167,7 @@ class VSEQFQuickShortcutsSkip(bpy.types.Operator):
 
     def execute(self, context):
         bpy.ops.ed.undo_push()
-        second_frames = int(round(context.scene.render.fps / context.scene.render.fps_base))
+        second_frames = int(round(get_fps(context.scene)))
         if self.type == "NEXTSECOND":
             context.scene.frame_current = context.scene.frame_current + second_frames
         elif self.type == "LASTSECOND":
@@ -1201,7 +1210,7 @@ class VSEQFQuickShortcutsResetPlay(bpy.types.Operator):
 #Functions and classes related to threepoint editing
 def update_clip_import(self, context):
     #todo: prevent values from being extended past sequence bounds
-    fps = round(context.scene.render.fps / context.scene.render.fps_base)
+    fps = round(get_fps(context.scene))
     if self.import_frames_in >= fps:
         self.import_frames_in = 0
         self.import_seconds_in = self.import_seconds_in + 1
@@ -1332,7 +1341,7 @@ class VSEQFThreePointPanel(bpy.types.Panel):
 
         row = layout.row()
         row.operator('vseqf.threepoint_modal_operator', text='Set In/Out')
-        fps = context.scene.render.fps / context.scene.render.fps_base
+        fps = get_fps(context.scene)
         row = layout.row()
         if clip.import_settings.import_frame_in != -1:
             row.label("In: "+str(clip.import_settings.import_frame_in)+' ('+timecode_from_frames(clip.import_settings.import_frame_in, fps)+')')
@@ -1504,7 +1513,7 @@ class VSEQFThreePointOperator(bpy.types.Operator):
     last_length = -1
 
     def update_import_values(self, context):
-        fps = round(context.scene.render.fps / context.scene.render.fps_base)
+        fps = round(get_fps(context.scene))
         settings = self.clip.import_settings
         if settings.import_frame_length != -1:
             frame_length = settings.import_frame_length
@@ -2719,7 +2728,7 @@ class VSEQFQuickZooms(bpy.types.Operator):
             #Zoom value is a number of seconds
             scene = context.scene
             cursor = scene.frame_current
-            zoom_custom(cursor, (cursor + ((scene.render.fps/scene.render.fps_base) * int(self.area))))
+            zoom_custom(cursor, (cursor + (get_fps(scene) * int(self.area))))
         elif self.area == 'timeline':
             scene = context.scene
             zoom_custom(scene.frame_start, scene.frame_end)
@@ -3646,7 +3655,7 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
             self.bl_label = 'Add Image'
         vseqf = context.scene.vseqf
         prefs = get_prefs()
-        fps = context.scene.render.fps / context.scene.render.fps_base
+        fps = get_fps(context.scene)
         self.length = fps * 4
         self.start_frame = context.scene.frame_current
         if len(context.scene.sequence_editor.sequences_all) == 0:
@@ -3834,7 +3843,7 @@ class VSEQFQuickSnaps(bpy.types.Operator):
 
         #Cursor snaps
         if self.type == 'cursor_to_seconds':
-            fps = scene.render.fps / scene.render.fps_base
+            fps = get_fps(scene)
             scene.frame_current = round(round(scene.frame_current / fps) * fps)
         elif self.type == 'cursor_to_beginning':
             if active:
@@ -4164,8 +4173,9 @@ class VSEQFQuickListPanel(bpy.types.Panel):
             row = box.row()
             split = row.split(percentage=0.8)
             col = split.row()
-            col.label("Len: "+timecode_from_frames(sequence.frame_final_duration, (scene.render.fps / scene.render.fps_base), levels=4))
-            col.label("Pos: "+timecode_from_frames(sequence.frame_start, (scene.render.fps / scene.render.fps_base), levels=4))
+            fps = get_fps(scene)
+            col.label("Len: "+timecode_from_frames(sequence.frame_final_duration, fps, levels=4))
+            col.label("Pos: "+timecode_from_frames(sequence.frame_start, fps, levels=4))
 
             #Third row - length, position and proxy toggle
             if vseqf.quicklist_editing:
@@ -4379,7 +4389,7 @@ class VSEQFQuickMarkerList(bpy.types.UIList):
     """Draws an editable list of current markers in the timeline"""
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         del data, icon, active_data, active_propname
-        timecode = timecode_from_frames(item.frame, (context.scene.render.fps / context.scene.render.fps_base), levels=0, subsecond_type='frames')
+        timecode = timecode_from_frames(item.frame, get_fps(context.scene), levels=0, subsecond_type='frames')
         split = layout.split(percentage=.9, align=True)
         subsplit = split.split(align=True)
         subsplit.operator('vseqf.quickmarkers_jump', text=item.name+' ('+timecode+')').frame = item.frame
