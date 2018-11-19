@@ -28,10 +28,13 @@ Known Issues:
    Right now the script cannot apply a vertical zoom level, as far as I can tell this is missing functionality in Blenders python api.
 
 Future Possibilities:
-   way to drag over an area of a strip and have it cut out or ripple-cut out
-   special tags with time index and length, displayed in overlay as clip markers
-   Ripple insert... need to think about how to do this, but I want it!
+   Add a way to drag over an area of a strip and have it cut out or ripple-cut out
+   Add special tags with time index and length, displayed in overlay as clip markers - need to implement display, and interface in panel
+   Ripple insert in real-time while grabbing... need to think about how to do this, but I want it!
+   Ability to ripple cut beyond the edge of the selected strips to ADD to the clip
    Copy/paste wrapper that copies strip animation data
+   Showing a visual offset on the active audio sequence, showing how far out of sync it is from it's video parent
+   Update the cursor based on context, maybe add icon under it, or add a 'help' area at bottom of vse
 
 Changelog:
 0.93
@@ -69,14 +72,11 @@ Changelog:
    Improved marker grabbing behavior
    Improvements to Quick3Point
    Added display of current strip length under center of strip
+   Fixed canceled grabs causing waveforms to redraw
+   Improved QuickTags interface
 
 Todo: check and improve tooltips on all buttons, make sure shortcuts are listed
-Todo: add: ability to ripple cut beyond the edge of the selected strips to ADD to the clip
-Todo: add: Look into adding a visual offset on the active audio sequence, showing how far out of sync it is from it's video parent
-Todo: bug: stop using undos if at all possible, they cause waveforms to need to be regenerated
-Todo: think about splitting some panels into their own/other tabs (maybe an 'edits' tab?)
-Todo: update readme: add QuickShortcuts, snap to grabbed edge
-Todo: look into updating the cursor based on context, maybe add icon under it, or add a 'help' area at bottom of vse
+Todo: update readme: add QuickShortcuts, Quick3Point, snap to grabbed edge
 """
 
 
@@ -279,6 +279,14 @@ def find_sequences_start(sequences):
         if sequence.frame_final_start < start:
             start = sequence.frame_final_start
     return start
+
+
+def find_timeline_height(sequences):
+    height = 1
+    for sequence in sequences:
+        if sequence.channel > height:
+            height = sequence.channel
+    return height
 
 
 def current_active(context):
@@ -650,7 +658,7 @@ def find_close_sequence(sequences, selected_sequence, direction, mode='overlap',
     return found
 
 
-def timecode_from_frames(frame, fps, levels=0, subsecond_type='miliseconds'):
+def timecode_from_frames(frame, fps, levels=0, subsecond_type='miliseconds', mode='string'):
     """Converts a frame number to a standard timecode in the format: HH:MM:SS:FF
     Arguments:
         frame: Integer, frame number to convert to a timecode
@@ -664,6 +672,7 @@ def timecode_from_frames(frame, fps, levels=0, subsecond_type='miliseconds'):
         subsecond_type: String, determines the format of the final element of the timecode:
             'miliseconds': subseconds will be divided by 100
             'frames': subseconds will be divvided by the current fps
+        mode: return mode, if 'string', will return a string timecode, if other, will return a list of integers
 
     Returns: A string timecode"""
 
@@ -693,22 +702,25 @@ def timecode_from_frames(frame, fps, levels=0, subsecond_type='miliseconds'):
     seconds = int(remaining_seconds[1])
     subseconds = int(round(remaining_seconds[0] * subsecond_divisor))
 
-    hours_text = str(hours).zfill(2)
-    minutes_text = str(minutes).zfill(2)
-    seconds_text = str(seconds).zfill(2)
-    subseconds_text = str(subseconds).zfill(2)
+    if mode != 'string':
+        return [hours, minutes, seconds, subseconds]
+    else:
+        hours_text = str(hours).zfill(2)
+        minutes_text = str(minutes).zfill(2)
+        seconds_text = str(seconds).zfill(2)
+        subseconds_text = str(subseconds).zfill(2)
 
-    #format and return the time value
-    time_text = subseconds_text
-    if levels > 1 or (levels == 0 and seconds > 0):
-        time_text = seconds_text+'.'+time_text
-    if levels > 2 or (levels == 0 and minutes > 0):
-        time_text = minutes_text+':'+time_text
-    if levels > 3 or (levels == 0 and hours > 0):
-        time_text = hours_text+':'+time_text
-    if negative:
-        time_text = '-'+time_text
-    return time_text
+        #format and return the time value
+        time_text = subseconds_text
+        if levels > 1 or (levels == 0 and seconds > 0):
+            time_text = seconds_text+'.'+time_text
+        if levels > 2 or (levels == 0 and minutes > 0):
+            time_text = minutes_text+':'+time_text
+        if levels > 3 or (levels == 0 and hours > 0):
+            time_text = hours_text+':'+time_text
+        if negative:
+            time_text = '-'+time_text
+        return time_text
 
 
 class VSEQFCompactEdit(bpy.types.Panel):
@@ -1208,23 +1220,122 @@ class VSEQFQuickShortcutsResetPlay(bpy.types.Operator):
 
 
 #Functions and classes related to threepoint editing
-def update_clip_import(self, context):
-    #todo: prevent values from being extended past sequence bounds
-    fps = round(get_fps(context.scene))
-    if self.import_frames_in >= fps:
-        self.import_frames_in = 0
-        self.import_seconds_in = self.import_seconds_in + 1
-    if self.import_seconds_in >= 60:
+def update_import_frame_in(self, fps):
+    self.import_frame_in = (self.import_minutes_in * 60 * fps) + (self.import_seconds_in * fps) + self.import_frames_in
+
+
+def update_import_frame_length(self, fps):
+    self.import_frame_length = (self.import_minutes_length * 60 * fps) + (self.import_seconds_length * fps) + self.import_frames_length
+
+
+def update_import_minutes_in(self, context):
+    fps = get_fps(context.scene)
+    length = self.full_length
+    length_timecode = timecode_from_frames(length, fps, subsecond_type='frames', mode='list')
+    max_hours, max_minutes, max_seconds, max_frames = length_timecode
+    max_minutes = max_minutes + (max_hours * 60)
+    if self.import_minutes_in + self.import_minutes_length > max_minutes:
+        if self.import_minutes_length > 0:
+            self.import_minutes_length = self.import_minutes_length - 1
+        else:
+            self.import_minutes_in = self.import_minutes_in - 1
+    update_import_frame_in(self, fps)
+
+
+def update_import_minutes_length(self, context):
+    fps = get_fps(context.scene)
+    length = self.full_length
+    length_timecode = timecode_from_frames(length, fps, subsecond_type='frames', mode='list')
+    max_hours, max_minutes, max_seconds, max_frames = length_timecode
+    max_minutes = max_minutes + (max_hours * 60)
+    if self.import_minutes_in + self.import_minutes_length > max_minutes:
+        self.import_minutes_length = self.import_minutes_length - 1
+    update_import_frame_length(self, fps)
+
+
+def update_import_seconds_in(self, context):
+    fps = get_fps(context.scene)
+    length = self.full_length
+    length_timecode = timecode_from_frames(length, fps, subsecond_type='frames', mode='list')
+    max_hours, max_minutes, max_seconds, max_frames = length_timecode
+    max_minutes = max_minutes + (max_hours * 60)
+    if self.import_seconds_in >= 60 and self.import_minutes_in < max_minutes:
         self.import_seconds_in = 0
         self.import_minutes_in = self.import_minutes_in + 1
-    self.import_frame_in = (self.import_minutes_in * 60 * fps) + (self.import_seconds_in * fps) + self.import_frames_in
-    if self.import_frames_length >= fps:
-        self.import_frames_length = 0
-        self.import_seconds_length = self.import_seconds_length + 1
-    if self.import_seconds_length >= 60:
-        self.import_seconds_length = 0
-        self.import_minutes_length = self.import_minutes_length + 1
-    self.import_frame_length = (self.import_minutes_length * 60 * fps) + (self.import_seconds_length * fps) + self.import_frames_length
+    else:
+        if self.import_seconds_in + self.import_seconds_length >= 60:
+            max_minutes = max_minutes - 1
+        if self.import_minutes_in + self.import_minutes_length >= max_minutes:
+            if self.import_seconds_length > 0:
+                self.import_seconds_length = self.import_seconds_length - 1
+            elif self.import_minutes_length > 0:
+                self.import_minutes_length = self.import_minutes_length - 1
+                self.import_seconds_length = 59
+            elif self.import_seconds_in + self.import_seconds_length >= max_seconds:
+                self.import_seconds_in = max_seconds
+    update_import_frame_in(self, fps)
+
+
+def update_import_seconds_length(self, context):
+    fps = get_fps(context.scene)
+    length = self.full_length
+    length_timecode = timecode_from_frames(length, fps, subsecond_type='frames', mode='list')
+    max_hours, max_minutes, max_seconds, max_frames = length_timecode
+    max_minutes = max_minutes + (max_hours * 60)
+    if self.import_minutes_in + self.import_minutes_length >= max_minutes:
+        if self.import_seconds_length + self.import_seconds_in > max_seconds:
+            self.import_seconds_length = max_seconds - self.import_seconds_in
+    else:
+        if self.import_seconds_length >= 60:
+            self.import_seconds_length = 0
+            self.import_minutes_length = self.import_minutes_length + 1
+    update_import_frame_length(self, fps)
+
+
+def update_import_frames_in(self, context):
+    fps = get_fps(context.scene)
+    length = self.full_length
+    length_timecode = timecode_from_frames(length, fps, subsecond_type='frames', mode='list')
+    max_hours, max_minutes, max_seconds, max_frames = length_timecode
+    max_minutes = max_minutes + (max_hours * 60)
+    if self.import_frames_in >= fps and (self.import_seconds_in < max_seconds or self.import_minutes_in < max_minutes):
+        #this variable is maxed out, and more can be added to next variables, so cycle up the next variable
+        self.import_frames_in = 0
+        self.import_seconds_in = self.import_seconds_in + 1
+    else:
+        if self.import_frames_in + self.import_frames_length >= fps:
+            max_seconds = max_seconds - 1
+        if self.import_seconds_in + self.import_seconds_length >= max_seconds and self.import_minutes_in + self.import_minutes_length >= max_minutes:
+            #all above variables are maxed out in current setup, this cannot be rolled over unless length is lowered
+            if self.import_seconds_length > 0 or self.import_minutes_length > 0:
+                #reduce seconds length, roll frames up to next
+                self.import_seconds_length = self.import_seconds_length - 1
+                self.import_frames_length = round(fps) - 1
+            elif self.import_frames_length > 1:
+                #reduce frame length
+                self.import_frames_length = self.import_frames_length - 1
+            elif self.import_frames_in + self.import_frames_length >= fps - 1:
+                #everything is maxed out, hold at maximum
+                self.import_frames_in = max_frames - 1
+    update_import_frame_in(self, fps)
+
+
+def update_import_frames_length(self, context):
+    fps = get_fps(context.scene)
+    length = self.full_length
+    length_timecode = timecode_from_frames(length, fps, subsecond_type='frames', mode='list')
+    max_hours, max_minutes, max_seconds, max_frames = length_timecode
+    max_minutes = max_minutes + (max_hours * 60)
+    if self.import_minutes_in + self.import_minutes_length >= max_minutes and self.import_seconds_in + self.import_seconds_length >= max_seconds:
+        if self.import_frames_length == 0:
+            self.import_frames_length = 1
+        elif self.import_frames_length + self.import_frames_in > max_frames:
+            self.import_frames_length = max_frames - self.import_frames_in
+    else:
+        if self.import_frames_length >= fps:
+            self.import_frames_length = 0
+            self.import_seconds_length = self.import_seconds_length + 1
+    update_import_frame_length(self, fps)
 
 
 def three_point_draw_callback(self, context):
@@ -1634,6 +1745,7 @@ class VSEQFThreePointOperator(bpy.types.Operator):
             self.clip = context.space_data.clip
             self.last_in = self.clip.import_settings.import_frame_in
             self.last_length = self.clip.import_settings.import_frame_length
+            self.clip.import_settings.full_length = self.clip.frame_duration
             if self.clip.import_settings.import_frame_in == -1:
                 self.in_frame = 0
                 self.clip.import_settings.import_frame_in = 0
@@ -1723,6 +1835,9 @@ class VSEQFGrabAdd(bpy.types.Operator):
     snap_edge_sequence = None
     secondary_snap_edge = None
     secondary_snap_edge_sequence = None
+    timeline_start = 1
+    timeline_end = 1
+    timeline_height = 1
 
     def find_by_name(self, name):
         #finds the sequence data matching the given name.
@@ -1779,9 +1894,22 @@ class VSEQFGrabAdd(bpy.types.Operator):
             return True
         return False
 
-    def move_sequences(self, offset_x, offset_y, all=False):
+    def move_sequences(self, offset_x, offset_y, reset=False):
         ripple_offset = 0
         ripple_start = self.sequences[0][1]
+
+        timeline_length = self.timeline_end - self.timeline_start
+
+        if reset:
+            for seq in self.sequences:
+                sequence = seq[0]
+                sequence.channel = seq[4] + self.timeline_height
+                sequence.frame_start = seq[3] + timeline_length
+            for seq in self.sequences:
+                sequence = seq[0]
+                sequence.channel = seq[4]
+                sequence.frame_start = seq[3]
+            return
 
         for seq in self.sequences:
             sequence = seq[0]
@@ -1975,7 +2103,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
 
         if event.type in {'LEFTMOUSE', 'RET'}:
             self.remove_draw_handler()
-            self.move_sequences(offset_x, offset_y, all=True)  #check sequences one last time, just to be sure
+            self.move_sequences(offset_x, offset_y)  #check sequences one last time, just to be sure
             for seq in self.sequences:
                 sequence = seq[0]
                 if self.prefs.fades:
@@ -2000,7 +2128,10 @@ class VSEQFGrabAdd(bpy.types.Operator):
             if not self.cancelled:
                 self.cancelled = True
                 current_frame = context.scene.frame_current
-                bpy.ops.ed.undo()
+                self.ripple = False
+                self.ripple_pop = False
+                self.move_sequences(0, 0, reset=True)
+                #bpy.ops.ed.undo()
                 if not context.screen.is_animation_playing:
                     context.scene.frame_current = self.start_frame
                     context.scene.sequence_editor.overlay_frame = self.start_overlay_frame
@@ -2059,6 +2190,9 @@ class VSEQFGrabAdd(bpy.types.Operator):
             else:
                 to_move.append(seq)
         sequences = current_sequences(context)
+        self.timeline_start = find_sequences_start(sequences)
+        self.timeline_end = find_sequences_end(sequences)
+        self.timeline_height = find_timeline_height(sequences)
         for seq in sequences:
             sequence_data = self.get_sequence_data(seq)
             if parenting and seq in to_move:
@@ -2159,6 +2293,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
             self.can_pop = True
         else:
             self.can_pop = False
+        #bpy.ops.ed.undo_push()
         context.window_manager.modal_handler_add(self)
         args = (self, context)
         self._handle = bpy.types.SpaceSequenceEditor.draw_handler_add(vseqf_grab_draw, args, 'WINDOW', 'POST_PIXEL')
@@ -3213,7 +3348,6 @@ class VSEQFQuickFadesCross(bpy.types.Operator):
     type = bpy.props.StringProperty()
 
     def execute(self, context):
-        bpy.ops.ed.undo_push()
         sequences = current_sequences(context)
 
         #store a list of selected sequences since adding a crossfade destroys the selection
@@ -3222,6 +3356,7 @@ class VSEQFQuickFadesCross(bpy.types.Operator):
 
         for sequence in selected_sequences:
             if sequence.type != 'SOUND' and not hasattr(sequence, 'input_1'):
+                bpy.ops.ed.undo_push()
                 first_sequence = None
                 second_sequence = None
                 #iterate through selected sequences and add crossfades to previous or next sequence
@@ -3288,7 +3423,6 @@ class VSEQFQuickFadesCross(bpy.types.Operator):
             sequence.select = True
         if active_sequence:
             context.scene.sequence_editor.active_strip = active_sequence
-        bpy.ops.ed.undo_push()
         return{'FINISHED'}
 
 
@@ -3493,11 +3627,12 @@ class VSEQFQuickParents(bpy.types.Operator):
     action = bpy.props.StringProperty()
 
     def execute(self, context):
-        bpy.ops.ed.undo_push()
         selected = current_selected(context)
         active = current_active(context)
         if not active:
             return {'CANCELLED'}
+
+        bpy.ops.ed.undo_push()
 
         if (self.action == 'add') and (len(selected) > 1):
             add_children(active, selected)
@@ -3530,10 +3665,10 @@ class VSEQFQuickParentsClear(bpy.types.Operator):
     strip = bpy.props.StringProperty()
 
     def execute(self, context):
-        bpy.ops.ed.undo_push()
         sequences = current_sequences(context)
         for sequence in sequences:
             if sequence.name == self.strip:
+                bpy.ops.ed.undo_push()
                 clear_parent(sequence)
                 break
         redraw_sequencers()
@@ -4592,7 +4727,6 @@ class VSEQFQuickMarkersAddPreset(bpy.types.Operator):
 def populate_selected_tags():
     vseqf = bpy.context.scene.vseqf
     selected_sequences = current_selected(bpy.context)
-    vseqf.selected_tags.clear()
     populate_tags(sequences=selected_sequences, tags=vseqf.selected_tags)
 
 
@@ -4610,7 +4744,10 @@ def populate_tags(sequences=False, tags=False):
     for sequence in sequences:
         for tag in sequence.tags:
             temp_tags.add(tag.text)
-    tags.clear()
+    try:
+        tags.clear()
+    except:
+        pass
     add_tags = sorted(temp_tags)
     for tag in add_tags:
         new_tag = tags.add()
@@ -4679,24 +4816,33 @@ class VSEQFQuickTagsPanel(bpy.types.Panel):
         row = layout.row()
         row.template_list("VSEQFQuickTagListAll", "", vseqf, 'tags', vseqf, 'marker_index')
         row = layout.row()
-        split = row.split(percentage=.9, align=True)
-        split.prop(vseqf, 'current_tag')
-        split.operator('vseqf.quicktags_add', text="", icon="PLUS").text = vseqf.current_tag
+        row.separator()
+
         row = layout.row()
-        split = row.split(percentage=.5)
-        if vseqf.show_selected_tags:
+        row.label('Edit Tags:')
+        row = layout.row()
+        row.prop(vseqf, 'show_tags', expand=True)
+        if vseqf.show_tags == 'SELECTED':
             populate_selected_tags()
-            split.label('Selected Tags:')
-            split.prop(vseqf, 'show_selected_tags', text='Show All Selected', toggle=True)
             row = layout.row()
             row.template_list("VSEQFQuickTagList", "", vseqf, 'selected_tags', vseqf, 'marker_index', rows=2)
+            row = layout.row()
+            split = row.split(percentage=.9, align=True)
+            split.prop(vseqf, 'current_tag', text='New Tag')
+            split.operator('vseqf.quicktags_add', text="", icon="PLUS").text = vseqf.current_tag
+            row = layout.row()
+            row.operator('vseqf.quicktags_clear', text='Clear Selected Strip Tags').mode = 'selected'
         else:
-            split.label('Active Tags:')
-            split.prop(vseqf, 'show_selected_tags', text='Show All Selected', toggle=True)
             row = layout.row()
             row.template_list("VSEQFQuickTagList", "", sequence, 'tags', vseqf, 'marker_index', rows=2)
-        row = layout.row()
-        row.operator('vseqf.quicktags_clear', text='Clear Selected Tags')
+            row = layout.row()
+            split = row.split(percentage=.9, align=True)
+            split.prop(vseqf, 'current_tag', text='New Tag')
+            split.operator('vseqf.quicktags_add_active', text="", icon="PLUS").text = vseqf.current_tag
+            #row = layout.row()
+            #row.operator('vseqf.quicktags_add_marker', text='Add Marker Tag').marker = str(scene.frame_current)+','+vseqf.current_tag
+            row = layout.row()
+            row.operator('vseqf.quicktags_clear', text='Clear Active Strip Tags').mode = 'active'
 
 
 class VSEQFQuickTagListAll(bpy.types.UIList):
@@ -4718,7 +4864,10 @@ class VSEQFQuickTagList(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         del context, data, icon, active_data, active_propname
         split = layout.split(percentage=.9, align=True)
-        split.operator('vseqf.quicktags_select', text=item.text).text = item.text
+        display_text = item.text
+        if item.use_offset:
+            display_text = display_text + '(' + str(item.offset) + ')'
+        split.operator('vseqf.quicktags_select', text=display_text).text = item.text
         split.operator('vseqf.quicktags_remove', text='', icon='X').text = item.text
 
     def draw_filter(self, context, layout):
@@ -4739,14 +4888,25 @@ class VSEQFQuickTagsClear(bpy.types.Operator):
     bl_label = 'VSEQF Quick Tags Clear'
     bl_description = 'Clear all tags on all selected sequences'
 
+    mode = bpy.props.StringProperty('selected')
+
     def execute(self, context):
-        sequences = current_selected(context)
-        if not sequences:
-            return {'FINISHED'}
-        bpy.ops.ed.undo_push()
-        for sequence in sequences:
+        if self.mode == 'selected':
+            sequences = current_selected(context)
+            if not sequences:
+                return {'FINISHED'}
+            bpy.ops.ed.undo_push()
+            for sequence in sequences:
+                sequence.tags.clear()
+            populate_selected_tags()
+            populate_tags()
+        else:
+            sequence = current_active(context)
+            if not sequence:
+                return {'FINISHED'}
+            bpy.ops.ed.undo_push()
             sequence.tags.clear()
-        populate_tags()
+            populate_tags()
         return{'FINISHED'}
 
 
@@ -4826,13 +4986,43 @@ class VSEQFQuickTagsRemove(bpy.types.Operator):
             for index, tag in reversed(list(enumerate(sequence.tags))):
                 if tag.text == self.text:
                     sequence.tags.remove(index)
-
+        populate_selected_tags()
         populate_tags()
         return{'FINISHED'}
 
 
+class VSEQFQuickTagsAddMarker(bpy.types.Operator):
+    """Adds a marker tag with the given text to the active sequence"""
+    bl_idname = 'vseqf.quicktags_add_marker'
+    bl_label = 'VSEQF Quick Tags Add Marker'
+    bl_description = 'Add this marker tag to active sequence.'
+
+    marker = bpy.props.StringProperty()
+
+    def execute(self, context):
+        marker = self.marker.replace("\n", '')
+        frame, text = marker.split(',', 1)
+        frame = int(frame)
+        if text:
+            bpy.ops.ed.undo_push()
+            sequence = current_active(context)
+            marker_frame = frame - sequence.frame_start
+            tag_found = False
+            for tag in sequence.tags:
+                if tag.text == text:
+                    tag_found = True
+            if not tag_found:
+                tag = sequence.tags.add()
+                tag.text = text
+                tag.use_offset = True
+                tag.offset = marker_frame
+
+            populate_tags()
+        return{'FINISHED'}
+
+
 class VSEQFQuickTagsAdd(bpy.types.Operator):
-    """Adds a tag with the given text to the selected and active sequences
+    """Adds a tag with the given text to the selected sequences
     Argument:
         text: String, tag to add"""
     bl_idname = 'vseqf.quicktags_add'
@@ -4854,6 +5044,33 @@ class VSEQFQuickTagsAdd(bpy.types.Operator):
                 if not tag_found:
                     tag = sequence.tags.add()
                     tag.text = text
+
+            populate_tags()
+        return{'FINISHED'}
+
+
+class VSEQFQuickTagsAddActive(bpy.types.Operator):
+    """Adds a tag with the given text to the active sequence
+    Argument:
+        text: String, tag to add"""
+    bl_idname = 'vseqf.quicktags_add_active'
+    bl_label = 'VSEQF Quick Tags Add'
+    bl_description = 'Add this tag to the active sequence'
+
+    text = bpy.props.StringProperty()
+
+    def execute(self, context):
+        text = self.text.replace("\n", '')
+        if text:
+            bpy.ops.ed.undo_push()
+            sequence = current_active(context)
+            tag_found = False
+            for tag in sequence.tags:
+                if tag.text == text:
+                    tag_found = True
+            if not tag_found:
+                tag = sequence.tags.add()
+                tag.text = text
 
             populate_tags()
         return{'FINISHED'}
@@ -5054,7 +5271,6 @@ class VSEQFCut(bpy.types.Operator):
 
         #find the ripple amount
         ripple_amount = 0
-        ripple_frame = self.frame
         for sequence in to_cut_temp:
             if side == 'LEFT':
                 cut_amount = self.frame - sequence.frame_final_start
@@ -5326,7 +5542,6 @@ class VSEQFDelete(bpy.types.Operator):
                 first_start = sequence.frame_final_start
             offset = 0 - sequence.frame_final_duration
             start_frame = sequence.frame_final_start
-            end_frame = sequence.frame_final_end
             to_delete = [sequence]
             if vseqf_parenting() and context.scene.vseqf.delete_children:
                 children = find_children(sequence)
@@ -5421,6 +5636,12 @@ class VSEQFTags(bpy.types.PropertyGroup):
     text = bpy.props.StringProperty(
         name="Tag Text",
         default="")
+    use_offset = bpy.props.BoolProperty(
+        name="Use Frame Offset",
+        default=False)
+    offset = bpy.props.IntProperty(
+        name="Frame Offset",
+        default=0)
 
 
 class VSEQFMarkerPreset(bpy.types.PropertyGroup):
@@ -5477,6 +5698,9 @@ class VSEQFZoomPreset(bpy.types.PropertyGroup):
 
 
 class VSEQFQuick3PointValues(bpy.types.PropertyGroup):
+    full_length = bpy.props.IntProperty(
+        default=1,
+        min=0)
     import_frame_in = bpy.props.IntProperty(
         default=-1,
         min=-1)
@@ -5486,27 +5710,27 @@ class VSEQFQuick3PointValues(bpy.types.PropertyGroup):
     import_minutes_in = bpy.props.IntProperty(
         default=0,
         min=0,
-        update=update_clip_import)
+        update=update_import_minutes_in)
     import_seconds_in = bpy.props.IntProperty(
         default=0,
         min=0,
-        update=update_clip_import)
+        update=update_import_seconds_in)
     import_frames_in = bpy.props.IntProperty(
         default=0,
         min=0,
-        update=update_clip_import)
+        update=update_import_frames_in)
     import_minutes_length = bpy.props.IntProperty(
         default=0,
         min=0,
-        update=update_clip_import)
+        update=update_import_minutes_length)
     import_seconds_length = bpy.props.IntProperty(
         default=0,
         min=0,
-        update=update_clip_import)
+        update=update_import_seconds_length)
     import_frames_length = bpy.props.IntProperty(
         default=0,
         min=0,
-        update=update_clip_import)
+        update=update_import_frames_length)
 
 
 class VSEQFSetting(bpy.types.PropertyGroup):
@@ -5650,6 +5874,10 @@ class VSEQFSetting(bpy.types.PropertyGroup):
         default='')
     tags = bpy.props.CollectionProperty(type=VSEQFTags)
     selected_tags = bpy.props.CollectionProperty(type=VSEQFTags)
+    show_tags = bpy.props.EnumProperty(
+        name="Show Tags On",
+        default='ACTIVE',
+        items=[('ACTIVE', 'Active Strip', '', 1), ('SELECTED', 'Selected Strips', '', 2)])
     show_selected_tags = bpy.props.BoolProperty(
         name="Show Tags For All Selected Sequences",
         default=False)
@@ -5904,6 +6132,7 @@ classes = (SEQUENCER_MT_add, SEQUENCER_MT_strip, VSEQFAddZoom, VSEQFClearZooms, 
            VSEQFQuickMarkersAddPreset, VSEQFQuickMarkersMenu, VSEQFQuickMarkersPanel, VSEQFQuickMarkersPlace,
            VSEQFQuickMarkersRemovePreset, VSEQFQuickParents, VSEQFQuickParentsClear, VSEQFQuickParentsMenu,
            VSEQFQuickSnaps, VSEQFQuickSnapsMenu, VSEQFQuickTagList, VSEQFQuickTagListAll, VSEQFQuickTagsAdd,
+           VSEQFQuickTagsAddActive, VSEQFQuickTagsAddMarker,
            VSEQFQuickTagsClear, VSEQFQuickTagsMenu, VSEQFQuickTagsPanel, VSEQFQuickTagsRemove, VSEQFQuickTagsRemoveFrom,
            VSEQFQuickTagsSelect, VSEQFQuickTimeline, VSEQFQuickTimelineMenu, VSEQFQuickZoomPreset,
            VSEQFQuickZoomPresetMenu, VSEQFQuickZooms, VSEQFQuickZoomsMenu, VSEQFRemoveZoom, VSEQFSelectGrab,
