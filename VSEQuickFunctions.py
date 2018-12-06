@@ -74,6 +74,7 @@ Changelog:
    Added display of current strip length under center of strip
    Fixed canceled grabs causing waveforms to redraw
    Improved QuickTags interface
+   Reworked ripple delete, it should now behave properly with overlapping sequences
 
 Todo: check and improve tooltips on all buttons, make sure shortcuts are listed
 Todo: update readme: add QuickShortcuts, Quick3Point, snap to grabbed edge
@@ -152,9 +153,6 @@ def ripple_timeline(sequences, start_frame, ripple_amount, select_ripple=True):
     'select_ripple' will select all sequences that were moved."""
 
     to_change = []
-    print(start_frame)
-    print(ripple_amount)
-    print('')
     for sequence in sequences:
         if sequence.frame_final_end > start_frame - ripple_amount:
             to_change.append([sequence, sequence.channel, sequence.frame_start + ripple_amount, True])
@@ -5533,30 +5531,43 @@ class VSEQFDelete(bpy.types.Operator):
 
     def execute(self, context):
         bpy.ops.ed.undo_push()
-        sequences = current_selected(context)
-        if not sequences:
+        to_delete = current_selected(context)
+        if not to_delete:
             return {'CANCELLED'}
-        first_start = sequences[0].frame_final_start
-        for sequence in sequences:
-            if sequence.frame_final_start < first_start:
-                first_start = sequence.frame_final_start
-            offset = 0 - sequence.frame_final_duration
-            start_frame = sequence.frame_final_start
-            to_delete = [sequence]
+
+        #Determine frames that need to be rippled
+        ripple_frames = set()
+        for deletable in to_delete:
+            delete_start = deletable.frame_final_start
+            delete_end = deletable.frame_final_end
+            for frame in range(delete_start, delete_end+1):
+                ripple_frames.add(frame)
+
+        #Delete selected
+        for sequence in to_delete:
             if vseqf_parenting() and context.scene.vseqf.delete_children:
                 children = find_children(sequence)
                 for child in children:
-                    if child not in sequences:
-                        to_delete.append(child)
-            bpy.ops.sequencer.select_all(action='DESELECT')
-            for delete in to_delete:
-                delete.select = True
-            bpy.ops.sequencer.delete()
-            if self.ripple:
-                all_sequences = current_sequences(context)
-                ripple_timeline(all_sequences, start_frame, offset, select_ripple=False)
+                    if child not in to_delete:
+                        child.select = True
+        bpy.ops.sequencer.delete()
+
         if self.ripple:
-            context.scene.frame_current = first_start
+            #Ripple remaining sequences
+            sequences = current_sequences(context)
+            ripple_frames = list(ripple_frames)
+            ripple_frames.sort()
+            start_frame = ripple_frames[0]
+            end_frame = ripple_frames[0]
+            ripple_frames.append(ripple_frames[-1]+2)
+            for frame in ripple_frames:
+                if frame - end_frame > 1:
+                    #Ripple section, start next section
+                    ripple_length = end_frame - start_frame
+                    ripple_timeline(sequences, start_frame, -ripple_length)
+                    start_frame = frame
+                end_frame = frame
+            context.scene.frame_current = ripple_frames[0]
         self.reset()
         return {'FINISHED'}
 
