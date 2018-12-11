@@ -17,11 +17,6 @@
 # ##### END GPL LICENSE BLOCK #####
 
 """
-2.8 update notes: https://wiki.blender.org/wiki/User:NBurn/2.80_Python_API_Changes
-   scene_update_post handler has been removed, need a new way to run the continous function, or hope it is added back?
-   any time variable types are set (ie, variable = Class()), the ':' is used now (variable: Class())
-   bgl is gone? how to draw overlays now?
-
 Known Issues:
    Sometimes undo pushing breaks... not sure what's going on there
    Uncut does not work on movieclip type sequences... there appears to be no way of getting the sequence's source file.
@@ -60,6 +55,7 @@ Changelog:
    Right-click context menu option added, hold right click to activate it.  Options will differ depending on what is clicked on - cursor, sequence, sequence handles, markers, empty area
 
 0.94 (In progress)
+   Updated for Blender 2.8 - lots of code changes, updated menus
    Frame skipping now works with reverse playback as well, and fixed poor behavior
    Added QuickShortcuts - timeline and sequence movement using the numpad.  Thanks to tintwotin for the ideas!
    Added option to snap cursor to a dragged edge if one edge is grabbed, if two are grabbed, the second edge will be set to the overlay frame.
@@ -76,28 +72,32 @@ Changelog:
    Improved QuickTags interface
    Reworked ripple delete, it should now behave properly with overlapping sequences
 
+Todo: test all features in 2.8
+Todo: grab multiple no longer works
+Todo: ripple pop doesnt move children properly
 Todo: check and improve tooltips on all buttons, make sure shortcuts are listed
-Todo: update readme: add QuickShortcuts, Quick3Point, snap to grabbed edge
+Todo: update readme: add QuickShortcuts, Quick3Point, snap to grabbed edge, remove simplify menus
 """
-
 
 
 import bpy
 import bgl
+import gpu
 import blf
 import math
 import time
 import os
 from bpy.app.handlers import persistent
 from bpy_extras.io_utils import ImportHelper
+from gpu_extras.batch import batch_for_shader
 
 
 bl_info = {
     "name": "VSE Quick Functions",
     "description": "Improves functionality of the sequencer by adding new menus and functions for snapping, adding fades, zooming, sequence parenting, ripple editing, playback speed, and more.",
     "author": "Hudson Barkley (Snu/snuq/Aritodo)",
-    "version": (0, 9, 3),
-    "blender": (2, 79, 0),
+    "version": (0, 9, 4),
+    "blender": (2, 80, 0),
     "location": "Sequencer Panels; Sequencer Menus; Sequencer S, F, Z, Ctrl-P, Shift-P, Alt-M, Alt-K Shortcuts",
     "wiki_url": "https://github.com/snuq/VSEQF",
     "tracker_url": "https://github.com/snuq/VSEQF/issues",
@@ -324,38 +324,37 @@ def get_prefs():
 
 
 def draw_line(sx, sy, ex, ey, width, color=(1.0, 1.0, 1.0, 1.0)):
-    bgl.glEnable(bgl.GL_BLEND)
-    bgl.glColor4f(*color)
-    bgl.glLineWidth(width)
-    bgl.glBegin(bgl.GL_LINE_STRIP)
-    bgl.glVertex2i(sx, sy)
-    bgl.glVertex2i(ex, ey)
-    bgl.glEnd()
+    coords = [(sx, sy), (ex, ey)]
+    shader = gpu.shader.from_builtin('2D_UNIFORM_COLOR')
+    batch = batch_for_shader(shader, 'LINES', {'pos': coords})
+    shader.bind()
+    shader.uniform_float('color', color)
+    batch.draw(shader)
 
 
 def draw_rect(x, y, w, h, color=(1.0, 1.0, 1.0, 1.0)):
-    bgl.glBegin(bgl.GL_QUADS)
-    bgl.glColor4f(*color)
-    bgl.glVertex2f(x, y)
-    bgl.glVertex2f(x+w, y)
-    bgl.glVertex2f(x+w, y+h)
-    bgl.glVertex2f(x, y+h)
-    bgl.glEnd()
+    vertices = ((x, y), (x+w, y), (x, y+h), (x+w, y+h))
+    indices = ((0, 1, 2), (2, 1, 3))
+    shader = gpu.shader.from_builtin('2D_UNIFORM_COLOR')
+    batch = batch_for_shader(shader, 'TRIS', {"pos": vertices}, indices=indices)
+    shader.bind()
+    shader.uniform_float('color', color)
+    batch.draw(shader)
 
 
-def draw_ngon(verts, color=(1.0, 1.0, 1.0, 1.0)):
-    while len(verts) < 4:
-        verts.append(verts[-1])
-    bgl.glBegin(bgl.GL_QUADS)
-    bgl.glColor4f(*color)
-    for vert in verts:
-        bgl.glVertex2f(*vert)
-    bgl.glEnd()
+def draw_tri(v1, v2, v3, color=(1.0, 1.0, 1.0, 1.0)):
+    vertices = (v1, v2, v3)
+    indices = ((0, 1, 2), )
+    shader = gpu.shader.from_builtin('2D_UNIFORM_COLOR')
+    batch = batch_for_shader(shader, 'TRIS', {"pos": vertices}, indices=indices)
+    shader.bind()
+    shader.uniform_float('color', color)
+    batch.draw(shader)
 
 
 def draw_text(x, y, size, text, color=(1.0, 1.0, 1.0, 1.0)):
     font_id = 0
-    bgl.glColor4f(*color)
+    blf.color(font_id, *color)
     blf.position(font_id, x, y, 0)
     blf.size(font_id, size, 72)
     blf.draw(font_id, text)
@@ -424,10 +423,7 @@ def edit_panel(self, context):
     """Used to add extra information and variables to the VSE 'Edit Strip' panel"""
 
     #load up preferences
-    if __name__ in context.user_preferences.addons:
-        prefs = context.user_preferences.addons[__name__].preferences
-    else:
-        prefs = VSEQFTempSettings()
+    prefs = get_prefs()
 
     scene = context.scene
     active_sequence = current_active(context)
@@ -437,9 +433,9 @@ def edit_panel(self, context):
     layout = self.layout
     row = layout.row()
     fps = get_fps(scene)
-    row.label("Final Offset: "+timecode_from_frames(active_sequence.frame_offset_start, fps)+" : "+timecode_from_frames(active_sequence.frame_offset_end, fps))
+    row.label(text="Final Offset: "+timecode_from_frames(active_sequence.frame_offset_start, fps)+" : "+timecode_from_frames(active_sequence.frame_offset_end, fps))
     row = layout.row()
-    row.label("Final Start: "+timecode_from_frames(active_sequence.frame_final_start, fps))
+    row.label(text="Final Start: "+timecode_from_frames(active_sequence.frame_final_start, fps))
 
     if prefs.fades:
         #display info about the fade in and out of the current sequence
@@ -448,13 +444,13 @@ def edit_panel(self, context):
 
         row = layout.row()
         if fadein > 0:
-            row.label("Fadein: "+str(round(fadein))+" Frames")
+            row.label(text="Fadein: "+str(round(fadein))+" Frames")
         else:
-            row.label("No Fadein Detected")
+            row.label(text="No Fadein Detected")
         if fadeout > 0:
-            row.label("Fadeout: "+str(round(fadeout))+" Frames")
+            row.label(text="Fadeout: "+str(round(fadeout))+" Frames")
         else:
-            row.label("No Fadeout Detected")
+            row.label(text="No Fadeout Detected")
 
     if prefs.parenting:
         #display info about parenting relationships
@@ -468,25 +464,25 @@ def edit_panel(self, context):
         #List relationships for active sequence
         if parent:
             row = box.row()
-            split = row.split(percentage=.8, align=True)
-            split.label("Parent: "+parent.name)
-            split.operator('vseqf.quickparents', text='', icon="BORDER_RECT").action = 'select_parent'
+            split = row.split(factor=.8, align=True)
+            split.label(text="Parent: "+parent.name)
+            split.operator('vseqf.quickparents', text='', icon="ARROW_LEFTRIGHT").action = 'select_parent'
             split.operator('vseqf.quickparents', text='', icon="X").action = 'clear_parent'
         if len(children) > 0:
             row = box.row()
-            split = row.split(percentage=.8, align=True)
-            subsplit = split.split(percentage=.1)
+            split = row.split(factor=.8, align=True)
+            subsplit = split.split(factor=.1)
             subsplit.prop(scene.vseqf, 'expanded_children', icon="TRIA_DOWN" if scene.vseqf.expanded_children else "TRIA_RIGHT", icon_only=True, emboss=False)
-            subsplit.label("Children: "+children[0].name)
-            split.operator('vseqf.quickparents', text='', icon="BORDER_RECT").action = 'select_children'
+            subsplit.label(text="Children: "+children[0].name)
+            split.operator('vseqf.quickparents', text='', icon="ARROW_LEFTRIGHT").action = 'select_children'
             split.operator('vseqf.quickparents', text='', icon="X").action = 'clear_children'
             if scene.vseqf.expanded_children:
                 index = 1
                 while index < len(children):
                     row = box.row()
-                    split = row.split(percentage=.1)
-                    split.label()
-                    split.label(children[index].name)
+                    split = row.split(factor=.1)
+                    split.label(text='')
+                    split.label(text=children[index].name)
                     index = index + 1
 
         row = box.row()
@@ -731,23 +727,15 @@ class VSEQFCompactEdit(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        #Check if panel is disabled
-        if __name__ in bpy.context.user_preferences.addons:
-            prefs = bpy.context.user_preferences.addons[__name__].preferences
-        else:
-            prefs = VSEQFTempSettings()
+        prefs = get_prefs()
 
-        #Check for active sequence
         if not current_active(context):
             return False
         else:
             return prefs.edit
 
     def draw(self, context):
-        if __name__ in context.user_preferences.addons:
-            prefs = context.user_preferences.addons[__name__].preferences
-        else:
-            prefs = VSEQFTempSettings()
+        prefs = get_prefs()
         scene = context.scene
         strip = current_active(context)
         vseqf = scene.vseqf
@@ -755,9 +743,9 @@ class VSEQFCompactEdit(bpy.types.Panel):
         fps = get_fps(scene)
 
         row = layout.row()
-        split = row.split(percentage=.8)
+        split = row.split(factor=.8)
         split.prop(strip, 'name', text="")
-        split.label("("+strip.type+")")
+        split.label(text="("+strip.type+")")
 
         if strip.type == 'SOUND':
             row = layout.row(align=True)
@@ -773,7 +761,7 @@ class VSEQFCompactEdit(bpy.types.Panel):
             row = layout.row(align=True)
             sub = row.row(align=True)
             sub.active = not strip.mute
-            split = sub.split(percentage=.3, align=True)
+            split = sub.split(factor=.3, align=True)
             split.prop(strip, "blend_type", text="")
             split.prop(strip, "blend_alpha", text="Opacity", slider=True)
             row.prop(strip, "mute", toggle=True, icon_only=True)
@@ -801,13 +789,13 @@ class VSEQFCompactEdit(bpy.types.Panel):
 
             row = layout.row()
             if fadein > 0:
-                row.label("Fadein: "+str(round(fadein))+" Frames")
+                row.label(text="Fadein: "+str(round(fadein))+" Frames")
             else:
-                row.label("No Fadein Detected")
+                row.label(text="No Fadein Detected")
             if fadeout > 0:
-                row.label("Fadeout: "+str(round(fadeout))+" Frames")
+                row.label(text="Fadeout: "+str(round(fadeout))+" Frames")
             else:
-                row.label("No Fadeout Detected")
+                row.label(text="No Fadeout Detected")
 
         if prefs.parenting:
             #display info about parenting relationships
@@ -831,25 +819,25 @@ class VSEQFCompactEdit(bpy.types.Panel):
             #List relationships for active sequence
             if parent:
                 row = box.row()
-                split = row.split(percentage=.8, align=True)
-                split.label("Parent: "+parent.name)
+                split = row.split(factor=.8, align=True)
+                split.label(text="Parent: "+parent.name)
                 split.operator('vseqf.quickparents', text='', icon="BORDER_RECT").action = 'select_parent'
                 split.operator('vseqf.quickparents', text='', icon="X").action = 'clear_parent'
             if len(children) > 0:
                 row = box.row()
-                split = row.split(percentage=.8, align=True)
-                subsplit = split.split(percentage=.1)
+                split = row.split(factor=.8, align=True)
+                subsplit = split.split(factor=.1)
                 subsplit.prop(vseqf, 'expanded_children', icon="TRIA_DOWN" if scene.vseqf.expanded_children else "TRIA_RIGHT", icon_only=True, emboss=False)
-                subsplit.label("Children: "+children[0].name)
+                subsplit.label(text="Children: "+children[0].name)
                 split.operator('vseqf.quickparents', text='', icon="BORDER_RECT").action = 'select_children'
                 split.operator('vseqf.quickparents', text='', icon="X").action = 'clear_children'
                 if vseqf.expanded_children:
                     index = 1
                     while index < len(children):
                         row = box.row()
-                        split = row.split(percentage=.1)
-                        split.label()
-                        split.label(children[index].name)
+                        split = row.split(factor=.1)
+                        split.label(text='')
+                        split.label(text=children[index].name)
                         index = index + 1
 
             row = box.row()
@@ -866,7 +854,7 @@ class VSEQFCompactEdit(bpy.types.Panel):
 #Functions related to continuous update
 @persistent
 def vseqf_continuous(scene):
-    if not bpy.context.screen or bpy.context.screen.scene != scene:
+    if not bpy.context.scene or bpy.context.scene != scene:
         return
     vseqf = scene.vseqf
     if vseqf.last_frame != scene.frame_current:
@@ -966,6 +954,8 @@ def vseqf_draw():
     height = region.height
     left, bottom = view.region_to_view(0, 0)
     right, top = view.region_to_view(width, height)
+    if math.isnan(left):
+        return
     shown_width = right - left
     shown_height = top - bottom
     channel_px = height / shown_height
@@ -1006,6 +996,7 @@ def vseqf_draw():
             draw_rect(active_right - fadeout_width, active_top - (fade_height * 2), fadeout_width, fade_height, color=(.5, .5, 1, .75))
             draw_text(active_right - (text_size * 4), active_top, text_size, 'Out: '+str(fadeout), text_color)
     if prefs.parenting:
+        bgl.glEnable(bgl.GL_BLEND)
         children = find_children(active_strip)
         parent = find_parent(active_strip)
         if parent:
@@ -1018,6 +1009,7 @@ def vseqf_draw():
             pixel_x = active_pos_x + pixel_x_distance
             pixel_y = active_pos_y + pixel_y_distance
             draw_line(strip_x, active_pos_y, pixel_x, pixel_y, 2, color=(0.0, 0.0, 0.0, 0.2))
+        coords = []
         for child in children:
             child_x = child.frame_final_start + (child.frame_final_duration / 2)
             child_y = child.channel + 0.5
@@ -1027,7 +1019,14 @@ def vseqf_draw():
             pixel_y_distance = int(distance_y * channel_px)
             pixel_x = active_pos_x + pixel_x_distance
             pixel_y = active_pos_y + pixel_y_distance
-            draw_line(strip_x, active_pos_y, pixel_x, pixel_y, 2, color=(1.0, 1.0, 1.0, 0.2))
+            coords.append((strip_x, active_pos_y))
+            coords.append((pixel_x, pixel_y))
+        shader = gpu.shader.from_builtin('2D_UNIFORM_COLOR')
+        batch = batch_for_shader(shader, 'LINES', {'pos': coords})
+        shader.bind()
+        shader.uniform_float('color', (1.0, 1.0, 1.0, 0.2))
+        batch.draw(shader)
+        bgl.glDisable(bgl.GL_BLEND)
 
 
 #Functions and classes related to QuickShortcuts
@@ -1118,7 +1117,7 @@ class VSEQFQuickShortcutsNudge(bpy.types.Operator):
     bl_idname = 'vseqf.nudge_selected'
     bl_label = 'Move the selected sequences'
 
-    direction = bpy.props.EnumProperty(name='Direction', items=[("UP", "Up", "", 1), ("DOWN", "Down", "", 2), ("LEFT", "Left", "", 3), ("RIGHT", "Right", "", 4), ("LEFT-M", "Left Medium", "", 5), ("RIGHT-M", "Right Medium", "", 6), ("LEFT-L", "Left Large", "", 7), ("RIGHT-L", "Right Large", "", 8)])
+    direction: bpy.props.EnumProperty(name='Direction', items=[("UP", "Up", "", 1), ("DOWN", "Down", "", 2), ("LEFT", "Left", "", 3), ("RIGHT", "Right", "", 4), ("LEFT-M", "Left Medium", "", 5), ("RIGHT-M", "Right Medium", "", 6), ("LEFT-L", "Left Large", "", 7), ("RIGHT-L", "Right Large", "", 8)])
 
     def execute(self, context):
         bpy.ops.ed.undo_push()
@@ -1146,7 +1145,7 @@ class VSEQFQuickShortcutsSpeed(bpy.types.Operator):
     bl_idname = 'vseqf.change_speed'
     bl_label = 'Raise or lower playback speed'
 
-    speed_change = bpy.props.EnumProperty(name='Type', items=[("UP", "Up", "", 1), ("DOWN", "Down", "", 2)])
+    speed_change: bpy.props.EnumProperty(name='Type', items=[("UP", "Up", "", 1), ("DOWN", "Down", "", 2)])
 
     def execute(self, context):
         if self.speed_change == 'UP':
@@ -1174,7 +1173,7 @@ class VSEQFQuickShortcutsSkip(bpy.types.Operator):
     bl_idname = 'vseqf.skip_timeline'
     bl_label = 'Skip timeline location'
 
-    type = bpy.props.EnumProperty(name='Type', items=[("NEXTSECOND", "One Second Forward", "", 1), ("LASTSECOND", "One Second Backward", "", 2), ("NEXTEDGE", "Next Clip Edge", "", 3), ("LASTEDGE", "Last Clip Edge", "", 4), ("LASTMARKER", "Last Marker", "", 5), ("NEXTMARKER", "Next Marker", "", 6)])
+    type: bpy.props.EnumProperty(name='Type', items=[("NEXTSECOND", "One Second Forward", "", 1), ("LASTSECOND", "One Second Backward", "", 2), ("NEXTEDGE", "Next Clip Edge", "", 3), ("LASTEDGE", "Last Clip Edge", "", 4), ("LASTMARKER", "Last Marker", "", 5), ("NEXTMARKER", "Next Marker", "", 6)])
 
     def execute(self, context):
         bpy.ops.ed.undo_push()
@@ -1206,7 +1205,7 @@ class VSEQFQuickShortcutsResetPlay(bpy.types.Operator):
     bl_idname = 'vseqf.reset_playback'
     bl_label = 'Reset playback to normal speed and play'
 
-    direction = bpy.props.EnumProperty(name='Direction', items=[("FORWARD", "Forward", "", 1), ("BACKWARD", "Backward", "", 2)])
+    direction: bpy.props.EnumProperty(name='Direction', items=[("FORWARD", "Forward", "", 1), ("BACKWARD", "Backward", "", 2)])
 
     def execute(self, context):
         if self.direction == 'BACKWARD':
@@ -1338,6 +1337,7 @@ def update_import_frames_length(self, context):
 
 
 def three_point_draw_callback(self, context):
+    #todo: improve efficiency by drawing all graphics in one go, rather than using functions
     colorfg = (1.0, 1.0, 1.0, 1.0)
     colorbg = (0.1, 0.1, 0.1, 1.0)
     colormg = (0.5, 0.5, 0.5, 1.0)
@@ -1358,7 +1358,8 @@ def three_point_draw_callback(self, context):
     #draw in/out icons
     in_x = self.in_percent * width
     draw_rect(in_x, height - scale, quarter_scale, scale, colorfg)
-    draw_ngon([(in_x, height - half_scale), (in_x + half_scale, height), (in_x + half_scale, height - scale)], colorfg)
+    draw_tri((in_x, height - half_scale), (in_x + half_scale, height), (in_x + half_scale, height - scale), colorfg)
+
     if self.in_percent <= .5:
         in_text_x = in_x + scale
     else:
@@ -1367,7 +1368,7 @@ def three_point_draw_callback(self, context):
 
     out_x = self.out_percent * width
     draw_rect(out_x - quarter_scale, height - double_scale, quarter_scale, scale, colorfg)
-    draw_ngon([(out_x, height - half_scale - scale), (out_x - half_scale, height - scale), (out_x - half_scale, height - double_scale)], colorfg)
+    draw_tri((out_x, height - half_scale - scale), (out_x - half_scale, height - scale), (out_x - half_scale, height - double_scale), colorfg)
     if self.out_percent >= .5:
         out_text_x = 0 + half_scale
     else:
@@ -1433,6 +1434,7 @@ class VSEQFThreePointPanel(bpy.types.Panel):
     bl_label = "3 Point Edit"
     bl_space_type = 'CLIP_EDITOR'
     bl_region_type = 'UI'
+    bl_category = "Track"
 
     @classmethod
     def poll(cls, context):
@@ -1454,9 +1456,9 @@ class VSEQFThreePointPanel(bpy.types.Panel):
         fps = get_fps(context.scene)
         row = layout.row()
         if clip.import_settings.import_frame_in != -1:
-            row.label("In: "+str(clip.import_settings.import_frame_in)+' ('+timecode_from_frames(clip.import_settings.import_frame_in, fps)+')')
+            row.label(text="In: "+str(clip.import_settings.import_frame_in)+' ('+timecode_from_frames(clip.import_settings.import_frame_in, fps)+')')
         else:
-            row.label("In: Not Set")
+            row.label(text="In: Not Set")
         row = layout.row()
         col = row.column(align=True)
         col.prop(clip.import_settings, 'import_minutes_in', text='Minutes In')
@@ -1469,9 +1471,9 @@ class VSEQFThreePointPanel(bpy.types.Panel):
         col.prop(clip.import_settings, 'import_frames_length', text='Frames Length')
         row = layout.row()
         if clip.import_settings.import_frame_length != -1:
-            row.label("Length: "+str(clip.import_settings.import_frame_length)+' ('+timecode_from_frames(clip.import_settings.import_frame_length, fps)+')')
+            row.label(text="Length: "+str(clip.import_settings.import_frame_length)+' ('+timecode_from_frames(clip.import_settings.import_frame_length, fps)+')')
         else:
-            row.label("Length Not Set")
+            row.label(text="Length Not Set")
         row = layout.row()
         row.operator('vseqf.threepoint_import', text='Import At Cursor').type = 'cursor'
         row = layout.row()
@@ -1488,7 +1490,7 @@ class VSEQFThreePointImport(bpy.types.Operator):
     bl_idname = "vseqf.threepoint_import"
     bl_label = "Imports a movie clip into the VSE as a movie sequence"
 
-    type = bpy.props.StringProperty()
+    type: bpy.props.StringProperty()
 
     def execute(self, context):
         override_area = False
@@ -1730,7 +1732,6 @@ class VSEQFThreePointOperator(bpy.types.Operator):
             bpy.ops.screen.animation_play()
         bpy.types.SpaceClipEditor.draw_handler_remove(self._handle, 'WINDOW')
         bpy.ops.scene.delete()
-        context.screen.scene = self.original_scene
         self.update_import_values(context)
         #context.scene.frame_current = self.start_frame
 
@@ -2201,7 +2202,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
                 self.grabbed_sequences.append(sequence_data)
             else:
                 self.sequences.append(sequence_data)
-        self._timer = context.window_manager.event_timer_add(0.01, context.window)
+        self._timer = context.window_manager.event_timer_add(time_step=0.01, window=context.window)
         self.sequences.sort(key=lambda x: x[1])
         self.grabbed_sequences.sort(key=lambda x: x[1])
         self.sequences = self.grabbed_sequences + self.sequences  #ensure that the grabbed sequences are processed first to prevent issues with ripple
@@ -2304,7 +2305,7 @@ class VSEQFGrab(bpy.types.Operator):
     bl_idname = "vseqf.grab"
     bl_label = "Replacement for the default grab operator with more features"
 
-    mode = bpy.props.StringProperty("")
+    mode: bpy.props.StringProperty("")
 
     def execute(self, context):
         del context
@@ -2462,7 +2463,7 @@ class VSEQFSelectGrab(bpy.types.Operator):
         self.mouse_start_y = event.mouse_y
         self.mouse_start_region_x = event.mouse_region_x
         self.mouse_start_region_y = event.mouse_region_y
-        self._timer = context.window_manager.event_timer_add(0.05, context.window)
+        self._timer = context.window_manager.event_timer_add(time_step=0.05, window=context.window)
         context.window_manager.modal_handler_add(self)
         return {'RUNNING_MODAL'}
 
@@ -2504,7 +2505,7 @@ class VSEQFContextCursor(bpy.types.Menu):
         props.next = True
         props.center = False
         layout.separator()
-        layout.label('Snap:')
+        layout.label(text='Snap:')
         layout.operator('vseqf.quicksnaps', text='Cursor To Nearest Second').type = 'cursor_to_seconds'
         sequence = current_active(context)
         if sequence:
@@ -2574,7 +2575,7 @@ class VSEQFContextSequence(bpy.types.Menu):
         layout.operator('ed.undo', text='Undo')
         if strip:
             layout.separator()
-            layout.label('Active Sequence:')
+            layout.label(text='Active Sequence:')
             layout.prop(strip, 'mute')
             layout.prop(strip, 'lock')
             if prefs.tags:
@@ -2596,9 +2597,7 @@ def frame_step(scene):
     Argument:
         scene: the current Scene"""
 
-    if bpy.context.screen is None:  #sometimes this happens... no idea why...
-        return
-    if bpy.context.screen.scene != scene:
+    if bpy.context.scene != scene:
         return
     step = abs(scene.vseqf.step) - 1
     difference = scene.frame_current - scene.vseqf.last_frame
@@ -2768,7 +2767,7 @@ class VSEQFQuickZoomPreset(bpy.types.Operator):
     bl_idname = 'vseqf.quickzoom_preset'
     bl_label = "Zoom To QuickZoom Preset"
 
-    name = bpy.props.StringProperty()
+    name: bpy.props.StringProperty()
 
     def execute(self, context):
         vseqf = context.scene.vseqf
@@ -2802,7 +2801,7 @@ class VSEQFRemoveZoom(bpy.types.Operator):
     bl_idname = 'vseqf.quickzoom_remove'
     bl_label = 'Remove Zoom Preset'
 
-    name = bpy.props.StringProperty()
+    name: bpy.props.StringProperty()
 
     def execute(self, context):
         vseqf = context.scene.vseqf
@@ -2821,7 +2820,7 @@ class VSEQFAddZoom(bpy.types.Operator):
     bl_idname = 'vseqf.quickzoom_add'
     bl_label = "Add Zoom Preset"
 
-    mode = bpy.props.StringProperty()
+    mode: bpy.props.StringProperty()
 
     def execute(self, context):
         left, right, bottom, top = get_vse_position(context)
@@ -2855,7 +2854,7 @@ class VSEQFQuickZooms(bpy.types.Operator):
     bl_description = 'Changes zoom level of the sequencer timeline'
 
     #Should be set to 'all', 'selected', cursor', or a positive number of seconds
-    area = bpy.props.StringProperty()
+    area: bpy.props.StringProperty()
 
     def execute(self, context):
         if self.area.isdigit():
@@ -2916,7 +2915,7 @@ class VSEQFFollow(bpy.types.Operator):
         if self.region is None or self.view is None:
             return {'CANCELLED'}
         self.recalculate_target(context)
-        self._timer = context.window_manager.event_timer_add(0.25, context.window)
+        self._timer = context.window_manager.event_timer_add(time_step=0.25, window=context.window)
         context.window_manager.modal_handler_add(self)
         return {'RUNNING_MODAL'}
 
@@ -3152,11 +3151,7 @@ class VSEQFQuickFadesPanel(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        #Check if panel is disabled
-        if __name__ in bpy.context.user_preferences.addons:
-            prefs = bpy.context.user_preferences.addons[__name__].preferences
-        else:
-            prefs = VSEQFTempSettings()
+        prefs = get_prefs()
         try:
             #Check for an active sequence to operate on
             sequence = current_active(context)
@@ -3181,13 +3176,13 @@ class VSEQFQuickFadesPanel(bpy.types.Panel):
         #First row, detected fades
         row = layout.row()
         if fadein > 0:
-            row.label("Fadein: "+str(round(fadein))+" Frames")
+            row.label(text="Fadein: "+str(round(fadein))+" Frames")
         else:
-            row.label("No Fadein Detected")
+            row.label(text="No Fadein Detected")
         if fadeout > 0:
-            row.label("Fadeout: "+str(round(fadeout))+" Frames")
+            row.label(text="Fadeout: "+str(round(fadeout))+" Frames")
         else:
-            row.label("No Fadeout Detected")
+            row.label(text="No Fadeout Detected")
 
         #Setting fades section
         row = layout.row()
@@ -3220,10 +3215,7 @@ class VSEQFQuickFadesMenu(bpy.types.Menu):
     @classmethod
     def poll(cls, context):
         del context
-        if __name__ in bpy.context.user_preferences.addons:
-            prefs = bpy.context.user_preferences.addons[__name__].preferences
-        else:
-            prefs = VSEQFTempSettings()
+        prefs = get_prefs()
         return prefs.fades
 
     def draw(self, context):
@@ -3240,13 +3232,13 @@ class VSEQFQuickFadesMenu(bpy.types.Menu):
 
             #Detected fades section
             if fadein > 0:
-                layout.label("Fadein: "+str(round(fadein))+" Frames")
+                layout.label(text="Fadein: "+str(round(fadein))+" Frames")
             else:
-                layout.label("No Fadein Detected")
+                layout.label(text="No Fadein Detected")
             if fadeout > 0:
-                layout.label("Fadeout: "+str(round(fadeout))+" Frames")
+                layout.label(text="Fadeout: "+str(round(fadeout))+" Frames")
             else:
-                layout.label("No Fadeout Detected")
+                layout.label(text="No Fadeout Detected")
 
             #Fade length
             layout.prop(vseqf, 'fade')
@@ -3263,7 +3255,7 @@ class VSEQFQuickFadesMenu(bpy.types.Menu):
             layout.operator('vseqf.quickfades_cross', text='Smart Cross to Next').type = 'nextsmart'
 
         else:
-            layout.label("No Sequence Selected")
+            layout.label(text="No Sequence Selected")
 
 
 class VSEQFQuickFadesSet(bpy.types.Operator):
@@ -3280,7 +3272,7 @@ class VSEQFQuickFadesSet(bpy.types.Operator):
     bl_description = 'Adds or changes fade for selected sequences'
 
     #Should be set to 'in' or 'out'
-    type = bpy.props.StringProperty()
+    type: bpy.props.StringProperty()
 
     def execute(self, context):
         bpy.ops.ed.undo_push()
@@ -3303,8 +3295,8 @@ class VSEQFQuickFadesClear(bpy.types.Operator):
     bl_label = 'VSEQF Quick Fades Clear Fades'
     bl_description = 'Clears fade in and out for selected sequences'
 
-    direction = bpy.props.StringProperty('both')
-    active_only = bpy.props.BoolProperty(False)
+    direction: bpy.props.StringProperty('both')
+    active_only: bpy.props.BoolProperty(False)
 
     def execute(self, context):
         bpy.ops.ed.undo_push()
@@ -3344,7 +3336,7 @@ class VSEQFQuickFadesCross(bpy.types.Operator):
     bl_label = 'VSEQF Quick Fades Add Crossfade'
     bl_description = 'Adds a crossfade between selected sequence and next or previous sequence in timeline'
 
-    type = bpy.props.StringProperty()
+    type: bpy.props.StringProperty()
 
     def execute(self, context):
         sequences = current_sequences(context)
@@ -3561,10 +3553,7 @@ class VSEQFQuickParentsMenu(bpy.types.Menu):
     @classmethod
     def poll(cls, context):
         del context
-        if __name__ in bpy.context.user_preferences.addons:
-            prefs = bpy.context.user_preferences.addons[__name__].preferences
-        else:
-            prefs = VSEQFTempSettings()
+        prefs = get_prefs()
         return prefs.parenting
 
     def draw(self, context):
@@ -3590,22 +3579,22 @@ class VSEQFQuickParentsMenu(bpy.types.Menu):
             if parent:
                 #Parent sequence is found, display it
                 layout.separator()
-                layout.label("     Parent: ")
+                layout.label(text="     Parent: ")
                 layout.label(parent.name)
                 layout.separator()
 
             if len(children) > 0:
                 #At least one child sequence is found, display them
                 layout.separator()
-                layout.label("     Children:")
+                layout.label(text="     Children:")
                 index = 0
                 while index < len(children):
-                    layout.label(children[index].name)
+                    layout.label(text=children[index].name)
                     index = index + 1
                 layout.separator()
 
         else:
-            layout.label('No Sequence Selected')
+            layout.label(text='No Sequence Selected')
 
 
 class VSEQFQuickParents(bpy.types.Operator):
@@ -3623,7 +3612,7 @@ class VSEQFQuickParents(bpy.types.Operator):
     bl_label = 'VSEQF Quick Parents'
     bl_description = 'Sets Or Removes Strip Parents'
 
-    action = bpy.props.StringProperty()
+    action: bpy.props.StringProperty()
 
     def execute(self, context):
         selected = current_selected(context)
@@ -3661,7 +3650,7 @@ class VSEQFQuickParentsClear(bpy.types.Operator):
     bl_label = 'VSEQF Quick Parent Remove Parent'
     bl_description = 'Removes Strip Parent'
 
-    strip = bpy.props.StringProperty()
+    strip: bpy.props.StringProperty()
 
     def execute(self, context):
         sequences = current_sequences(context)
@@ -3679,59 +3668,59 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
     bl_idname = 'vseqf.import'
     bl_label = 'Import Strip'
 
-    type = bpy.props.EnumProperty(
+    type: bpy.props.EnumProperty(
         name="Import Type",
         items=(('MOVIE', 'Movie', ""), ("IMAGE", "Image", "")),
         default='MOVIE')
 
-    files = bpy.props.CollectionProperty(type=bpy.types.PropertyGroup)
+    files: bpy.props.CollectionProperty(type=bpy.types.PropertyGroup)
 
-    relative_path = bpy.props.BoolProperty(
+    relative_path: bpy.props.BoolProperty(
         name="Relative Path",
         description="Select the file relative to the blend file",
         default=True)
-    start_frame = bpy.props.IntProperty(
+    start_frame: bpy.props.IntProperty(
         name="Start Frame",
         description="Start frame of the sequence strip",
         default=0)
-    channel = bpy.props.IntProperty(
+    channel: bpy.props.IntProperty(
         name="Channel",
         description="Channel to place this strip into",
         default=1)
-    replace_selection = bpy.props.BoolProperty(
+    replace_selection: bpy.props.BoolProperty(
         name="Replace Selection",
         description="Replace the current selection",
         default=True)
-    sound = bpy.props.BoolProperty(
+    sound: bpy.props.BoolProperty(
         name="Sound",
         description="Load sound with the movie",
         default=True)
-    use_movie_framerate = bpy.props.BoolProperty(
+    use_movie_framerate: bpy.props.BoolProperty(
         name="Use Movie Framerate",
         description="Use framerate from the movie to keep sound and video in sync",
         default=False)
-    import_location = bpy.props.EnumProperty(
+    import_location: bpy.props.EnumProperty(
         name="Import At",
         description="Location to import strips at",
         items=(("IMPORT_FRAME", "Import At Frame", ""), ("INSERT_FRAME", "Insert At Frame", ""), ("CUT_INSERT", "Cut And Insert At Frame", ""), ("END", "Import At End", "")),
         default="IMPORT_FRAME")
-    autoparent = bpy.props.BoolProperty(
+    autoparent: bpy.props.BoolProperty(
         name="Auto-Parent A/V",
         description="Automatically parent audio strips to their movie strips",
         default=True)
-    autoproxy = bpy.props.BoolProperty(
+    autoproxy: bpy.props.BoolProperty(
         name="Auto-Set Proxy",
         description="Automatically enable proxy settings",
         default=False)
-    autogenerateproxy = bpy.props.BoolProperty(
+    autogenerateproxy: bpy.props.BoolProperty(
         name="Auto-Generate Proxy",
         description="Automatically generate proxies for imported strips",
         default=False)
-    use_placeholders = bpy.props.BoolProperty(
+    use_placeholders: bpy.props.BoolProperty(
         name="Use Placeholders",
         description="Use placeholders for missing frames of the strip",
         default=False)
-    length = bpy.props.IntProperty(
+    length: bpy.props.IntProperty(
         name="Image Length",
         description="Length in frames to use for a single imported image",
         default=30)
@@ -3765,7 +3754,7 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
             row.prop(self, 'start_frame')
             row = layout.row()
             if number_of_files > 1:
-                row.label("Length: "+str(number_of_files))
+                row.label(text="Length: "+str(number_of_files))
             else:
                 row.prop(self, 'length')
             row = layout.row()
@@ -3963,7 +3952,7 @@ class VSEQFQuickSnaps(bpy.types.Operator):
     bl_label = 'VSEQF Quick Snaps'
     bl_description = 'Snaps selected sequences'
 
-    type = bpy.props.StringProperty()
+    type: bpy.props.StringProperty()
 
     def execute(self, context):
         bpy.ops.ed.undo_push()
@@ -4220,13 +4209,8 @@ class VSEQFQuickListPanel(bpy.types.Panel):
     @classmethod
     def poll(cls, context):
         del context
-        #Check if panel is disabled
-        if __name__ in bpy.context.user_preferences.addons:
-            prefs = bpy.context.user_preferences.addons[__name__].preferences
-        else:
-            prefs = VSEQFTempSettings()
+        prefs = get_prefs()
 
-        #Check for sequences
         if not bpy.context.sequences:
             return False
         if len(bpy.context.sequences) > 0:
@@ -4235,10 +4219,7 @@ class VSEQFQuickListPanel(bpy.types.Panel):
             return False
 
     def draw(self, context):
-        if __name__ in bpy.context.user_preferences.addons:
-            prefs = bpy.context.user_preferences.addons[__name__].preferences
-        else:
-            prefs = VSEQFTempSettings()
+        prefs = get_prefs()
         scene = bpy.context.scene
         sequences = current_sequences(context)
         active = current_active(context)
@@ -4251,7 +4232,7 @@ class VSEQFQuickListPanel(bpy.types.Panel):
 
         #Display Mode
         row = layout.row(align=True)
-        row.label('Display:')
+        row.label(text='Display:')
         row.prop(vseqf, 'quicklist_editing', toggle=True)
         if prefs.parenting:
             row.prop(vseqf, 'quicklist_parenting', toggle=True)
@@ -4262,7 +4243,7 @@ class VSEQFQuickListPanel(bpy.types.Panel):
         row = layout.row()
         row.operator('vseqf.quicklist_select', text='Select/Deselect All Sequences').sequence = ''
         row = layout.row(align=True)
-        row.label('Sort By:')
+        row.label(text='Sort By:')
         row.prop(vseqf, 'quicklist_sort', expand=True)
         if vseqf.quicklist_sort_reverse:
             reverse_icon = 'TRIA_UP'
@@ -4274,7 +4255,7 @@ class VSEQFQuickListPanel(bpy.types.Panel):
         #Display all sequences
         for index, sequence in enumerate(sorted_sequences):
             if vseqf.quicklist_sort == 'POSITION':
-                column = layout.split(percentage=0.93, align=True)
+                column = layout.split(factor=0.93, align=True)
             else:
                 column = layout
             if hasattr(sequence, 'input_1') and box is not None:
@@ -4296,7 +4277,7 @@ class VSEQFQuickListPanel(bpy.types.Panel):
             split = row.split(align=True)
             split.prop(sequence, 'mute', text='')
             split.prop(sequence, 'lock', text='')
-            split = row.split(align=True, percentage=0.2)
+            split = row.split(align=True, factor=0.2)
             col = split.column(align=True)
             col.operator('vseqf.quicklist_select', text="("+sequence.type+")").sequence = sequence.name
             col.active = sequence.select
@@ -4305,17 +4286,17 @@ class VSEQFQuickListPanel(bpy.types.Panel):
 
             #Second row - length and position in time index
             row = box.row()
-            split = row.split(percentage=0.8)
+            split = row.split(factor=0.8)
             col = split.row()
             fps = get_fps(scene)
-            col.label("Len: "+timecode_from_frames(sequence.frame_final_duration, fps, levels=4))
-            col.label("Pos: "+timecode_from_frames(sequence.frame_start, fps, levels=4))
+            col.label(text="Len: "+timecode_from_frames(sequence.frame_final_duration, fps, levels=4))
+            col.label(text="Pos: "+timecode_from_frames(sequence.frame_start, fps, levels=4))
 
             #Third row - length, position and proxy toggle
             if vseqf.quicklist_editing:
                 subbox = box.box()
                 row = subbox.row()
-                split = row.split(percentage=0.8)
+                split = row.split(factor=0.8)
                 col = split.row(align=True)
                 col.prop(sequence, 'frame_final_duration', text="Len")
                 col.prop(sequence, 'frame_start', text="Pos")
@@ -4325,7 +4306,7 @@ class VSEQFQuickListPanel(bpy.types.Panel):
                     if sequence.use_proxy:
                         #Proxy is enabled, add row for proxy settings
                         row = subbox.row()
-                        split = row.split(percentage=0.33)
+                        split = row.split(factor=0.33)
                         col = split.row(align=True)
                         col.prop(sequence.proxy, 'quality')
                         col = split.row(align=True)
@@ -4340,13 +4321,13 @@ class VSEQFQuickListPanel(bpy.types.Panel):
                 linemax = 4
                 subbox = box.box()
                 row = subbox.row()
-                row.label('Tags:')
+                row.label(text='Tags:')
                 for tag in sequence.tags:
                     if line > linemax:
                         row = subbox.row()
-                        row.label('')
+                        row.label(text='')
                         line = 1
-                    split = row.split(percentage=.8, align=True)
+                    split = row.split(factor=.8, align=True)
                     split.operator('vseqf.quicktags_select', text=tag.text).text = tag.text
                     split.operator('vseqf.quicktags_remove_from', text='', icon='X').tag = tag.text+'\n'+sequence.name
                     line = line + 1
@@ -4356,28 +4337,28 @@ class VSEQFQuickListPanel(bpy.types.Panel):
             if len(children) > 0 and vseqf.quicklist_parenting and prefs.parenting:
                 subbox = box.box()
                 row = subbox.row()
-                split = row.split(percentage=0.25)
+                split = row.split(factor=0.25)
                 col = split.column()
-                col.label('Children:')
+                col.label(text='Children:')
                 col = split.column()
                 for child in children:
-                    subsplit = col.split(percentage=0.85)
-                    subsplit.label(child.name)
+                    subsplit = col.split(factor=0.85)
+                    subsplit.label(text=child.name)
                     subsplit.operator('vseqf.quickparents_clear_parent', text="", icon='X').strip = child.name
 
             #List sub-sequences in a meta sequence
             if sequence.type == 'META':
                 row = box.row()
-                split = row.split(percentage=0.25)
+                split = row.split(factor=0.25)
                 col = split.column()
-                col.label('Sub-sequences:')
+                col.label(text='Sub-sequences:')
                 col = split.column()
                 for i, subsequence in enumerate(sequence.sequences):
                     if i > 6:
                         #Stops listing sub-sequences if list is too long
-                        col.label('...')
+                        col.label(text='...')
                         break
-                    col.label(subsequence.name)
+                    col.label(text=subsequence.name)
             if vseqf.quicklist_sort == 'POSITION' and not hasattr(sequence, 'input_1'):
                 col = column.column(align=True)
                 col.operator('vseqf.quicklist_up', text='', icon='TRIA_UP').sequence = sequence.name
@@ -4395,7 +4376,7 @@ class VSEQFQuickListUp(bpy.types.Operator):
     bl_label = "VSEQF Quick List Move Sequence Up"
     bl_description = "Move Sequence Up One"
 
-    sequence = bpy.props.StringProperty()
+    sequence: bpy.props.StringProperty()
 
     def execute(self, context):
         sequences = current_sequences(context)
@@ -4420,7 +4401,7 @@ class VSEQFQuickListDown(bpy.types.Operator):
     bl_label = "VSEQF Quick List Move Sequence Down"
     bl_description = "Move Sequence Down One"
 
-    sequence = bpy.props.StringProperty()
+    sequence: bpy.props.StringProperty()
 
     def execute(self, context):
         sequences = current_sequences(context)
@@ -4442,7 +4423,7 @@ class VSEQFQuickListSelect(bpy.types.Operator):
     bl_idname = "vseqf.quicklist_select"
     bl_label = "VSEQF Quick List Select Sequence"
 
-    sequence = bpy.props.StringProperty()
+    sequence: bpy.props.StringProperty()
 
     def execute(self, context):
         sequences = current_sequences(context)
@@ -4475,10 +4456,7 @@ class VSEQFQuickMarkersPanel(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        if __name__ in context.user_preferences.addons:
-            prefs = context.user_preferences.addons[__name__].preferences
-        else:
-            prefs = VSEQFTempSettings()
+        prefs = get_prefs()
         return prefs.markers
 
     def draw(self, context):
@@ -4487,7 +4465,7 @@ class VSEQFQuickMarkersPanel(bpy.types.Panel):
         layout = self.layout
 
         row = layout.row()
-        split = row.split(percentage=.9, align=True)
+        split = row.split(factor=.9, align=True)
         split.prop(vseqf, 'current_marker')
         split.operator('vseqf.quickmarkers_add_preset', text="", icon="PLUS").preset = vseqf.current_marker
         row = layout.row()
@@ -4495,7 +4473,7 @@ class VSEQFQuickMarkersPanel(bpy.types.Panel):
         row = layout.row()
         row.prop(vseqf, 'marker_deselect', toggle=True)
         row = layout.row()
-        row.label("Marker List:")
+        row.label(text="Marker List:")
         row = layout.row()
         row.template_list("VSEQFQuickMarkerList", "", scene, "timeline_markers", scene.vseqf, "marker_index", rows=4)
 
@@ -4504,11 +4482,11 @@ class VSEQFQuickMarkerPresetList(bpy.types.UIList):
     """Draws an editable list of QuickMarker presets"""
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         del context, data, icon, active_data, active_propname
-        split = layout.split(percentage=.9, align=True)
+        split = layout.split(factor=.9, align=True)
         split.operator('vseqf.quickmarkers_place', text=item.text).marker = item.text
         split.operator('vseqf.quickmarkers_remove_preset', text='', icon='X').marker = item.text
 
-    def draw_filter(self, context, layout):
+    def draw_filter(self, context, layout, reverse):
         pass
 
     def filter_items(self, context, data, property):
@@ -4524,14 +4502,14 @@ class VSEQFQuickMarkerList(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         del data, icon, active_data, active_propname
         timecode = timecode_from_frames(item.frame, get_fps(context.scene), levels=0, subsecond_type='frames')
-        split = layout.split(percentage=.9, align=True)
+        split = layout.split(factor=.9, align=True)
         subsplit = split.split(align=True)
         subsplit.operator('vseqf.quickmarkers_jump', text=item.name+' ('+timecode+')').frame = item.frame
         if item.frame == context.scene.frame_current:
             subsplit.enabled = False
         split.operator('vseqf.quickmarkers_delete', text='', icon='X').frame = item.frame
 
-    def draw_filter(self, context, layout):
+    def draw_filter(self, context, layout, reverse):
         pass
 
     def filter_items(self, context, data, property):
@@ -4552,7 +4530,7 @@ class VSEQFQuickMarkerDelete(bpy.types.Operator):
     bl_idname = 'vseqf.quickmarkers_delete'
     bl_label = 'Delete Marker At Frame'
 
-    frame = bpy.props.IntProperty()
+    frame: bpy.props.IntProperty()
 
     def execute(self, context):
         scene = context.scene
@@ -4569,7 +4547,7 @@ class VSEQFQuickMarkerMove(bpy.types.Operator):
     bl_idname = 'vseqf.quickmarkers_move'
     bl_label = 'Move This Marker'
 
-    frame = bpy.props.IntProperty()
+    frame: bpy.props.IntProperty()
 
     def execute(self, context):
         marker = None
@@ -4588,7 +4566,7 @@ class VSEQFQuickMarkerRename(bpy.types.Operator):
     bl_idname = 'vseqf.quickmarkers_rename'
     bl_label = 'Rename This Marker'
 
-    marker_name = bpy.props.StringProperty(name='Marker Name')
+    marker_name: bpy.props.StringProperty(name='Marker Name')
 
     def execute(self, context):
         for marker in context.scene.timeline_markers:
@@ -4614,7 +4592,7 @@ class VSEQFQuickMarkerJump(bpy.types.Operator):
     bl_idname = 'vseqf.quickmarkers_jump'
     bl_label = 'Jump To Timeline Marker'
 
-    frame = bpy.props.IntProperty()
+    frame: bpy.props.IntProperty()
 
     def execute(self, context):
         scene = context.scene
@@ -4629,10 +4607,7 @@ class VSEQFQuickMarkersMenu(bpy.types.Menu):
 
     @classmethod
     def poll(cls, context):
-        if __name__ in context.user_preferences.addons:
-            prefs = context.user_preferences.addons[__name__].preferences
-        else:
-            prefs = VSEQFTempSettings()
+        prefs = get_prefs()
         return prefs.markers
 
     def draw(self, context):
@@ -4654,7 +4629,7 @@ class VSEQFQuickMarkersPlace(bpy.types.Operator):
     bl_idname = 'vseqf.quickmarkers_place'
     bl_label = 'VSEQF Quick Markers Place A Marker'
 
-    marker = bpy.props.StringProperty()
+    marker: bpy.props.StringProperty()
 
     def execute(self, context):
         scene = context.scene
@@ -4686,7 +4661,7 @@ class VSEQFQuickMarkersRemovePreset(bpy.types.Operator):
     bl_label = 'VSEQF Quick Markers Remove Preset'
 
     #marker name to be removed
-    marker = bpy.props.StringProperty()
+    marker: bpy.props.StringProperty()
 
     def execute(self, context):
         vseqf = context.scene.vseqf
@@ -4707,7 +4682,7 @@ class VSEQFQuickMarkersAddPreset(bpy.types.Operator):
     bl_idname = 'vseqf.quickmarkers_add_preset'
     bl_label = 'VSEQF Quick Markers Add Preset'
 
-    preset = bpy.props.StringProperty()
+    preset: bpy.props.StringProperty()
 
     def execute(self, context):
         if not self.preset:
@@ -4759,13 +4734,8 @@ class VSEQFQuickTagsMenu(bpy.types.Menu):
 
     @classmethod
     def poll(cls, context):
-        #Check if panel is disabled
-        if __name__ in context.user_preferences.addons:
-            prefs = context.user_preferences.addons[__name__].preferences
-        else:
-            prefs = VSEQFTempSettings()
+        prefs = get_prefs()
 
-        #Check for sequences
         if not context.sequences or not context.scene.sequence_editor:
             return False
         if len(context.sequences) > 0 and context.scene.sequence_editor.active_strip:
@@ -4791,13 +4761,8 @@ class VSEQFQuickTagsPanel(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        #Check if panel is disabled
-        if __name__ in context.user_preferences.addons:
-            prefs = context.user_preferences.addons[__name__].preferences
-        else:
-            prefs = VSEQFTempSettings()
+        prefs = get_prefs()
 
-        #Check for sequences
         if not context.sequences or not context.scene.sequence_editor:
             return False
         if len(context.sequences) > 0 and context.scene.sequence_editor.active_strip:
@@ -4811,14 +4776,14 @@ class VSEQFQuickTagsPanel(bpy.types.Panel):
         sequence = current_active(context)
         layout = self.layout
         row = layout.row()
-        row.label('All Tags:')
+        row.label(text='All Tags:')
         row = layout.row()
         row.template_list("VSEQFQuickTagListAll", "", vseqf, 'tags', vseqf, 'marker_index')
         row = layout.row()
         row.separator()
 
         row = layout.row()
-        row.label('Edit Tags:')
+        row.label(text='Edit Tags:')
         row = layout.row()
         row.prop(vseqf, 'show_tags', expand=True)
         if vseqf.show_tags == 'SELECTED':
@@ -4826,7 +4791,7 @@ class VSEQFQuickTagsPanel(bpy.types.Panel):
             row = layout.row()
             row.template_list("VSEQFQuickTagList", "", vseqf, 'selected_tags', vseqf, 'marker_index', rows=2)
             row = layout.row()
-            split = row.split(percentage=.9, align=True)
+            split = row.split(factor=.9, align=True)
             split.prop(vseqf, 'current_tag', text='New Tag')
             split.operator('vseqf.quicktags_add', text="", icon="PLUS").text = vseqf.current_tag
             row = layout.row()
@@ -4835,7 +4800,7 @@ class VSEQFQuickTagsPanel(bpy.types.Panel):
             row = layout.row()
             row.template_list("VSEQFQuickTagList", "", sequence, 'tags', vseqf, 'marker_index', rows=2)
             row = layout.row()
-            split = row.split(percentage=.9, align=True)
+            split = row.split(factor=.9, align=True)
             split.prop(vseqf, 'current_tag', text='New Tag')
             split.operator('vseqf.quicktags_add_active', text="", icon="PLUS").text = vseqf.current_tag
             #row = layout.row()
@@ -4849,11 +4814,11 @@ class VSEQFQuickTagListAll(bpy.types.UIList):
 
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         del context, data, icon, active_data, active_propname
-        split = layout.split(percentage=.9, align=True)
+        split = layout.split(factor=.9, align=True)
         split.operator('vseqf.quicktags_select', text=item.text).text = item.text
         split.operator('vseqf.quicktags_add', text='', icon="PLUS").text = item.text
 
-    def draw_filter(self, context, layout):
+    def draw_filter(self, context, layout, reverse):
         pass
 
 
@@ -4862,14 +4827,14 @@ class VSEQFQuickTagList(bpy.types.UIList):
 
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         del context, data, icon, active_data, active_propname
-        split = layout.split(percentage=.9, align=True)
+        split = layout.split(factor=.9, align=True)
         display_text = item.text
         if item.use_offset:
             display_text = display_text + '(' + str(item.offset) + ')'
         split.operator('vseqf.quicktags_select', text=display_text).text = item.text
         split.operator('vseqf.quicktags_remove', text='', icon='X').text = item.text
 
-    def draw_filter(self, context, layout):
+    def draw_filter(self, context, layout, reverse):
         pass
 
     def filter_items(self, context, data, property):
@@ -4887,7 +4852,7 @@ class VSEQFQuickTagsClear(bpy.types.Operator):
     bl_label = 'VSEQF Quick Tags Clear'
     bl_description = 'Clear all tags on all selected sequences'
 
-    mode = bpy.props.StringProperty('selected')
+    mode: bpy.props.StringProperty('selected')
 
     def execute(self, context):
         if self.mode == 'selected':
@@ -4918,7 +4883,7 @@ class VSEQFQuickTagsSelect(bpy.types.Operator):
     bl_label = 'VSEQF Quick Tags Select'
     bl_description = 'Select all sequences with this tag'
 
-    text = bpy.props.StringProperty()
+    text: bpy.props.StringProperty()
 
     def execute(self, context):
         bpy.ops.ed.undo_push()
@@ -4947,7 +4912,7 @@ class VSEQFQuickTagsRemoveFrom(bpy.types.Operator):
     bl_label = 'VSEQF Quick Tags Remove From'
     bl_description = 'Remove this tag from this sequence'
 
-    tag = bpy.props.StringProperty()
+    tag: bpy.props.StringProperty()
 
     def execute(self, context):
         if '\n' in self.tag:
@@ -4973,7 +4938,7 @@ class VSEQFQuickTagsRemove(bpy.types.Operator):
     bl_label = 'VSEQF Quick Tags Remove'
     bl_description = 'Remove this tag from all selected sequences'
 
-    text = bpy.props.StringProperty()
+    text: bpy.props.StringProperty()
 
     def execute(self, context):
         sequences = current_selected(context)
@@ -4996,7 +4961,7 @@ class VSEQFQuickTagsAddMarker(bpy.types.Operator):
     bl_label = 'VSEQF Quick Tags Add Marker'
     bl_description = 'Add this marker tag to active sequence.'
 
-    marker = bpy.props.StringProperty()
+    marker: bpy.props.StringProperty()
 
     def execute(self, context):
         marker = self.marker.replace("\n", '')
@@ -5028,7 +4993,7 @@ class VSEQFQuickTagsAdd(bpy.types.Operator):
     bl_label = 'VSEQF Quick Tags Add'
     bl_description = 'Add this tag to all selected sequences'
 
-    text = bpy.props.StringProperty()
+    text: bpy.props.StringProperty()
 
     def execute(self, context):
         text = self.text.replace("\n", '')
@@ -5056,7 +5021,7 @@ class VSEQFQuickTagsAddActive(bpy.types.Operator):
     bl_label = 'VSEQF Quick Tags Add'
     bl_description = 'Add this tag to the active sequence'
 
-    text = bpy.props.StringProperty()
+    text: bpy.props.StringProperty()
 
     def execute(self, context):
         text = self.text.replace("\n", '')
@@ -5125,13 +5090,13 @@ class VSEQFCut(bpy.types.Operator):
     bl_label = "Wrapper for the built in sequence cut operator that maintains parenting relationships and provides extra cut operations."
 
     frame = bpy.props.IntProperty()
-    use_frame = bpy.props.BoolProperty(default=False)
-    type = bpy.props.EnumProperty(name='Type', items=[("SOFT", "Soft", "", 1), ("HARD", "Hard", "", 2), ("INSERT", "Insert Cut", "", 3), ("INSERT_ONLY", "Insert Only", "", 4), ("TRIM", "Trim", "", 5), ("TRIM_LEFT", "Trim Left", "", 6), ("TRIM_RIGHT", "Trim Right", "", 7), ("SLIDE", "Slide", "", 8), ("SLIDE_LEFT", "Slide Left", "", 9), ("SLIDE_RIGHT", "Slide Right", "", 10), ("RIPPLE", "Ripple", "", 11), ("RIPPLE_LEFT", "Ripple Left", "", 12), ("RIPPLE_RIGHT", "Ripple Right", "", 13), ("UNCUT", "UnCut", "", 14), ("UNCUT_LEFT", "UnCut Left", "", 15), ("UNCUT_RIGHT", "UnCut Right", "", 16)], default='SOFT')
-    side = bpy.props.EnumProperty(name='Side', items=[("BOTH", "Both", "", 1), ("RIGHT", "Right", "", 2), ("LEFT", "Left", "", 3)], default='BOTH')
-    all = bpy.props.BoolProperty(name='Cut All', default=False)
-    use_all = bpy.props.BoolProperty(default=False)
-    insert = bpy.props.IntProperty(0)
-    use_insert = bpy.props.BoolProperty(default=False)
+    use_frame: bpy.props.BoolProperty(default=False)
+    type: bpy.props.EnumProperty(name='Type', items=[("SOFT", "Soft", "", 1), ("HARD", "Hard", "", 2), ("INSERT", "Insert Cut", "", 3), ("INSERT_ONLY", "Insert Only", "", 4), ("TRIM", "Trim", "", 5), ("TRIM_LEFT", "Trim Left", "", 6), ("TRIM_RIGHT", "Trim Right", "", 7), ("SLIDE", "Slide", "", 8), ("SLIDE_LEFT", "Slide Left", "", 9), ("SLIDE_RIGHT", "Slide Right", "", 10), ("RIPPLE", "Ripple", "", 11), ("RIPPLE_LEFT", "Ripple Left", "", 12), ("RIPPLE_RIGHT", "Ripple Right", "", 13), ("UNCUT", "UnCut", "", 14), ("UNCUT_LEFT", "UnCut Left", "", 15), ("UNCUT_RIGHT", "UnCut Right", "", 16)], default='SOFT')
+    side: bpy.props.EnumProperty(name='Side', items=[("BOTH", "Both", "", 1), ("RIGHT", "Right", "", 2), ("LEFT", "Left", "", 3)], default='BOTH')
+    all: bpy.props.BoolProperty(name='Cut All', default=False)
+    use_all: bpy.props.BoolProperty(default=False)
+    insert: bpy.props.IntProperty(0)
+    use_insert: bpy.props.BoolProperty(default=False)
 
     def __init__(self):
         if not self.use_frame:
@@ -5414,13 +5379,8 @@ class VSEQFQuickCutsMenu(bpy.types.Menu):
 
     @classmethod
     def poll(cls, context):
-        #Check if panel is disabled
-        if __name__ in context.user_preferences.addons:
-            prefs = context.user_preferences.addons[__name__].preferences
-        else:
-            prefs = VSEQFTempSettings()
+        prefs = get_prefs()
 
-        #Check for sequences
         if not context.sequences or not context.scene.sequence_editor:
             return False
         if len(context.sequences) > 0:
@@ -5459,13 +5419,8 @@ class VSEQFQuickCutsPanel(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        #Check if panel is disabled
-        if __name__ in context.user_preferences.addons:
-            prefs = context.user_preferences.addons[__name__].preferences
-        else:
-            prefs = VSEQFTempSettings()
+        prefs = get_prefs()
 
-        #Check for sequences
         if not context.sequences or not context.scene.sequence_editor:
             return False
         if len(context.sequences) > 0:
@@ -5491,7 +5446,7 @@ class VSEQFQuickCutsPanel(bpy.types.Panel):
 
         box = layout.box()
         row = box.row()
-        split = row.split(percentage=.5, align=True)
+        split = row.split(factor=.5, align=True)
         column = split.column(align=True)
         column.operator('vseqf.cut', text='Trim Left', icon='BACK').type = 'TRIM_LEFT'
         column.operator('vseqf.cut', text='Slide Trim Left', icon='BACK').type = 'SLIDE_LEFT'
@@ -5504,7 +5459,7 @@ class VSEQFQuickCutsPanel(bpy.types.Panel):
 
         box = layout.box()
         row = box.row()
-        split = row.split(percentage=.5, align=True)
+        split = row.split(factor=.5, align=True)
         column = split.column(align=True)
         column.operator('vseqf.quicktimeline', text='Timeline To All').operation = 'sequences'
         column.operator('vseqf.quicktimeline', text='Start To All').operation = 'sequences_start'
@@ -5525,7 +5480,7 @@ class VSEQFDelete(bpy.types.Operator):
     bl_idname = 'vseqf.delete'
     bl_label = 'VSEQF Delete'
 
-    ripple = bpy.props.BoolProperty(default=False)
+    ripple: bpy.props.BoolProperty(default=False)
 
     def reset(self):
         self.ripple = False
@@ -5589,7 +5544,7 @@ class VSEQFQuickTimeline(bpy.types.Operator):
     bl_idname = 'vseqf.quicktimeline'
     bl_label = 'VSEQF Quick Timeline'
 
-    operation = bpy.props.StringProperty()
+    operation: bpy.props.StringProperty()
 
     def execute(self, context):
         operation = self.operation
@@ -5645,20 +5600,20 @@ class VSEQFQuickTimeline(bpy.types.Operator):
 #Classes for settings and variables
 class VSEQFTags(bpy.types.PropertyGroup):
     """QuickTags property that stores tag information"""
-    text = bpy.props.StringProperty(
+    text: bpy.props.StringProperty(
         name="Tag Text",
         default="")
-    use_offset = bpy.props.BoolProperty(
+    use_offset: bpy.props.BoolProperty(
         name="Use Frame Offset",
         default=False)
-    offset = bpy.props.IntProperty(
+    offset: bpy.props.IntProperty(
         name="Frame Offset",
         default=0)
 
 
 class VSEQFMarkerPreset(bpy.types.PropertyGroup):
     """Property for marker presets"""
-    text = bpy.props.StringProperty(name="Text", default="")
+    text: bpy.props.StringProperty(name="Text", default="")
 
 
 class VSEQFSettingsMenu(bpy.types.Menu):
@@ -5667,21 +5622,17 @@ class VSEQFSettingsMenu(bpy.types.Menu):
     bl_label = "Quick Settings"
 
     def draw(self, context):
-        if __name__ in bpy.context.user_preferences.addons:
-            prefs = bpy.context.user_preferences.addons[__name__].preferences
-        else:
-            prefs = VSEQFTempSettings()
+        prefs = get_prefs()
 
         layout = self.layout
         scene = context.scene
-        layout.prop(scene.vseqf, 'simplify_menus')
         layout.prop(scene.vseqf, 'grab_multiselect')
         layout.prop(scene.vseqf, 'snap_cursor_to_edge')
         layout.prop(scene.vseqf, 'snap_new_end')
         layout.prop(scene.vseqf, 'context')
         if prefs.parenting:
             layout.separator()
-            layout.label('QuickParenting Settings')
+            layout.label(text='QuickParenting Settings')
             layout.separator()
             layout.prop(scene.vseqf, 'children')
             layout.prop(scene.vseqf, 'delete_children')
@@ -5689,7 +5640,7 @@ class VSEQFSettingsMenu(bpy.types.Menu):
             layout.prop(scene.vseqf, 'select_children')
         if prefs.proxy:
             layout.separator()
-            layout.label('QuickProxy Settings')
+            layout.label(text='QuickProxy Settings')
             layout.separator()
             layout.prop(scene.vseqf, 'enable_proxy')
             layout.prop(scene.vseqf, 'build_proxy')
@@ -5702,44 +5653,44 @@ class VSEQFSettingsMenu(bpy.types.Menu):
 
 class VSEQFZoomPreset(bpy.types.PropertyGroup):
     """Property group to store a sequencer view position"""
-    name = bpy.props.StringProperty(name="Preset Name", default="")
-    left = bpy.props.FloatProperty(name="Leftmost Visible Frame", default=0.0)
-    right = bpy.props.FloatProperty(name="Rightmost Visible Frame", default=300.0)
-    bottom = bpy.props.FloatProperty(name="Bottom Visible Channel", default=0.0)
-    top = bpy.props.FloatProperty(name="Top Visible Channel", default=5.0)
+    name: bpy.props.StringProperty(name="Preset Name", default="")
+    left: bpy.props.FloatProperty(name="Leftmost Visible Frame", default=0.0)
+    right: bpy.props.FloatProperty(name="Rightmost Visible Frame", default=300.0)
+    bottom: bpy.props.FloatProperty(name="Bottom Visible Channel", default=0.0)
+    top: bpy.props.FloatProperty(name="Top Visible Channel", default=5.0)
 
 
 class VSEQFQuick3PointValues(bpy.types.PropertyGroup):
-    full_length = bpy.props.IntProperty(
+    full_length: bpy.props.IntProperty(
         default=1,
         min=0)
-    import_frame_in = bpy.props.IntProperty(
+    import_frame_in: bpy.props.IntProperty(
         default=-1,
         min=-1)
-    import_frame_length = bpy.props.IntProperty(
+    import_frame_length: bpy.props.IntProperty(
         default=-1,
         min=-1)
-    import_minutes_in = bpy.props.IntProperty(
+    import_minutes_in: bpy.props.IntProperty(
         default=0,
         min=0,
         update=update_import_minutes_in)
-    import_seconds_in = bpy.props.IntProperty(
+    import_seconds_in: bpy.props.IntProperty(
         default=0,
         min=0,
         update=update_import_seconds_in)
-    import_frames_in = bpy.props.IntProperty(
+    import_frames_in: bpy.props.IntProperty(
         default=0,
         min=0,
         update=update_import_frames_in)
-    import_minutes_length = bpy.props.IntProperty(
+    import_minutes_length: bpy.props.IntProperty(
         default=0,
         min=0,
         update=update_import_minutes_length)
-    import_seconds_length = bpy.props.IntProperty(
+    import_seconds_length: bpy.props.IntProperty(
         default=0,
         min=0,
         update=update_import_seconds_length)
-    import_frames_length = bpy.props.IntProperty(
+    import_frames_length: bpy.props.IntProperty(
         default=0,
         min=0,
         update=update_import_frames_length)
@@ -5747,165 +5698,160 @@ class VSEQFQuick3PointValues(bpy.types.PropertyGroup):
 
 class VSEQFSetting(bpy.types.PropertyGroup):
     """Property group to store most VSEQF settings.  This will be assigned to scene.vseqf"""
-    context = bpy.props.BoolProperty(
+    context: bpy.props.BoolProperty(
         name="Enable Context Menu",
         default=True)
-    zoom_presets = bpy.props.CollectionProperty(type=VSEQFZoomPreset)
-    last_frame = bpy.props.IntProperty(
+    zoom_presets: bpy.props.CollectionProperty(type=VSEQFZoomPreset)
+    last_frame: bpy.props.IntProperty(
         name="Last Scene Frame",
         default=1)
 
-    simplify_menus = bpy.props.BoolProperty(
-        name="Simplify Sequencer Menus",
-        default=True,
-        description="Remove some items from the sequencer menus that require mouse input or are less useful.")
-
-    follow = bpy.props.BoolProperty(
+    follow: bpy.props.BoolProperty(
         name="Cursor Following",
         default=False,
         update=start_follow)
-    grab_multiselect = bpy.props.BoolProperty(
+    grab_multiselect: bpy.props.BoolProperty(
         name="Grab Multiple With Right-Click",
         default=False,
         description="Allows the right-click drag grab to work with multiple strips.")
 
-    children = bpy.props.BoolProperty(
+    children: bpy.props.BoolProperty(
         name="Cut/Move Children",
         default=True,
         description="Automatically cut and move child strips along with a parent.")
-    autoparent = bpy.props.BoolProperty(
+    autoparent: bpy.props.BoolProperty(
         name="Auto-Parent New Audio To Video",
         default=True,
         description="Automatically parent audio strips to video when importing a movie with both types of strips.")
-    select_children = bpy.props.BoolProperty(
+    select_children: bpy.props.BoolProperty(
         name="Auto-Select Children",
         default=False,
         description="Automatically select child strips when a parent is selected.")
-    expanded_children = bpy.props.BoolProperty(default=True)
-    delete_children = bpy.props.BoolProperty(
+    expanded_children: bpy.props.BoolProperty(default=True)
+    delete_children: bpy.props.BoolProperty(
         name="Auto-Delete Children",
         default=False,
         description="Automatically delete child strips when a parent is deleted.")
 
-    transition = bpy.props.EnumProperty(
+    transition: bpy.props.EnumProperty(
         name="Transition Type",
         default="CROSS",
         items=[("CROSS", "Crossfade", "", 1), ("WIPE", "Wipe", "", 2), ("GAMMA_CROSS", "Gamma Cross", "", 3)])
-    fade = bpy.props.IntProperty(
+    fade: bpy.props.IntProperty(
         name="Fade Length",
         default=0,
         min=0,
         description="Default Fade Length In Frames")
-    fadein = bpy.props.IntProperty(
+    fadein: bpy.props.IntProperty(
         name="Fade In Length",
         default=0,
         min=0,
         description="Current Fade In Length In Frames")
-    fadeout = bpy.props.IntProperty(
+    fadeout: bpy.props.IntProperty(
         name="Fade Out Length",
         default=0,
         min=0,
         description="Current Fade Out Length In Frames")
 
-    quicklist_parenting = bpy.props.BoolProperty(
+    quicklist_parenting: bpy.props.BoolProperty(
         name="Parenting",
         default=True,
         description='Display parenting information')
-    quicklist_tags = bpy.props.BoolProperty(
+    quicklist_tags: bpy.props.BoolProperty(
         name="Tags",
         default=True,
         description='Display tags')
-    quicklist_editing = bpy.props.BoolProperty(
+    quicklist_editing: bpy.props.BoolProperty(
         name="Settings",
         default=False,
         description='Display position, length and proxy settings')
-    quicklist_sort_reverse = bpy.props.BoolProperty(
+    quicklist_sort_reverse: bpy.props.BoolProperty(
         name='Reverse Sort',
         default=False,
         description='Reverse sort')
-    quicklist_sort = bpy.props.EnumProperty(
+    quicklist_sort: bpy.props.EnumProperty(
         name="Sort Method",
         default='POSITION',
         items=[('POSITION', 'Position', '', 1), ('TITLE', 'Title', '', 2), ('LENGTH', 'Length', '', 3)])
 
-    enable_proxy = bpy.props.BoolProperty(
+    enable_proxy: bpy.props.BoolProperty(
         name="Enable Proxy On Import",
         default=False)
-    build_proxy = bpy.props.BoolProperty(
+    build_proxy: bpy.props.BoolProperty(
         name="Auto-Build Proxy On Import",
         default=False)
-    proxy_25 = bpy.props.BoolProperty(
+    proxy_25: bpy.props.BoolProperty(
         name="25%",
         default=True)
-    proxy_50 = bpy.props.BoolProperty(
+    proxy_50: bpy.props.BoolProperty(
         name="50%",
         default=False)
-    proxy_75 = bpy.props.BoolProperty(
+    proxy_75: bpy.props.BoolProperty(
         name="75%",
         default=False)
-    proxy_100 = bpy.props.BoolProperty(
+    proxy_100: bpy.props.BoolProperty(
         name="100%",
         default=False)
-    proxy_quality = bpy.props.IntProperty(
+    proxy_quality: bpy.props.IntProperty(
         name="Quality",
         default=90,
         min=1,
         max=100)
 
-    current_marker_frame = bpy.props.IntProperty(
+    current_marker_frame: bpy.props.IntProperty(
         default=0)
-    marker_index = bpy.props.IntProperty(
+    marker_index: bpy.props.IntProperty(
         name="Marker Display Index",
         default=0)
-    marker_presets = bpy.props.CollectionProperty(
+    marker_presets: bpy.props.CollectionProperty(
         type=VSEQFMarkerPreset)
-    expanded_markers = bpy.props.BoolProperty(default=True)
-    current_marker = bpy.props.StringProperty(
+    expanded_markers: bpy.props.BoolProperty(default=True)
+    current_marker: bpy.props.StringProperty(
         name="New Preset",
         default='')
-    marker_deselect = bpy.props.BoolProperty(
+    marker_deselect: bpy.props.BoolProperty(
         name="Deselect New Markers",
         default=True)
 
-    zoom_size = bpy.props.IntProperty(
+    zoom_size: bpy.props.IntProperty(
         name='Zoom Amount',
         default=200,
         min=1,
         description="Zoom size in frames",
         update=zoom_cursor)
-    step = bpy.props.IntProperty(
+    step: bpy.props.IntProperty(
         name="Frame Step",
         default=0,
         min=-7,
         max=7)
-    skip_index = bpy.props.IntProperty(
+    skip_index: bpy.props.IntProperty(
         default=0)
 
-    current_tag = bpy.props.StringProperty(
+    current_tag: bpy.props.StringProperty(
         name="New Tag",
         default='')
-    tags = bpy.props.CollectionProperty(type=VSEQFTags)
-    selected_tags = bpy.props.CollectionProperty(type=VSEQFTags)
-    show_tags = bpy.props.EnumProperty(
+    tags: bpy.props.CollectionProperty(type=VSEQFTags)
+    selected_tags: bpy.props.CollectionProperty(type=VSEQFTags)
+    show_tags: bpy.props.EnumProperty(
         name="Show Tags On",
         default='ACTIVE',
         items=[('ACTIVE', 'Active Strip', '', 1), ('SELECTED', 'Selected Strips', '', 2)])
-    show_selected_tags = bpy.props.BoolProperty(
+    show_selected_tags: bpy.props.BoolProperty(
         name="Show Tags For All Selected Sequences",
         default=False)
 
-    quickcuts_insert = bpy.props.IntProperty(
+    quickcuts_insert: bpy.props.IntProperty(
         name="Frames To Insert",
         default=0,
         min=0)
-    quickcuts_all = bpy.props.BoolProperty(
+    quickcuts_all: bpy.props.BoolProperty(
         name='Cut All Sequences',
         default=False,
         description='Cut all sequences, regardless of selection (not including locked sequences)')
-    snap_new_end = bpy.props.BoolProperty(
+    snap_new_end: bpy.props.BoolProperty(
         name='Snap Cursor To End Of New Sequences',
         default=False)
-    snap_cursor_to_edge = bpy.props.BoolProperty(
+    snap_cursor_to_edge: bpy.props.BoolProperty(
         name='Snap Cursor When Dragging Edges',
         default=True)
 
@@ -5913,31 +5859,31 @@ class VSEQFSetting(bpy.types.PropertyGroup):
 class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
     """Addon preferences for QuickFunctions, used to enable and disable features"""
     bl_idname = __name__
-    parenting = bpy.props.BoolProperty(
+    parenting: bpy.props.BoolProperty(
         name="Enable Quick Parenting",
         default=True)
-    fades = bpy.props.BoolProperty(
+    fades: bpy.props.BoolProperty(
         name="Enable Quick Fades",
         default=True)
-    list = bpy.props.BoolProperty(
+    list: bpy.props.BoolProperty(
         name="Enable Quick List",
         default=False)
-    proxy = bpy.props.BoolProperty(
+    proxy: bpy.props.BoolProperty(
         name="Enable Quick Proxy",
         default=True)
-    markers = bpy.props.BoolProperty(
+    markers: bpy.props.BoolProperty(
         name="Enable Quick Markers",
         default=True)
-    tags = bpy.props.BoolProperty(
+    tags: bpy.props.BoolProperty(
         name="Enable Quick Tags",
         default=True)
-    cuts = bpy.props.BoolProperty(
+    cuts: bpy.props.BoolProperty(
         name="Enable Quick Cuts",
         default=True)
-    edit = bpy.props.BoolProperty(
+    edit: bpy.props.BoolProperty(
         name="Enable Compact Edit Panel",
         default=False)
-    threepoint = bpy.props.BoolProperty(
+    threepoint: bpy.props.BoolProperty(
         name="Enable Quick Three Point",
         default=True)
 
@@ -5957,31 +5903,31 @@ class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
 
 class VSEQFTempSettings(object):
     """Substitute for the addon preferences when this script isn't loaded as an addon"""
-    parenting = bpy.props.BoolProperty(
+    parenting: bpy.props.BoolProperty(
         name="Enable Quick Parenting",
         default=True)
-    fades = bpy.props.BoolProperty(
+    fades: bpy.props.BoolProperty(
         name="Enable Quick Fades",
         default=True)
-    list = bpy.props.BoolProperty(
+    list: bpy.props.BoolProperty(
         name="Enable Quick List",
         default=True)
-    proxy = bpy.props.BoolProperty(
+    proxy: bpy.props.BoolProperty(
         name="Enable Quick Proxy",
         default=True)
-    markers = bpy.props.BoolProperty(
+    markers: bpy.props.BoolProperty(
         name="Enable Quick Markers",
         default=True)
-    tags = bpy.props.BoolProperty(
+    tags: bpy.props.BoolProperty(
         name="Enable Quick Tags",
         default=True)
-    cuts = bpy.props.BoolProperty(
+    cuts: bpy.props.BoolProperty(
         name="Enable Quick Cuts",
         default=True)
-    edit = bpy.props.BoolProperty(
+    edit: bpy.props.BoolProperty(
         name="Enable Compact Edit Panel",
         default=True)
-    threepoint = bpy.props.BoolProperty(
+    threepoint: bpy.props.BoolProperty(
         name="Enable Quick Three Point",
         default=True)
 
@@ -6007,129 +5953,169 @@ class VSEQFDeleteRippleConfirm(bpy.types.Menu):
         layout.operator("vseqf.delete", text='Delete').ripple = True
 
 
+class SEQUENCER_MT_strip_transform(bpy.types.Menu):
+    bl_label = "Transform"
+
+    def draw(self, context):
+        layout = self.layout
+
+        #layout.operator("transform.transform", text="Move").mode = 'TRANSLATION'
+        layout.operator("vseqf.grab", text="Grab/Move")
+        #layout.operator("transform.transform", text="Move/Extend from Frame").mode = 'TIME_EXTEND'
+        layout.operator("vseqf.grab", text="Grab/Extend from frame").mode = 'TIME_EXTEND'
+        #layout.operator("sequencer.slip", text="Slip Strip Contents")
+        layout.operator("vseqf.grab", text="Slip Strip Contents").mode = 'SLIP'
+
+        layout.separator()
+        layout.operator_menu_enum("sequencer.swap", "side")
+
+        layout.separator()
+        layout.operator("sequencer.gap_remove").all = False
+        layout.operator("sequencer.gap_insert")
+
+
 class SEQUENCER_MT_strip(bpy.types.Menu):
     bl_label = "Strip"
 
     def draw(self, context):
-        vseqf = context.scene.vseqf
         layout = self.layout
 
         layout.operator_context = 'INVOKE_REGION_WIN'
-        layout.operator("vseqf.grab", text="Grab/Move")
-        if not vseqf.simplify_menus:
-            layout.operator("vseqf.grab", text="Grab/Extend from frame").mode = 'TIME_EXTEND'
-            layout.operator("sequencer.gap_remove").all = False
-            layout.operator("sequencer.gap_insert")
 
         layout.separator()
+        layout.menu("SEQUENCER_MT_strip_transform")
+        layout.operator("sequencer.snap")
+        layout.operator("sequencer.offset_clear")
 
+        layout.separator()
+        layout.operator("sequencer.copy", text="Copy")
+        layout.operator("sequencer.paste", text="Paste")
+        layout.operator("sequencer.duplicate_move")
+        layout.operator("sequencer.delete", text="Delete...")
+
+        layout.separator()
+        #layout.operator("sequencer.cut", text="Cut (Hard) at frame").type = 'HARD'
+        #layout.operator("sequencer.cut", text="Cut (Soft) at frame").type = 'SOFT'
         layout.operator("vseqf.cut", text="Cut (hard) at frame").type = 'HARD'
         layout.operator("vseqf.cut", text="Cut (soft) at frame").type = 'SOFT'
-        layout.operator("vseqf.grab", text="Slip Strip Contents").mode = 'SLIP'
-        if not vseqf.simplify_menus:
-            layout.operator("sequencer.images_separate")
-        layout.operator("sequencer.offset_clear")
-        if not vseqf.simplify_menus:
-            layout.operator("sequencer.deinterlace_selected_movies")
-        layout.operator("sequencer.rebuild_proxy")
-        layout.separator()
 
-        layout.operator("sequencer.duplicate_move")
-        layout.operator("sequencer.delete")
+        layout.separator()
+        layout.operator("sequencer.deinterlace_selected_movies")
+        layout.operator("sequencer.rebuild_proxy")
 
         strip = current_active(context)
 
         if strip:
             stype = strip.type
 
-            # XXX note strip.type is never equal to 'EFFECT', look at seq_type_items within rna_sequencer.c
-            if stype == 'EFFECT':
-                pass
-            elif stype == 'IMAGE':
+            if stype in {
+                    'CROSS', 'ADD', 'SUBTRACT', 'ALPHA_OVER', 'ALPHA_UNDER',
+                    'GAMMA_CROSS', 'MULTIPLY', 'OVER_DROP', 'WIPE', 'GLOW',
+                    'TRANSFORM', 'COLOR', 'SPEED', 'MULTICAM', 'ADJUSTMENT',
+                    'GAUSSIAN_BLUR', 'TEXT',
+            }:
+                layout.separator()
+                layout.operator_menu_enum("sequencer.change_effect_input", "swap")
+                layout.operator_menu_enum("sequencer.change_effect_type", "type")
+                layout.operator("sequencer.reassign_inputs")
+                layout.operator("sequencer.swap_inputs")
+            elif stype in {'IMAGE', 'MOVIE'}:
                 layout.separator()
                 layout.operator("sequencer.rendersize")
-            elif stype == 'SCENE':
-                pass
-            elif stype == 'MOVIE':
-                layout.separator()
-                layout.operator("sequencer.rendersize")
+                layout.operator("sequencer.images_separate")
             elif stype == 'SOUND':
                 layout.separator()
                 layout.operator("sequencer.crossfade_sounds")
+            elif stype == 'META':
+                layout.separator()
+                layout.operator("sequencer.meta_separate")
 
         layout.separator()
+        #layout.operator("sequencer.meta_make")
         layout.operator("vseqf.meta_make")
-        layout.operator("sequencer.meta_separate")
 
         layout.separator()
-        layout.operator("sequencer.reload", text="Reload Strips")
-        layout.operator("sequencer.reload", text="Reload Strips and Adjust Length").adjust_length = True
-        layout.operator("sequencer.reassign_inputs")
-        layout.operator("sequencer.swap_inputs")
+        layout.menu("SEQUENCER_MT_strip_input")
 
         layout.separator()
-        layout.operator("sequencer.lock")
-        layout.operator("sequencer.unlock")
-        layout.operator("sequencer.mute").unselected = False
-        layout.operator("sequencer.unmute").unselected = False
+        layout.menu("SEQUENCER_MT_strip_lock_mute")
 
-        layout.operator("sequencer.mute", text="Mute Deselected Strips").unselected = True
-
-        #layout.operator('vseqf.quicksnaps', text='Snap Cursor To Nearest Second').type = 'cursor_to_seconds'
         try:
             #Display only if active sequence is set
             sequence = current_active(context)
             if sequence:
                 layout.separator()
-                #layout.operator('vseqf.quicksnaps', text='Snap Cursor To Beginning Of Sequence').type = 'cursor_to_beginning'
-                #layout.operator('vseqf.quicksnaps', text='Snap Cursor To End Of Sequence').type = 'cursor_to_end'
                 layout.operator('vseqf.quicksnaps', text='Snap Sequence Beginning To Cursor').type = 'begin_to_cursor'
                 layout.operator('vseqf.quicksnaps', text='Snap Sequence End To Cursor').type = 'end_to_cursor'
                 layout.operator('vseqf.quicksnaps', text='Snap Sequence To Previous Sequence').type = 'sequence_to_previous'
                 layout.operator('vseqf.quicksnaps', text='Snap Sequence To Next Sequence').type = 'sequence_to_next'
         except:
             pass
-        if not vseqf.simplify_menus:
-            layout.operator_menu_enum("sequencer.swap", "side")
 
-            layout.separator()
 
-            layout.operator("sequencer.swap_data")
-            layout.menu("SEQUENCER_MT_change")
+def sel_sequences(context):
+    try:
+        return len(context.selected_sequences) if context.selected_sequences else 0
+    except AttributeError:
+        return 0
 
 
 class SEQUENCER_MT_add(bpy.types.Menu):
     bl_label = "Add"
 
     def draw(self, context):
-        del context
-        layout = self.layout
 
+        layout = self.layout
         layout.operator_context = 'INVOKE_REGION_WIN'
 
         if len(bpy.data.scenes) > 10:
             layout.operator_context = 'INVOKE_DEFAULT'
-            layout.operator("sequencer.scene_strip_add", text="Scene...")
+            layout.operator("sequencer.scene_strip_add", text="Scene...", icon='SCENE_DATA')
+        elif len(bpy.data.scenes) > 1:
+            layout.operator_menu_enum("sequencer.scene_strip_add", "scene", text="Scene", icon='SCENE_DATA')
         else:
-            layout.operator_menu_enum("sequencer.scene_strip_add", "scene", text="Scene")
+            layout.menu("SEQUENCER_MT_add_empty", text="Scene", icon='SCENE_DATA')
 
         if len(bpy.data.movieclips) > 10:
             layout.operator_context = 'INVOKE_DEFAULT'
-            layout.operator("sequencer.movieclip_strip_add", text="Clips...")
+            layout.operator("sequencer.movieclip_strip_add", text="Clip...", icon='CLIP')
+        elif len(bpy.data.movieclips) > 1:
+            layout.operator_menu_enum("sequencer.movieclip_strip_add", "clip", text="Clip", icon='CLIP')
         else:
-            layout.operator_menu_enum("sequencer.movieclip_strip_add", "clip", text="Clip")
+            layout.menu("SEQUENCER_MT_add_empty", text="Clip", icon='CLIP')
 
         if len(bpy.data.masks) > 10:
             layout.operator_context = 'INVOKE_DEFAULT'
-            layout.operator("sequencer.mask_strip_add", text="Masks...")
+            layout.operator("sequencer.mask_strip_add", text="Mask...", icon='MOD_MASK')
+        elif len(bpy.data.masks) > 1:
+            layout.operator_menu_enum("sequencer.mask_strip_add", "mask", text="Mask", icon='MOD_MASK')
         else:
-            layout.operator_menu_enum("sequencer.mask_strip_add", "mask", text="Mask")
+            layout.menu("SEQUENCER_MT_add_empty", text="Mask", icon='MOD_MASK')
 
-        layout.operator("vseqf.import", text="Movie").type = 'MOVIE'
-        layout.operator("vseqf.import", text="Image").type = 'IMAGE'
-        layout.operator("sequencer.sound_strip_add", text="Sound")
+        layout.separator()
 
+        #layout.operator("sequencer.movie_strip_add", text="Movie", icon='FILE_MOVIE')
+        layout.operator("vseqf.import", text="Movie", icon="FILE_MOVIE").type = 'MOVIE'
+        layout.operator("sequencer.sound_strip_add", text="Sound", icon='FILE_SOUND')
+        #layout.operator("sequencer.image_strip_add", text="Image/Sequence", icon='FILE_IMAGE')
+        layout.operator("vseqf.import", text="Image/Sequence", icon="FILE_IMAGE").type = 'IMAGE'
+
+        layout.separator()
+
+        layout.operator_context = 'INVOKE_REGION_WIN'
+        layout.operator("sequencer.effect_strip_add", text="Color", icon='COLOR').type = 'COLOR'
+        layout.operator("sequencer.effect_strip_add", text="Text", icon='FONT_DATA').type = 'TEXT'
+
+        layout.separator()
+
+        layout.operator("sequencer.effect_strip_add", text="Adjustment Layer", icon='COLOR').type = 'ADJUSTMENT'
+
+        layout.operator_context = 'INVOKE_DEFAULT'
         layout.menu("SEQUENCER_MT_add_effect")
+
+        col = layout.column()
+        col.menu("SEQUENCER_MT_add_transitions")
+        col.enabled = sel_sequences(context) >= 2
 
 
 #Register properties, operators, menus and shortcuts
@@ -6305,7 +6291,7 @@ def register():
         if " frame_step " in str(handler):
             handlers.remove(handler)
     handlers.append(frame_step)
-    handlers = bpy.app.handlers.scene_update_post
+    handlers = bpy.app.handlers.depsgraph_update_post
     for handler in handlers:
         if " vseqf_continuous " in str(handler):
             handlers.remove(handler)
@@ -6334,7 +6320,7 @@ def unregister():
     for handler in handlers:
         if " frame_step " in str(handler):
             handlers.remove(handler)
-    handlers = bpy.app.handlers.scene_update_post
+    handlers = bpy.app.handlers.depsgraph_update_post
     for handler in handlers:
         if " vseqf_continuous " in str(handler):
             handlers.remove(handler)
