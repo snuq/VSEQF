@@ -1904,12 +1904,14 @@ class VSEQFGrabAdd(bpy.types.Operator):
         if reset:
             for seq in self.sequences:
                 sequence = seq[0]
-                sequence.channel = seq[4] + self.timeline_height
-                sequence.frame_start = seq[3] + timeline_length
+                if not hasattr(sequence, 'input_1'):
+                    sequence.channel = seq[4] + self.timeline_height
+                    sequence.frame_start = seq[3] + timeline_length
             for seq in self.sequences:
                 sequence = seq[0]
-                sequence.channel = seq[4]
-                sequence.frame_start = seq[3]
+                if not hasattr(sequence, 'input_1'):
+                    sequence.channel = seq[4]
+                    sequence.frame_start = seq[3]
             return
 
         for seq in self.sequences:
