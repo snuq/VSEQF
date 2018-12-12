@@ -77,8 +77,6 @@ Todo: ending cursor following causes inputs to not work until left mouse is clic
 Todo: check and improve tooltips on all buttons, make sure shortcuts are listed
 Todo: update readme:
     add QuickShortcuts
-    update Quick3Point
-    update QuickTags
 """
 
 
@@ -2048,7 +2046,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
                                     new_channel = seq[4] + input_2_channel_offset
                         else:
                             new_channel = seq[4] + input_1_channel_offset
-                    if new_channel is not False:
+                    if new_channel is not False and new_channel != sequence.channel:
                         sequence.channel = new_channel
 
     def modal(self, context, event):

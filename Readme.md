@@ -107,6 +107,18 @@ The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' o
 
 
 
+## QuickShortcuts
+Enables quick navigation of the timeline using the number pad.  
+
+* __Numpad:__
+
+| __7__: Cursor back one second  | __8__  | __9__: Cursor forward one second  |
+| __4__: Reverse/slower playback  | __5__: Play/pause  | __6__: Forward/faster playback  |
+| __1__: Cursor back one frame  | __2__  | __3__: Cursor forward one frame |
+| __0__: Cut  |   |   |
+
+
+
 ## QuickContext
 Enables right-click and hold in the sequencer to pop up a context menu allowing for different operations depending on what is clicked on.
 
@@ -140,9 +152,9 @@ The different menu types are:
 
 
 
-## QuickThreePoint
+## Quick3Point
 __Warning: This is very much alpha, it will likely change quite a bit in future versions, and may even be removed and put into another addon.__  
-To use this properly, your screen layout should have a file browser area, a movies clip editor area, and at least one sequencer area.  __This function may not work correctly if all these areas are not present.__  
+To use this properly, your screen layout should have a file browser area, a movie clip editor area, and at least one sequencer area.  __This function may not work correctly if all these areas are not present.__  
 
 If sequence that shares the same source as a loaded clip is active, that clip will be displayed in the clip editor.  
 
@@ -155,14 +167,20 @@ To use the following options, the clip does not need to have been loaded via the
 
    A graphic overlay will be created in the clip editor allowing for easy setting of the in and out points of the current clip. Drag the top arrow to set the left ('in') point, and the lower arrow to set the right ('out') point.  
    While in this mode, press the spacebar to play/pause the video.  
+   You can drag the playback position at the bottom of the clip editor.  
    Left click anywhere else, or press enter to confirm the changes.  
    Right click or press escape to cancel the changes.  
 
-* __In frame, Out frame, Length__
+* __Minutes In, Seconds In, Frames In__
 
-   The set in frame, or frames to be cut from the beginning (and timecode)  
-   The set out frame, or frames to be cut from the end (and timecode)  
-   The length the imported clip will be  
+   Set these values to manually adjust the in point for the clip (how much will be removed from the beginning).  
+   Adjusting the frames greater than the total frames in a second will increment the seconds, and adjusting the seconds greater than 59 will increment the minutes.  
+   If the length is at the maximum possible (end of the clip), it will be reduced as the in point is increased.  
+
+* __Minutes Length, Seconds Length, Frames Length__
+
+   Use these values to set the length of the clip, after the in point.  
+   If these values are increased beyond the endpoint of the clip, they will be snapped back to the end.  
 
 * __Import At Cursor__
 
@@ -481,29 +499,25 @@ Create tags, text snippets that can describe sequences, and apply them to any se
    Click a tag to select all sequences with that tag.  
    Click the '+' button to add that tag to all selected sequences.
 
-* __New Tag__
-
-   Type a tag into the field, and press the '+' button to add to all selected strips.  This tag will now show up in the list above as well.
-
-* __Show All Selected__
-
-   This button toggles the lower list between showing the tags for the active sequence (Active Tags) or showing tags for all selected sequences (Selected Tags).
-
-* __Active Tags__
+* __Active Strip__
 
    Shows a list of tags for the active sequence.
    Click a tag to select all sequences with this tag.
    Click the 'X' button to remove the tag from the active sequence.
 
-* __Selected Tags__
+* __Selected Strips__
 
    Shows a list of tags for all selected sequence.
    Click a tag to select all sequences with this tag.
    Click the 'X' button to remove the tag from all selected sequences.
 
-* __Clear Selected Tags__
+* __New Tag__
 
-   Removes all tags from all selected sequences.
+   Type a tag into the field, and press the '+' button to add to all selected strips.  This tag will now show up in the 'All Tags' list as well.
+
+* __Clear Active/Selected Strip Tags__
+
+   Removes all tags from the active or selected sequences.
 
 
 
