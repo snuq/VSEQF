@@ -112,10 +112,12 @@ Enables quick navigation of the timeline using the number pad.
 
 * __Numpad:__
 
-| __7__: Cursor back one second  | __8__  | __9__: Cursor forward one second  |
-| __4__: Reverse/slower playback  | __5__: Play/pause  | __6__: Forward/faster playback  |
-| __1__: Cursor back one frame  | __2__  | __3__: Cursor forward one frame |
-| __0__: Cut  |   |   |
+| | | |
+|-|-|-|
+| __7__: Cursor back one second | __8__ | __9__: Cursor forward one second |
+| __4__: Reverse/slower playback | __5__: Play/pause | __6__: Forward/faster playback |
+| __1__: Cursor back one frame | __2__ | __3__: Cursor forward one frame |
+| __0__: Cut |  |  |
 
 
 
