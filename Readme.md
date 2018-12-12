@@ -114,10 +114,10 @@ Enables quick navigation of the timeline using the number pad.
 
 | | | |
 |-|-|-|
-| __7__: Cursor back one second | __8__ | __9__: Cursor forward one second |
-| __4__: Reverse/slower playback | __5__: Play/pause | __6__: Forward/faster playback |
-| __1__: Cursor back one frame | __2__ | __3__: Cursor forward one frame |
-| __0__: Cut |  |  |
+| __7__<br>Cursor back one second | __8__<br> | __9__<br>Cursor forward one second |
+| __4__<br>Reverse/slower playback | __5__<br>Play/pause | __6__<br>Forward/faster playback |
+| __1__<br>Cursor back one frame | __2__<br> | __3__<br>Cursor forward one frame |
+| __0__<br>Cut | <br> | <br> |
 
 
 
