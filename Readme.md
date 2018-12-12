@@ -113,7 +113,7 @@ Enables quick navigation of the timeline using the number pad.
 * __Numpad:__
 
 | | | |
-|-|-|-|
+| :---: | :---: | :---: |
 | __7__<br>Cursor back one second | __8__<br> | __9__<br>Cursor forward one second |
 | __4__<br>Reverse/slower playback | __5__<br>Play/pause | __6__<br>Forward/faster playback |
 | __1__<br>Cursor back one frame | __2__<br> | __3__<br>Cursor forward one frame |
