@@ -55,7 +55,7 @@ Changelog:
    Right-click context menu option added, hold right click to activate it.  Options will differ depending on what is clicked on - cursor, sequence, sequence handles, markers, empty area
 
 0.94 (In progress)
-   Updated for Blender 2.8 - lots of code changes, updated menus
+   Updated for Blender 2.8 - lots of code changes, lots of bug fixes, updated menus
    Frame skipping now works with reverse playback as well, and fixed poor behavior
    Added QuickShortcuts - timeline and sequence movement using the numpad.  Thanks to tintwotin for the ideas!
    Added option to snap cursor to a dragged edge if one edge is grabbed, if two are grabbed, the second edge will be set to the overlay frame.
@@ -72,11 +72,13 @@ Changelog:
    Improved QuickTags interface
    Reworked ripple delete, it should now behave properly with overlapping sequences
 
-Todo: test all features in 2.8
-Todo: grab multiple no longer works
-Todo: ripple pop doesnt move children properly
+Todo: quick 3point causing recursion errors sometimes when adjusting in/out
+Todo: ending cursor following causes inputs to not work until left mouse is clicked
 Todo: check and improve tooltips on all buttons, make sure shortcuts are listed
-Todo: update readme: add QuickShortcuts, Quick3Point, snap to grabbed edge, remove simplify menus
+Todo: update readme:
+    add QuickShortcuts
+    update Quick3Point
+    update QuickTags
 """
 
 
@@ -104,7 +106,6 @@ bl_info = {
     "category": "Sequencer"
 }
 vseqf_draw_handler = None
-
 right_click_time = 0.5
 
 
@@ -155,7 +156,7 @@ def ripple_timeline(sequences, start_frame, ripple_amount, select_ripple=True):
 
     to_change = []
     for sequence in sequences:
-        if sequence.frame_final_end > start_frame - ripple_amount:
+        if sequence.frame_final_end > start_frame - ripple_amount and sequence.frame_final_start > start_frame:
             to_change.append([sequence, sequence.channel, sequence.frame_start + ripple_amount, True])
     for seq in to_change:
         sequence = seq[0]
@@ -560,6 +561,7 @@ def find_close_sequence(sequences, selected_sequence, direction, mode='overlap',
             'overlap': Only returns sequences that overlap selected_sequence
             'channel': Only returns sequences that are in the same channel as selected_sequence
             'simple': Just looks for the previous or next frame_final_start
+            'nooverlap': Returns the previous sequence, ignoring any that are overlapping
             <any other string>: All sequences are returned
         sounds: Boolean, if False, 'SOUND' sequence types are ignored
         effects: Boolean, if False, effect strips that are applied to another strip are ignored
@@ -634,7 +636,7 @@ def find_close_sequence(sequences, selected_sequence, direction, mode='overlap',
             if mode == 'overlap':
                 if len(overlap_nexts) > 0:
                     found = min(overlap_nexts, key=lambda overlap: abs(overlap.channel - selected_sequence.channel))
-            elif mode == 'channel':
+            elif mode == 'channel' or mode == 'nooverlap':
                 if len(nexts) > 0:
                     found = min(nexts, key=lambda next_seq: (next_seq.frame_final_start - selected_sequence.frame_final_end))
             else:
@@ -644,7 +646,7 @@ def find_close_sequence(sequences, selected_sequence, direction, mode='overlap',
             if mode == 'overlap':
                 if len(overlap_previous) > 0:
                     found = min(overlap_previous, key=lambda overlap: abs(overlap.channel - selected_sequence.channel))
-            elif mode == 'channel':
+            elif mode == 'channel' or mode == 'nooverlap':
                 if len(previous) > 0:
                     found = min(previous, key=lambda prev: (selected_sequence.frame_final_start - prev.frame_final_end))
             else:
@@ -821,7 +823,7 @@ class VSEQFCompactEdit(bpy.types.Panel):
                 row = box.row()
                 split = row.split(factor=.8, align=True)
                 split.label(text="Parent: "+parent.name)
-                split.operator('vseqf.quickparents', text='', icon="BORDER_RECT").action = 'select_parent'
+                split.operator('vseqf.quickparents', text='', icon="ARROW_LEFTRIGHT").action = 'select_parent'
                 split.operator('vseqf.quickparents', text='', icon="X").action = 'clear_parent'
             if len(children) > 0:
                 row = box.row()
@@ -829,7 +831,7 @@ class VSEQFCompactEdit(bpy.types.Panel):
                 subsplit = split.split(factor=.1)
                 subsplit.prop(vseqf, 'expanded_children', icon="TRIA_DOWN" if scene.vseqf.expanded_children else "TRIA_RIGHT", icon_only=True, emboss=False)
                 subsplit.label(text="Children: "+children[0].name)
-                split.operator('vseqf.quickparents', text='', icon="BORDER_RECT").action = 'select_children'
+                split.operator('vseqf.quickparents', text='', icon="ARROW_LEFTRIGHT").action = 'select_children'
                 split.operator('vseqf.quickparents', text='', icon="X").action = 'clear_children'
                 if vseqf.expanded_children:
                     index = 1
@@ -980,7 +982,7 @@ def vseqf_draw():
     if strip_x >= max_x and active_left < max_x:
         strip_x = max_x
 
-    draw_text(strip_x - (strip_x / width) * 40, active_bottom, text_size, '('+length_timecode+')', text_color)
+    draw_text(strip_x - (strip_x / width) * 40, active_bottom + (channel_px * .1), text_size, '('+length_timecode+')', text_color)
 
     #display fades
     if prefs.fades and active_width > text_size * 6:
@@ -1337,7 +1339,6 @@ def update_import_frames_length(self, context):
 
 
 def three_point_draw_callback(self, context):
-    #todo: improve efficiency by drawing all graphics in one go, rather than using functions
     colorfg = (1.0, 1.0, 1.0, 1.0)
     colorbg = (0.1, 0.1, 0.1, 1.0)
     colormg = (0.5, 0.5, 0.5, 1.0)
@@ -1801,7 +1802,7 @@ def vseqf_grab_draw(self, context):
     for seq in self.grabbed_sequences:
         sequence = seq[0]
         window_x, window_y = view.view_to_region(sequence.frame_final_start, sequence.channel)
-        draw_text(window_x, window_y, 12, mode, text_color)
+        draw_text(window_x, window_y - 6, 12, mode, text_color)
 
 
 class VSEQFGrabAdd(bpy.types.Operator):
@@ -1975,29 +1976,26 @@ class VSEQFGrabAdd(bpy.types.Operator):
                                 #this sequence's parent is selected
                                 parent_data = self.find_by_name(sequence.parent)
                                 parent = parent_data[0]
-                                #new_channel = seq[4] + (parent_data[0].channel - parent_data[4])
                                 new_channel = seq[4] + offset_y
-                                if self.ripple and seq[1] > ripple_start:
-                                    seq[8] = True
-                                    new_pos = new_pos + ripple_offset
-                                    new_start = new_start + ripple_offset
-                                    new_end = new_end + ripple_offset
-                                else:
-                                    if parent_data[3] != parent.frame_start:
-                                        #parent was moved, move child too
-                                        offset = parent.frame_start - parent_data[3]
-                                        new_pos = new_pos + offset
-                                        new_start = new_start + offset
-                                        new_end = new_end + offset
-                                    if parent_data[0].select_left_handle and parent_data[1] == seq[1]:
-                                        #parent sequence's left edge was changed, child's edge should match it
-                                        new_start = parent.frame_final_start
-                                    if parent_data[0].select_right_handle and parent_data[2] == seq[2]:
-                                        #parent sequence's right edge was changed, child's edge should match it
-                                        new_end = parent.frame_final_end
+                                if new_channel < 1:
+                                    new_channel = 1
+                                if parent_data[3] != parent.frame_start:
+                                    #parent was moved, move child too
+                                    offset = parent.frame_start - parent_data[3]
+                                    new_pos = new_pos + offset
+                                    new_start = new_start + offset
+                                    new_end = new_end + offset
+                                if parent_data[0].select_left_handle and parent_data[1] == seq[1]:
+                                    #parent sequence's left edge was changed, child's edge should match it
+                                    new_start = parent.frame_final_start
+                                if parent_data[0].select_right_handle and parent_data[2] == seq[2]:
+                                    #parent sequence's right edge was changed, child's edge should match it
+                                    new_end = parent.frame_final_end
                             else:
                                 #this is a child of a child, just move it the same amount that the grab is moved
                                 new_channel = seq[4] + offset_y
+                                if new_channel < 1:
+                                    new_channel = 1
                                 new_start = seq[1] + offset_x
                                 new_end = seq[2] + offset_x
                                 new_pos = seq[3] + offset_x
@@ -2355,6 +2353,7 @@ class VSEQFSelectGrab(bpy.types.Operator):
         view = region.view2d
         distance_multiplier = 15
         if context.scene.vseqf.context and run_time > right_click_time:
+            #Show a context menu
             location = view.region_to_view(event.mouse_region_x, event.mouse_region_y)
             click_frame, click_channel = location
             self.restore_selected()
@@ -2429,13 +2428,13 @@ class VSEQFSelectGrab(bpy.types.Operator):
 
     def invoke(self, context, event):
         bpy.ops.ed.undo_push()
-        if event.mouse_region_y > self.marker_area_height:
-            bpy.ops.sequencer.select('INVOKE_DEFAULT')
         self.start_time = time.time()
         self.selected = []
         selected_sequences = current_selected(context)
         for sequence in selected_sequences:
             self.selected.append([sequence, sequence.select_left_handle, sequence.select_right_handle])
+        if event.mouse_region_y > self.marker_area_height:
+            bpy.ops.sequencer.select('INVOKE_DEFAULT')
         prefs = get_prefs()
         if prefs.threepoint:
             active = current_active(context)
@@ -2468,13 +2467,25 @@ class VSEQFSelectGrab(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
 
+class VSEQFDoubleUndo(bpy.types.Operator):
+    """Undo previous action"""
+    bl_idname = "vseqf.double_undo"
+    bl_label = "Undo previous action"
+
+    def execute(self, context):
+        del context
+        bpy.ops.ed.undo()
+        bpy.ops.ed.undo()
+        return {'FINISHED'}
+
+
 class VSEQFContextMarker(bpy.types.Menu):
     bl_idname = 'vseqf.context_marker'
     bl_label = 'Marker Operations'
 
     def draw(self, context):
         layout = self.layout
-        layout.operator('ed.undo', text='Undo')
+        layout.operator('vseqf.double_undo', text='Undo')
         layout.separator()
         frame = context.scene.vseqf.current_marker_frame
         marker = None
@@ -2496,7 +2507,7 @@ class VSEQFContextCursor(bpy.types.Menu):
 
     def draw(self, context):
         layout = self.layout
-        layout.operator('ed.undo', text='Undo')
+        layout.operator('vseqf.double_undo', text='Undo')
         layout.separator()
         props = layout.operator("sequencer.strip_jump", text="Jump to Previous Strip")
         props.next = False
@@ -2523,7 +2534,7 @@ class VSEQFContextNone(bpy.types.Menu):
     def draw(self, context):
         del context
         layout = self.layout
-        layout.operator('ed.undo', text='Undo')
+        layout.operator('vseqf.double_undo', text='Undo')
         layout.separator()
         layout.menu('SEQUENCER_MT_add')
         layout.menu('vseqf.quickzooms_menu')
@@ -2536,7 +2547,7 @@ class VSEQFContextSequenceLeft(bpy.types.Menu):
     def draw(self, context):
         strip = current_active(context)
         layout = self.layout
-        layout.operator('ed.undo', text='Undo')
+        layout.operator('vseqf.double_undo', text='Undo')
         if strip:
             layout.separator()
             layout.prop(context.scene.vseqf, 'fade')
@@ -2553,7 +2564,7 @@ class VSEQFContextSequenceRight(bpy.types.Menu):
     def draw(self, context):
         strip = current_active(context)
         layout = self.layout
-        layout.operator('ed.undo', text='Undo')
+        layout.operator('vseqf.double_undo', text='Undo')
         if strip:
             layout.separator()
             layout.prop(context.scene.vseqf, 'fade')
@@ -2572,7 +2583,7 @@ class VSEQFContextSequence(bpy.types.Menu):
         strip = current_active(context)
         selected = current_selected(context)
         layout = self.layout
-        layout.operator('ed.undo', text='Undo')
+        layout.operator('vseqf.double_undo', text='Undo')
         if strip:
             layout.separator()
             layout.label(text='Active Sequence:')
@@ -2628,7 +2639,8 @@ def draw_quickspeed_header(self, context):
 def draw_follow_header(self, context):
     layout = self.layout
     scene = context.scene
-    layout.prop(scene.vseqf, 'follow', text='Follow Cursor', toggle=True)
+    if context.space_data.view_type != 'PREVIEW':
+        layout.prop(scene.vseqf, 'follow', text='Follow Cursor', toggle=True)
 
 
 def start_follow(_, context):
@@ -2881,6 +2893,8 @@ class VSEQFFollow(bpy.types.Operator):
     region = None
     view = None
     cursor_target = 0
+    animation_playing_last = False
+    skip_first_click = True
 
     _timer = None
 
@@ -2888,11 +2902,16 @@ class VSEQFFollow(bpy.types.Operator):
         view = self.view
         if not context.scene.vseqf.follow:
             return {'CANCELLED'}
+        if context.screen.is_animation_playing and not self.animation_playing_last:
+            self.recalculate_target(context)
         if event.type == 'LEFTMOUSE' and context.screen.is_animation_playing:
-            old_x = self.view.view_to_region(context.scene.frame_current, 0, clip=False)[0]
-            new_x = event.mouse_region_x
-            delta_x = new_x - old_x
-            self.cursor_target = self.cursor_target + delta_x
+            if self.skip_first_click:
+                self.skip_first_click = False
+            else:
+                old_x = self.view.view_to_region(context.scene.frame_current, 0, clip=False)[0]
+                new_x = event.mouse_region_x
+                delta_x = new_x - old_x
+                self.cursor_target = self.cursor_target + delta_x
 
         if event.type == 'TIMER':
             if context.screen.is_animation_playing:
@@ -2903,10 +2922,17 @@ class VSEQFFollow(bpy.types.Operator):
                 if cursor_location != 12000:
                     offset = (self.cursor_target - cursor_location)
                     bpy.ops.view2d.pan(override, deltax=-offset)
+        self.animation_playing_last = context.screen.is_animation_playing
         return {'PASS_THROUGH'}
 
     def invoke(self, context, event):
         del event
+        self.animation_playing_last = context.screen.is_animation_playing
+        if context.screen.is_animation_playing:
+            #Need to put this in to prevent blender from changing cursor position when the click that STARTED this is caught
+            self.skip_first_click = True
+        else:
+            self.skip_first_click = False
         area = context.area
         for region in area.regions:
             if region.type == 'WINDOW':
@@ -2914,7 +2940,8 @@ class VSEQFFollow(bpy.types.Operator):
                 self.view = region.view2d
         if self.region is None or self.view is None:
             return {'CANCELLED'}
-        self.recalculate_target(context)
+        if context.screen.is_animation_playing:
+            self.recalculate_target(context)
         self._timer = context.window_manager.event_timer_add(time_step=0.25, window=context.window)
         context.window_manager.modal_handler_add(self)
         return {'RUNNING_MODAL'}
@@ -3580,8 +3607,7 @@ class VSEQFQuickParentsMenu(bpy.types.Menu):
                 #Parent sequence is found, display it
                 layout.separator()
                 layout.label(text="     Parent: ")
-                layout.label(parent.name)
-                layout.separator()
+                layout.label(text=parent.name)
 
             if len(children) > 0:
                 #At least one child sequence is found, display them
@@ -3591,7 +3617,6 @@ class VSEQFQuickParentsMenu(bpy.types.Menu):
                 while index < len(children):
                     layout.label(text=children[index].name)
                     index = index + 1
-                layout.separator()
 
         else:
             layout.label(text='No Sequence Selected')
@@ -3819,10 +3844,6 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
         end_frame = self.find_end_frame(current_sequences(context))
         dirname = os.path.dirname(self.filepath)
         bpy.ops.sequencer.select_all(action='DESELECT')
-        if self.import_location == 'END':
-            context.scene.frame_current = end_frame
-        else:
-            context.scene.frame_current = self.start_frame
         if self.import_location in ['END', 'INSERT_FRAME', 'CUT_INSERT']:
             frame = end_frame
         else:
@@ -3991,8 +4012,8 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                 to_snap = selected
                 all_sequences = sequences
             if active:
-                previous = find_close_sequence(all_sequences, active, 'previous', 'any', sounds=True)
-                next_seq = find_close_sequence(all_sequences, active, 'next', 'any', sounds=True)
+                previous = find_close_sequence(all_sequences, active, 'previous', 'nooverlap', sounds=True)
+                next_seq = find_close_sequence(all_sequences, active, 'next', 'nooverlap', sounds=True)
             else:
                 previous = None
                 next_seq = None
@@ -5164,8 +5185,7 @@ class VSEQFCut(bpy.types.Operator):
         return False
 
     def execute(self, context):
-        self.cut(context)
-        return{'FINISHED'}
+        return self.start_cut(context)
 
     def invoke(self, context, event):
         mouse_x = event.mouse_region_x
@@ -5177,23 +5197,56 @@ class VSEQFCut(bpy.types.Operator):
             side = 'LEFT'
         else:
             side = 'RIGHT'
-        self.cut(context, side)
+        return self.start_cut(context, side)
+
+    def uncut(self, context, side="BOTH"):
+        #merges a sequence to the one on the left or right if they share the same source and position
+        if side == 'BOTH':
+            self.reset()
+            return{"CANCELLED"}
+
+        selected = current_selected(context)
+        to_uncut = []
+        for sequence in selected:
+            if not sequence.lock and not hasattr(sequence, 'input_1'):
+                to_uncut.append(sequence)
+        for sequence in to_uncut:
+            if side == 'LEFT':
+                direction = 'previous'
+            else:
+                direction = 'next'
+            sequences = current_sequences(context)
+            merge_to = find_close_sequence(sequences, sequence, direction=direction, mode='channel', sounds=True)
+            if merge_to:
+                if not merge_to.lock:
+                    source_matches = self.check_source(sequence, merge_to)
+                    if source_matches:
+                        merge_to_children = find_children(merge_to)
+                        add_children(sequence, merge_to_children)
+                        clear_children(merge_to)
+                        if direction == 'next':
+                            newend = merge_to.frame_final_end
+                            self.delete_sequence(merge_to)
+                            sequence.frame_final_end = newend
+                        else:
+                            newstart = merge_to.frame_final_start
+                            self.delete_sequence(merge_to)
+                            sequence.frame_final_start = newstart
+        self.reset()
         return{'FINISHED'}
 
-    def cut(self, context, side="BOTH"):
+    def start_cut(self, context, side="BOTH"):
         sequencer = context.scene.sequence_editor
         if not sequencer:
             self.reset()
-            return
+            return{'CANCELLED'}
         bpy.ops.ed.undo_push()
         if not self.use_all:
             self.all = context.scene.vseqf.quickcuts_all
         if self.type == 'UNCUT_LEFT':
-            self.type = 'UNCUT'
-            side = 'LEFT'
+            return self.uncut(context, side='LEFT')
         if self.type == 'UNCUT_RIGHT':
-            self.type = 'UNCUT'
-            side = 'RIGHT'
+            return self.uncut(context, side='RIGHT')
         if self.type == 'TRIM_LEFT':
             self.type = 'TRIM'
             side = 'LEFT'
@@ -5222,16 +5275,18 @@ class VSEQFCut(bpy.types.Operator):
         #determine all sequences available to cut
         to_cut_temp = []
         for sequence in sequences:
-            if not sequence.lock and (under_cursor(sequence, self.frame) or self.type == 'UNCUT') and (not hasattr(sequence, 'input_1')):
+            if not sequence.lock and under_cursor(sequence, self.frame) and not hasattr(sequence, 'input_1'):
                 if self.all:
+                    to_cut.append(sequence)
                     to_cut_temp.append(sequence)
                 elif sequence.select:
+                    to_cut.append(sequence)
                     to_cut_temp.append(sequence)
                     if vseqf_parenting():
                         children = get_recursive(sequence, [])
                         for child in children:
-                            if not child.lock and (not hasattr(child, 'input_1')) and child not in to_cut_temp:
-                                to_cut_temp.append(child)
+                            if not child.lock and (not hasattr(child, 'input_1')) and child not in to_cut:
+                                to_cut.append(child)
 
         #find the ripple amount
         ripple_amount = 0
@@ -5240,50 +5295,32 @@ class VSEQFCut(bpy.types.Operator):
                 cut_amount = self.frame - sequence.frame_final_start
             else:
                 cut_amount = sequence.frame_final_end - self.frame
-            to_cut.append(sequence)
+            #to_cut.append(sequence)
             if cut_amount > ripple_amount:
                 ripple_amount = cut_amount
+
         if side == 'LEFT':
             ripple_frame = self.frame - ripple_amount
         else:
             ripple_frame = self.frame
 
         bpy.ops.sequencer.select_all(action='DESELECT')
+        to_cut.sort(key=lambda x: x.frame_final_start)
         for sequence in to_cut:
+            cutable = under_cursor(sequence, self.frame)
             left = False
             right = False
-            if self.type == 'UNCUT':
-                to_select.append(sequence)
-                if side != 'BOTH':
-                    if side == 'LEFT':
-                        direction = 'previous'
-                    else:
-                        direction = 'next'
-                    merge_to = find_close_sequence(sequences, sequence, direction=direction, mode='channel', sounds=True)
-                    if merge_to:
-                        if not merge_to.lock:
-                            source_matches = self.check_source(sequence, merge_to)
-                            if source_matches:
-                                merge_to_children = find_children(merge_to)
-                                add_children(sequence, merge_to_children)
-                                clear_children(merge_to)
-                                if direction == 'next':
-                                    newend = merge_to.frame_final_end
-                                    self.delete_sequence(merge_to)
-                                    sequence.frame_final_end = newend
-                                else:
-                                    newstart = merge_to.frame_final_start
-                                    self.delete_sequence(merge_to)
-                                    sequence.frame_final_start = newstart
             if self.type in ['TRIM', 'SLIDE', 'RIPPLE']:
                 if side != 'BOTH':
                     if side == 'LEFT':
-                        sequence.frame_final_start = self.frame
+                        if cutable:
+                            sequence.frame_final_start = self.frame
                         to_select.append(sequence)
                         if self.type == 'SLIDE':
                             sequence.frame_start = sequence.frame_start - ripple_amount
                     else:
-                        sequence.frame_final_end = self.frame
+                        if cutable:
+                            sequence.frame_final_end = self.frame
                         to_select.append(sequence)
                         if self.type == 'SLIDE':
                             sequence.frame_start = sequence.frame_start + ripple_amount
@@ -5295,10 +5332,9 @@ class VSEQFCut(bpy.types.Operator):
                     cut_type = 'SOFT'
                 else:
                     cut_type = self.type
-                left, right = vseqf_cut(sequence=sequence, frame=self.frame, cut_type=cut_type)
-                cut_pairs.append([left, right])
-                #if right and self.type == 'INSERT':
-                #    to_change.append([right, right.channel, right.frame_start + context.scene.vseqf.quickcuts_insert, True])
+                if cutable:
+                    left, right = vseqf_cut(sequence=sequence, frame=self.frame, cut_type=cut_type)
+                    cut_pairs.append([left, right])
             else:
                 to_select.append(sequence)
             if (side == 'LEFT' or side == 'BOTH') and left:
@@ -5314,11 +5350,11 @@ class VSEQFCut(bpy.types.Operator):
         #fix parenting of cut sequences
         for cut_pair in cut_pairs:
             left, right = cut_pair
-            if right:
-                parent_pair = self.find_parent(right.parent, cut_pairs)
-                if parent_pair:
-                    if parent_pair[1]:
-                        right.parent = parent_pair[1].name
+            if right and left:
+                children = find_children(right, sequences=sequences)
+                for child in children:
+                    if child.frame_final_end <= right.frame_final_start:
+                        child.parent = left.name
 
         #ripple/insert
         if self.type == 'INSERT' or self.type == 'RIPPLE' or self.type == 'INSERT_ONLY':
@@ -5330,7 +5366,7 @@ class VSEQFCut(bpy.types.Operator):
                 else:
                     insert = context.scene.vseqf.quickcuts_insert
             sequences = current_sequences(context)
-            ripple_timeline(sequences, ripple_frame, insert)
+            ripple_timeline(sequences, ripple_frame - 1, insert)
         else:
             for sequence in to_select:
                 if sequence:
@@ -5344,12 +5380,7 @@ class VSEQFCut(bpy.types.Operator):
             if self.type in ['SLIDE']:
                 context.scene.frame_current = context.scene.frame_current + ripple_amount
         self.reset()
-
-    def find_parent(self, parent_name, cut_pairs):
-        for pair in cut_pairs:
-            if pair[0] and pair[0].name == parent_name:
-                return pair
-        return None
+        return{'FINISHED'}
 
 
 class VSEQFQuickTimelineMenu(bpy.types.Menu):
@@ -6120,7 +6151,7 @@ class SEQUENCER_MT_add(bpy.types.Menu):
 
 #Register properties, operators, menus and shortcuts
 classes = (SEQUENCER_MT_add, SEQUENCER_MT_strip, VSEQFAddZoom, VSEQFClearZooms, VSEQFCompactEdit, VSEQFContextCursor,
-           VSEQFContextMarker, VSEQFContextNone, VSEQFContextSequence, VSEQFContextSequenceLeft,
+           VSEQFContextMarker, VSEQFContextNone, VSEQFContextSequence, VSEQFContextSequenceLeft, VSEQFDoubleUndo,
            VSEQFContextSequenceRight, VSEQFCut, VSEQFDelete, VSEQFDeleteConfirm, VSEQFDeleteRippleConfirm,
            VSEQFFollow, VSEQFGrab, VSEQFGrabAdd, VSEQFImport, VSEQFMarkerPreset, VSEQFMeta, VSEQFQuickCutsMenu,
            VSEQFQuickCutsPanel, VSEQFQuickFadesClear,

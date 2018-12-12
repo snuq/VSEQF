@@ -31,11 +31,6 @@ Or support me by hiring Creative Life Productions if you have a need for the ser
 ## Sequence Editor Additions
 The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' operators have been added to, this enables:
 
-* __Sequencer 'Strip' Menu Changes__
-
-   Snap options added to menu.  
-   'Simplify' option added, this removes some less-used features from this menu.  Enable this option in the Quick Functions Settings menu.
-
 * __'Compact' Edit Panel__
 
    A new Edit Strip panel for the sequence editor properties area, providing more information in a smaller space than the default panel.  
@@ -59,11 +54,8 @@ The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' o
 
 * __Edge Grab Improvements__
 
-   When an edge is moved into another sequence, the selected sequence will be moved up a channel to allow the edge to be moved.
-
-* __Marker Moving Improvements__
-
-   Markers can be grabbed by right-click dragging the marker line as well as the bottom marker indicator.
+   When an edge is moved into another sequence, the selected sequence will be moved up a channel to allow the edge to be moved.  
+   The cursor can be automatically snapped to a dragged edge for better adjustment.  
 
 * __Right-Click Context Menus__
 
@@ -589,8 +581,6 @@ I welcome any help with these problems, if you have an idea on how to fix them, 
 
 * Uncut does not work on movieclip type sequences, this seems to be a limitation in Blender - there appears to be no way to get the sequence's source file.
 
-* Canceling a grab while playing back will cause the cursor to jump back to where it was when the grab started.  Unfortunately, a bug in Blender prevents me from fixing this.
-
 * Right now the script cannot apply a vertical zoom level, as far as I can tell this is missing functionality in Blenders python api.
 
 
@@ -601,8 +591,6 @@ These are things I want to add, but I don't yet know how to do so.
 * Ripple insert (opposite of ripple pop).  Not entirely sure how to code this yet, but I want it!
 
 * Copy/paste wrapper that will copy sequence animation data.
-
-* Export to EDL format that Reaper can read.
 
 
 
