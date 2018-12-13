@@ -75,8 +75,6 @@ Changelog:
 Todo: quick 3point causing recursion errors sometimes when adjusting in/out
 Todo: ending cursor following causes inputs to not work until left mouse is clicked
 Todo: check and improve tooltips on all buttons, make sure shortcuts are listed
-Todo: update readme:
-    add QuickShortcuts
 """
 
 

@@ -110,7 +110,7 @@ The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' o
 ## QuickShortcuts
 Enables quick navigation of the timeline using the number pad.  
 
-* __Numpad:__
+* __Numpad: Basic Movement And Playback__
 
 | | | |
 | :---: | :---: | :---: |
@@ -118,6 +118,33 @@ Enables quick navigation of the timeline using the number pad.
 | __4__<br>Reverse/slower playback | __5__<br>Play/pause | __6__<br>Forward/faster playback |
 | __1__<br>Cursor back one frame | __2__<br> | __3__<br>Cursor forward one frame |
 | __0__<br>Cut | <br> | <br> |
+
+* __Ctrl+Numpad: Advanced Movement And Jumps__
+
+| | | |
+| :---: | :---: | :---: |
+| __7__<br>Previous marker | __8__<br> | __9__<br>Next marker |
+| __4__<br>Previous sequence edge | __5__<br> | __6__<br>Next sequence edge |
+| __1__<br>Previous keyframe | __2__<br> | __3__<br>Next keyframe |
+| __0__<br> | <br> | <br> |
+
+* __Alt+Numpad: Move Selected Strips__
+
+| | | |
+| :---: | :---: | :---: |
+| __7__<br>Left one second | __8__<br>Up one channel | __9__<br>Right one second |
+| __4__<br>Left 1/2 second | __5__<br>Grab/move | __6__<br>Right 1/2 second |
+| __1__<br>Left one frame | __2__<br>Down one channel | __3__<br>Right one frame |
+| __0__<br>Ripple cut | <br> | <br> |
+
+* __Shift+Numpad: Zoom Timeline__
+
+| | | |
+| :---: | :---: | :---: |
+| __7__<br>Zoom to 10 minutes | __8__<br>Zoom to selected | __9__<br>Zoom to all |
+| __4__<br>Zoom to 1 minute | __5__<br>Zoom to 2 minutes | __6__<br>Zoom to 5 minutes |
+| __1__<br>Zoom to 2 seconds | __2__<br>Zoom to 10 seconds | __3__<br>Zoom to 30 seconds |
+| __0__<br> | <br> | <br> |
 
 
 
