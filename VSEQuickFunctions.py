@@ -3840,7 +3840,7 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
         selected = current_selected(context)
         active = current_active(context)
         end_frame = self.find_end_frame(current_sequences(context))
-        dirname = os.path.dirname(self.filepath)
+        dirname = os.path.dirname(bpy.path.abspath(self.filepath))
         bpy.ops.sequencer.select_all(action='DESELECT')
         if self.import_location in ['END', 'INSERT_FRAME', 'CUT_INSERT']:
             frame = end_frame
