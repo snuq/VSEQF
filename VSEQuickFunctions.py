@@ -72,7 +72,6 @@ Changelog:
    Improved QuickTags interface
    Reworked ripple delete, it should now behave properly with overlapping sequences
 
-Todo: add meta/unmeta to rightclick menu
 Todo: optimize ripple grabs by only adjusting strips after the grab point
 Todo: grab ripple and ripple-pop are VERY slow, difficult to switch modes due to blender not responding to key presses
 Todo: grab ripple pop - when placed, put cursor at pop position
@@ -851,6 +850,17 @@ class VSEQFCompactEdit(bpy.types.Panel):
             row = box.row()
             row.prop(vseqf, 'select_children', toggle=True)
             row.prop(vseqf, 'delete_children', toggle=True)
+
+
+class VSEQFMetaExit(bpy.types.Operator):
+    bl_idname = 'vseqf.meta_exit'
+    bl_label = 'Exit The Current Meta Strip'
+
+    def execute(self, context):
+        if inside_meta_strip():
+            bpy.ops.sequencer.select_all(action='DESELECT')
+            bpy.ops.sequencer.meta_toggle()
+        return{'FINISHED'}
 
 
 #Functions related to continuous update
@@ -2489,6 +2499,9 @@ class VSEQFContextMarker(bpy.types.Menu):
         layout = self.layout
         layout.operator('vseqf.double_undo', text='Undo')
         layout.separator()
+        if inside_meta_strip():
+            layout.operator('vseqf.meta_exit')
+            layout.separator()
         frame = context.scene.vseqf.current_marker_frame
         marker = None
         for timeline_marker in context.scene.timeline_markers:
@@ -2511,6 +2524,9 @@ class VSEQFContextCursor(bpy.types.Menu):
         layout = self.layout
         layout.operator('vseqf.double_undo', text='Undo')
         layout.separator()
+        if inside_meta_strip():
+            layout.operator('vseqf.meta_exit')
+            layout.separator()
         props = layout.operator("sequencer.strip_jump", text="Jump to Previous Strip")
         props.next = False
         props.center = False
@@ -2538,6 +2554,9 @@ class VSEQFContextNone(bpy.types.Menu):
         layout = self.layout
         layout.operator('vseqf.double_undo', text='Undo')
         layout.separator()
+        if inside_meta_strip():
+            layout.operator('vseqf.meta_exit')
+            layout.separator()
         layout.menu('SEQUENCER_MT_add')
         layout.menu('vseqf.quickzooms_menu')
 
@@ -2550,6 +2569,9 @@ class VSEQFContextSequenceLeft(bpy.types.Menu):
         strip = current_active(context)
         layout = self.layout
         layout.operator('vseqf.double_undo', text='Undo')
+        if inside_meta_strip():
+            layout.separator()
+            layout.operator('vseqf.meta_exit')
         if strip:
             layout.separator()
             layout.prop(context.scene.vseqf, 'fade')
@@ -2567,6 +2589,9 @@ class VSEQFContextSequenceRight(bpy.types.Menu):
         strip = current_active(context)
         layout = self.layout
         layout.operator('vseqf.double_undo', text='Undo')
+        if inside_meta_strip():
+            layout.separator()
+            layout.operator('vseqf.meta_exit')
         if strip:
             layout.separator()
             layout.prop(context.scene.vseqf, 'fade')
@@ -2586,6 +2611,9 @@ class VSEQFContextSequence(bpy.types.Menu):
         selected = current_selected(context)
         layout = self.layout
         layout.operator('vseqf.double_undo', text='Undo')
+        if inside_meta_strip():
+            layout.separator()
+            layout.operator('vseqf.meta_exit')
         if strip:
             layout.separator()
             layout.label(text='Active Sequence:')
@@ -2593,8 +2621,13 @@ class VSEQFContextSequence(bpy.types.Menu):
             layout.prop(strip, 'lock')
             if prefs.tags:
                 layout.menu('vseqf.quicktags_menu')
+            if strip.type == 'META':
+                layout.operator('sequencer.meta_toggle', text='Enter Meta Strip')
+                layout.operator('sequencer.meta_separate')
         if selected:
             layout.separator()
+            layout.label(text='Selected Sequence(s):')
+            layout.operator('sequencer.meta_make')
             if prefs.cuts:
                 layout.menu('vseqf.quickcuts_menu')
             if prefs.parenting:
@@ -6170,7 +6203,7 @@ classes = (SEQUENCER_MT_add, SEQUENCER_MT_strip, VSEQFAddZoom, VSEQFClearZooms, 
            VSEQFSettingsMenu, VSEQFTags, VSEQFThreePointBrowserPanel, VSEQFThreePointImport,
            VSEQFThreePointImportToClip, VSEQFThreePointOperator, VSEQFThreePointPanel, VSEQFZoomPreset,
            VSEQFQuickShortcutsNudge, VSEQFQuickShortcutsSpeed, VSEQFQuickShortcutsSkip, VSEQFQuickShortcutsResetPlay,
-           VSEQFQuick3PointValues, VSEQFSetting)
+           VSEQFQuick3PointValues, VSEQFSetting, VSEQFMetaExit)
 
 
 def register():
