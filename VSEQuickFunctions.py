@@ -72,6 +72,10 @@ Changelog:
    Improved QuickTags interface
    Reworked ripple delete, it should now behave properly with overlapping sequences
 
+Todo: add meta/unmeta to rightclick menu
+Todo: optimize ripple grabs by only adjusting strips after the grab point
+Todo: grab ripple and ripple-pop are VERY slow, difficult to switch modes due to blender not responding to key presses
+Todo: grab ripple pop - when placed, put cursor at pop position
 Todo: quick 3point causing recursion errors sometimes when adjusting in/out
 Todo: ending cursor following causes inputs to not work until left mouse is clicked
 Todo: check and improve tooltips on all buttons, make sure shortcuts are listed
@@ -313,8 +317,8 @@ def current_sequences(context):
 
 
 def get_prefs():
-    if __name__ in bpy.context.user_preferences.addons:
-        prefs = bpy.context.user_preferences.addons[__name__].preferences
+    if __name__ in bpy.context.preferences.addons:
+        prefs = bpy.context.preferences.addons[__name__].preferences
     else:
         prefs = VSEQFTempSettings()
     return prefs
@@ -939,7 +943,7 @@ def vseqf_continuous(scene):
 
 def vseqf_draw():
     prefs = get_prefs()
-    colors = bpy.context.user_preferences.themes[0].user_interface
+    colors = bpy.context.preferences.themes[0].user_interface
     text_color = list(colors.wcol_text.text_sel)+[1]
     active_strip = current_active(bpy.context)
     if not active_strip:
@@ -1785,7 +1789,7 @@ class VSEQFThreePointOperator(bpy.types.Operator):
 #Functions and classes related to grabs and selections
 def vseqf_grab_draw(self, context):
     #Callback function to draw overlays in sequencer when grab is activated
-    colors = context.user_preferences.themes[0].user_interface
+    colors = context.preferences.themes[0].user_interface
     text_color = list(colors.wcol_text.text_sel)+[1]
     if self.ripple:
         mode = 'Ripple'
@@ -4505,7 +4509,7 @@ class VSEQFQuickMarkerPresetList(bpy.types.UIList):
         split.operator('vseqf.quickmarkers_place', text=item.text).marker = item.text
         split.operator('vseqf.quickmarkers_remove_preset', text='', icon='X').marker = item.text
 
-    def draw_filter(self, context, layout, reverse):
+    def draw_filter(self, context, layout):
         pass
 
     def filter_items(self, context, data, property):
@@ -4528,7 +4532,7 @@ class VSEQFQuickMarkerList(bpy.types.UIList):
             subsplit.enabled = False
         split.operator('vseqf.quickmarkers_delete', text='', icon='X').frame = item.frame
 
-    def draw_filter(self, context, layout, reverse):
+    def draw_filter(self, context, layout):
         pass
 
     def filter_items(self, context, data, property):
@@ -4837,7 +4841,7 @@ class VSEQFQuickTagListAll(bpy.types.UIList):
         split.operator('vseqf.quicktags_select', text=item.text).text = item.text
         split.operator('vseqf.quicktags_add', text='', icon="PLUS").text = item.text
 
-    def draw_filter(self, context, layout, reverse):
+    def draw_filter(self, context, layout):
         pass
 
 
@@ -4853,7 +4857,7 @@ class VSEQFQuickTagList(bpy.types.UIList):
         split.operator('vseqf.quicktags_select', text=display_text).text = item.text
         split.operator('vseqf.quicktags_remove', text='', icon='X').text = item.text
 
-    def draw_filter(self, context, layout, reverse):
+    def draw_filter(self, context, layout):
         pass
 
     def filter_items(self, context, data, property):
