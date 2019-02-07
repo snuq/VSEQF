@@ -6144,9 +6144,9 @@ class SEQUENCER_MT_add(bpy.types.Menu):
 
         if len(bpy.data.movieclips) > 10:
             layout.operator_context = 'INVOKE_DEFAULT'
-            layout.operator("sequencer.movieclip_strip_add", text="Clip...", icon='CLIP')
+            layout.operator("sequencer.movieclip_strip_add", text="Clip...", icon='TRACKER')
         elif len(bpy.data.movieclips) > 1:
-            layout.operator_menu_enum("sequencer.movieclip_strip_add", "clip", text="Clip", icon='CLIP')
+            layout.operator_menu_enum("sequencer.movieclip_strip_add", "clip", text="Clip", icon='TRACKER')
         else:
             layout.menu("SEQUENCER_MT_add_empty", text="Clip", icon='CLIP')
 
