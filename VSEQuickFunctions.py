@@ -71,7 +71,9 @@ Changelog:
    Fixed canceled grabs causing waveforms to redraw
    Improved QuickTags interface
    Reworked ripple delete, it should now behave properly with overlapping sequences
+   Disabled ripple and edge snap while in slip mode
 
+Todo: cut parent/child pair is not splitting relationships properly
 Todo: optimize ripple grabs by only adjusting strips after the grab point
 Todo: grab ripple and ripple-pop are VERY slow, difficult to switch modes due to blender not responding to key presses
 Todo: grab ripple pop - when placed, put cursor at pop position
@@ -1801,12 +1803,15 @@ def vseqf_grab_draw(self, context):
     #Callback function to draw overlays in sequencer when grab is activated
     colors = context.preferences.themes[0].user_interface
     text_color = list(colors.wcol_text.text_sel)+[1]
-    if self.ripple:
-        mode = 'Ripple'
-        if self.ripple_pop:
-            mode = 'Ripple-Pop'
+    if self.mode == 'SLIP':
+        mode = 'Slip'
     else:
-        mode = 'Grab'
+        if self.ripple:
+            mode = 'Ripple'
+            if self.ripple_pop:
+                mode = 'Ripple-Pop'
+        else:
+            mode = 'Grab'
 
     view = context.region.view2d
     for seq in self.grabbed_sequences:
@@ -1820,6 +1825,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
     bl_idname = "vseqf.grabadd"
     bl_label = "Runs in tandem with the grab operator in the vse, adds functionality."
 
+    mode: bpy.props.StringProperty()
     grabbed_sequences = []
     grabbed_names = []
     target_grab_sequence = None
@@ -2064,37 +2070,39 @@ class VSEQFGrabAdd(bpy.types.Operator):
     def modal(self, context, event):
         if event.type == 'TIMER':
             pass
-        if event.alt:
-            self.alt_pressed = True
-        else:
-            if self.alt_pressed:
-                if self.can_pop:
-                    self.alt_pressed = False
-                    if self.ripple and self.ripple_pop:
-                        self.ripple = False
+        if self.mode != 'SLIP':
+            #prevent ripple and edge snap while in slip mode
+            if event.alt:
+                self.alt_pressed = True
+            else:
+                if self.alt_pressed:
+                    if self.can_pop:
+                        self.alt_pressed = False
+                        if self.ripple and self.ripple_pop:
+                            self.ripple = False
+                            self.ripple_pop = False
+                        elif self.ripple:
+                            self.ripple_pop = True
+                        else:
+                            self.ripple = True
+                    else:
+                        self.alt_pressed = False
+                        self.ripple = not self.ripple
                         self.ripple_pop = False
-                    elif self.ripple:
-                        self.ripple_pop = True
-                    else:
-                        self.ripple = True
-                else:
-                    self.alt_pressed = False
-                    self.ripple = not self.ripple
-                    self.ripple_pop = False
 
-        if context.scene.vseqf.snap_cursor_to_edge and not context.screen.is_animation_playing:
-            if self.snap_edge:
-                if self.snap_edge == 'left':
-                    frame = self.snap_edge_sequence.frame_final_start
-                else:
-                    frame = self.snap_edge_sequence.frame_final_end - 1
-                context.scene.frame_current = frame
-                if self.secondary_snap_edge:
-                    if self.secondary_snap_edge == 'left':
-                        overlay_frame = self.secondary_snap_edge_sequence.frame_final_start
+            if context.scene.vseqf.snap_cursor_to_edge and not context.screen.is_animation_playing:
+                if self.snap_edge:
+                    if self.snap_edge == 'left':
+                        frame = self.snap_edge_sequence.frame_final_start
                     else:
-                        overlay_frame = self.secondary_snap_edge_sequence.frame_final_end - 1
-                    context.scene.sequence_editor.overlay_frame = overlay_frame - frame
+                        frame = self.snap_edge_sequence.frame_final_end - 1
+                    context.scene.frame_current = frame
+                    if self.secondary_snap_edge:
+                        if self.secondary_snap_edge == 'left':
+                            overlay_frame = self.secondary_snap_edge_sequence.frame_final_start
+                        else:
+                            overlay_frame = self.secondary_snap_edge_sequence.frame_final_end - 1
+                        context.scene.sequence_editor.overlay_frame = overlay_frame - frame
         pos_x = 0
         pos_y = self.target_grab_sequence.channel
         if self.target_grab_variable == 'frame_start':
@@ -2319,7 +2327,7 @@ class VSEQFGrab(bpy.types.Operator):
 
     def execute(self, context):
         del context
-        bpy.ops.vseqf.grabadd('INVOKE_DEFAULT')
+        bpy.ops.vseqf.grabadd('INVOKE_DEFAULT', mode=self.mode)
         if self.mode == "TIME_EXTEND":
             bpy.ops.transform.transform("INVOKE_DEFAULT", mode=self.mode)
         elif self.mode == "SLIP":
