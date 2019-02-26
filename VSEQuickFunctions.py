@@ -73,7 +73,6 @@ Changelog:
    Reworked ripple delete, it should now behave properly with overlapping sequences
    Disabled ripple and edge snap while in slip mode
 
-Todo: cut parent/child pair is not splitting relationships properly
 Todo: optimize ripple grabs by only adjusting strips after the grab point
 Todo: grab ripple and ripple-pop are VERY slow, difficult to switch modes due to blender not responding to key presses
 Todo: grab ripple pop - when placed, put cursor at pop position
@@ -3525,7 +3524,6 @@ def find_children(parent_sequence, name=False, sequences=False):
         parent_name = parent_sequence.name
     if not sequences:
         sequences = current_sequences(bpy.context)
-        #sequences = bpy.context.scene.sequence_editor.sequences_all
     child_sequences = []
     for sequence in sequences:
         if sequence.parent == parent_name:
@@ -5394,10 +5392,10 @@ class VSEQFCut(bpy.types.Operator):
         for cut_pair in cut_pairs:
             left, right = cut_pair
             if right and left:
-                children = find_children(right, sequences=sequences)
+                children = find_children(left)
                 for child in children:
-                    if child.frame_final_end <= right.frame_final_start:
-                        child.parent = left.name
+                    if child.frame_final_start >= right.frame_final_start:
+                        child.parent = right.name
 
         #ripple/insert
         if self.type == 'INSERT' or self.type == 'RIPPLE' or self.type == 'INSERT_ONLY':
@@ -6156,7 +6154,7 @@ class SEQUENCER_MT_add(bpy.types.Menu):
         elif len(bpy.data.movieclips) > 1:
             layout.operator_menu_enum("sequencer.movieclip_strip_add", "clip", text="Clip", icon='TRACKER')
         else:
-            layout.menu("SEQUENCER_MT_add_empty", text="Clip", icon='CLIP')
+            layout.menu("SEQUENCER_MT_add_empty", text="Clip", icon='TRACKER')
 
         if len(bpy.data.masks) > 10:
             layout.operator_context = 'INVOKE_DEFAULT'
