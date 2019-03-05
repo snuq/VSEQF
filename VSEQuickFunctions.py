@@ -72,10 +72,8 @@ Changelog:
    Improved QuickTags interface
    Reworked ripple delete, it should now behave properly with overlapping sequences
    Disabled ripple and edge snap while in slip mode
+   Various optimizations to ripple and grabbing
 
-Todo: optimize ripple grabs by only adjusting strips after the grab point
-Todo: grab ripple and ripple-pop are VERY slow, difficult to switch modes due to blender not responding to key presses
-Todo: grab ripple pop - when placed, put cursor at pop position
 Todo: quick 3point causing recursion errors sometimes when adjusting in/out
 Todo: ending cursor following causes inputs to not work until left mouse is clicked
 Todo: check and improve tooltips on all buttons, make sure shortcuts are listed
@@ -325,6 +323,7 @@ def get_prefs():
 
 
 def draw_line(sx, sy, ex, ey, width, color=(1.0, 1.0, 1.0, 1.0)):
+    del width
     coords = [(sx, sy), (ex, ey)]
     shader = gpu.shader.from_builtin('2D_UNIFORM_COLOR')
     batch = batch_for_shader(shader, 'LINES', {'pos': coords})
@@ -858,6 +857,7 @@ class VSEQFMetaExit(bpy.types.Operator):
     bl_label = 'Exit The Current Meta Strip'
 
     def execute(self, context):
+        del context
         if inside_meta_strip():
             bpy.ops.sequencer.select_all(action='DESELECT')
             bpy.ops.sequencer.meta_toggle()
@@ -1826,6 +1826,8 @@ class VSEQFGrabAdd(bpy.types.Operator):
 
     mode: bpy.props.StringProperty()
     grabbed_sequences = []
+    child_sequences = []
+    ripple_sequences = []
     grabbed_names = []
     target_grab_sequence = None
     target_grab_variable = ''
@@ -1854,6 +1856,8 @@ class VSEQFGrabAdd(bpy.types.Operator):
     timeline_start = 1
     timeline_end = 1
     timeline_height = 1
+    ripple_start = 0
+    ripple_left = 0
 
     def find_by_name(self, name):
         #finds the sequence data matching the given name.
@@ -1910,161 +1914,146 @@ class VSEQFGrabAdd(bpy.types.Operator):
             return True
         return False
 
-    def move_sequences(self, offset_x, offset_y, reset=False):
-        ripple_offset = 0
-        ripple_start = self.sequences[0][1]
+    def reset_sequences(self):
+        #used when cancelling, puts everything back to where it was at the beginning by first moving it somewhere safe, then to the true location
 
         timeline_length = self.timeline_end - self.timeline_start
 
-        if reset:
-            for seq in self.sequences:
-                sequence = seq[0]
-                if not hasattr(sequence, 'input_1'):
-                    sequence.channel = seq[4] + self.timeline_height
-                    sequence.frame_start = seq[3] + timeline_length
-            for seq in self.sequences:
-                sequence = seq[0]
-                if not hasattr(sequence, 'input_1'):
-                    sequence.channel = seq[4]
-                    sequence.frame_start = seq[3]
-            return
-
         for seq in self.sequences:
             sequence = seq[0]
-            if not sequence.lock:
-                if not hasattr(sequence, 'input_1'):
-                    if sequence.select:
-                        #if ripple is enabled, this sequence will affect the position of all sequences after it
-                        if self.ripple:
-                            if sequence.select_left_handle and not sequence.select_right_handle and len(self.grabbed_sequences) == 1:
-                                #special ripple slide if only one sequence and left handle grabbed
-                                sequence.frame_start = seq[3]
-                                frame_start = seq[1]
-                                ripple_offset = ripple_offset + frame_start - sequence.frame_final_start
-                                sequence.frame_start = seq[3] + ripple_offset
-                            else:
-                                if self.ripple_pop and sequence.channel != seq[4] and self.sequencer_area_clear(seq[0].frame_final_start, seq[0].frame_final_end, seq[4], sequence.channel):
-                                    #ripple 'pop'
-                                    ripple_start = seq[1]
-                                    ripple_offset = sequence.frame_final_duration
-                                    ripple_offset = 0 - ripple_offset
-                                else:
-                                    ripple_start = seq[1]
-                                    ripple_offset = seq[2] - sequence.frame_final_end
-                                    ripple_offset = 0 - ripple_offset
-                        elif sequence.select_left_handle and not sequence.select_right_handle:
-                            #fix sequence left handle ripple position when ripple disabled
-                            if sequence.type not in ['MOVIE', 'SCENE', 'MOVIECLIP'] and sequence.frame_duration == 1:
-                                #single images and effects behave differently
-                                sequence.frame_final_end = seq[2]
-                            else:
-                                sequence.frame_start = seq[3]
-                        if sequence.select_left_handle or sequence.select_right_handle:
-                            #make sequences that are having the handles adjusted behave better
-                            new_channel = seq[4]
-                            new_start = sequence.frame_final_start
-                            new_end = sequence.frame_final_end
-                            if sequence.select_left_handle and sequence.select_right_handle and sequence.type in ['MOVIE', 'SCENE', 'MOVIECLIP']:
-                                if sequence.frame_duration - sequence.frame_offset_start == 1:
-                                    #sequence has been slipped beyond the right edges it can be, try to fix
-                                    duration = seq[2] - seq[1]
-                                    new_end = sequence.frame_final_start + duration
-                                    sequence.frame_final_end = new_end
-                                if sequence.frame_duration - sequence.frame_offset_end == 1:
-                                    #sequence has been slipped beyond the left edges it can be, try to fix
-                                    duration = seq[2] - seq[1]
-                                    new_start = sequence.frame_final_end - duration
-                                    sequence.frame_final_start = new_start
-                            while sequencer_area_filled(new_start, new_end, new_channel, new_channel, [sequence]):
-                                new_channel = new_channel + 1
-                            old_channel = sequence.channel
-                            old_position = sequence.frame_start
-                            sequence.channel = new_channel
-                            #fix sequence position, sometimes can get spazzed out when slipping
-                            if new_channel != old_channel:
-                                sequence.frame_start = old_position
-                    else:  #not selected
-                        if seq[9]:
-                            #this sequence has a parent that may be moved
-                            new_start = seq[1]
-                            new_end = seq[2]
-                            new_pos = seq[3]
-                            if sequence.parent in self.grabbed_names:
-                                #this sequence's parent is selected
-                                parent_data = self.find_by_name(sequence.parent)
-                                parent = parent_data[0]
-                                new_channel = seq[4] + offset_y
-                                if new_channel < 1:
-                                    new_channel = 1
-                                if parent_data[3] != parent.frame_start:
-                                    #parent was moved, move child too
-                                    offset = parent.frame_start - parent_data[3]
-                                    new_pos = new_pos + offset
-                                    new_start = new_start + offset
-                                    new_end = new_end + offset
-                                if parent_data[0].select_left_handle and parent_data[1] == seq[1]:
-                                    #parent sequence's left edge was changed, child's edge should match it
-                                    new_start = parent.frame_final_start
-                                if parent_data[0].select_right_handle and parent_data[2] == seq[2]:
-                                    #parent sequence's right edge was changed, child's edge should match it
-                                    new_end = parent.frame_final_end
-                            else:
-                                #this is a child of a child, just move it the same amount that the grab is moved
-                                new_channel = seq[4] + offset_y
-                                if new_channel < 1:
-                                    new_channel = 1
-                                new_start = seq[1] + offset_x
-                                new_end = seq[2] + offset_x
-                                new_pos = seq[3] + offset_x
-                            #if new_end != sequence.frame_final_end or new_start != sequence.frame_final_start:
-                            while sequencer_area_filled(new_start, new_end, new_channel, new_channel, [sequence]):
-                                new_channel = new_channel + 1
-                            sequence.channel = new_channel
-                            sequence.frame_start = new_pos
-                            sequence.frame_final_start = new_start
-                            sequence.frame_final_end = new_end
-                        else:
-                            #unparented, unselected sequences - need to ripple if enabled
-                            if self.ripple and (seq[1] >= ripple_start):
-                                seq[8] = True
-                                new_channel = seq[4]
-                                while sequencer_area_filled(seq[1] + ripple_offset, seq[2] + ripple_offset, new_channel, new_channel, [sequence]):
-                                    new_channel = new_channel + 1
-                                sequence.channel = new_channel
-                                sequence.frame_start = seq[3] + ripple_offset
-                    if seq[8] and not self.ripple:
-                        #fix sequence locations when ripple is disabled
-                        new_channel = seq[4]
-                        new_start = seq[1]
-                        new_end = seq[2]
-                        while sequencer_area_filled(new_start, new_end, new_channel, new_channel, [sequence]):
-                            new_channel = new_channel + 1
-                        sequence.channel = new_channel
-                        sequence.frame_start = seq[3]
-                        if sequence.frame_start == seq[3] and sequence.channel == seq[4]:
-                            #unfortunately, there seems to be a limitation in blender preventing me from putting the strip back where it should be... keep trying until the grabbed strips are out of the way.
-                            seq[8] = False
+            if not hasattr(sequence, 'input_1'):
+                sequence.channel = seq[4] + self.timeline_height
+                sequence.frame_start = seq[3] + timeline_length
+                sequence.frame_final_start = seq[1] + timeline_length
+                sequence.frame_final_end = seq[2] + timeline_length
+            else:
+                sequence.channel = seq[4] + self.timeline_height
+        for seq in self.sequences:
+            sequence = seq[0]
+            if not hasattr(sequence, 'input_1'):
+                sequence.channel = seq[4]
+                sequence.frame_start = seq[3]
+            else:
+                sequence.channel = seq[4]
+        return
+
+    def move_sequences(self, offset_x, offset_y):
+        #iterates through all sequences and moves them if needed based on what the grab modifier is doing
+
+        ripple_offset = 0
+
+        for seq in self.grabbed_sequences:
+            sequence = seq[0]
+            #if ripple is enabled, this sequence will affect the position of all sequences after it
+            if self.ripple:
+                if sequence.select_left_handle and not sequence.select_right_handle and len(self.grabbed_sequences) == 1:
+                    #special ripple slide if only one sequence and left handle grabbed
+                    sequence.frame_start = seq[3]
+                    frame_start = seq[1]
+                    ripple_offset = ripple_offset + frame_start - sequence.frame_final_start
+                    sequence.frame_start = seq[3] + ripple_offset
+                    offset_x = ripple_offset
                 else:
-                    #effect strip, just worry about changing the channel if it belongs to a selected sequence
-                    input_1 = sequence.input_1
-                    new_channel = False
-                    if hasattr(sequence, 'input_2'):
-                        input_2 = sequence.input_2
+                    if self.ripple_pop and sequence.channel != seq[4] and self.sequencer_area_clear(seq[0].frame_final_start, seq[0].frame_final_end, seq[4], sequence.channel):
+                        #ripple 'pop'
+                        ripple_offset = sequence.frame_final_duration
+                        ripple_offset = 0 - ripple_offset
                     else:
-                        input_2 = False
-                    input_1_data = self.find_by_sequence(input_1)
-                    if input_1_data:
-                        input_1_channel_offset = input_1_data[0].channel - input_1_data[4]
-                        if input_1_channel_offset == 0 and input_2:
-                            input_2_data = self.find_by_sequence(input_2)
-                            if input_2_data:
-                                input_2_channel_offset = input_2_data[0].channel - input_2_data[4]
-                                if input_2_channel_offset != 0:
-                                    new_channel = seq[4] + input_2_channel_offset
-                        else:
-                            new_channel = seq[4] + input_1_channel_offset
-                    if new_channel is not False and new_channel != sequence.channel:
-                        sequence.channel = new_channel
+                        ripple_offset = seq[2] - sequence.frame_final_end
+                        ripple_offset = 0 - ripple_offset
+            elif sequence.select_left_handle and not sequence.select_right_handle:
+                #fix sequence left handle ripple position when ripple disabled
+                if sequence.type not in ['MOVIE', 'SCENE', 'MOVIECLIP'] and sequence.frame_duration == 1:
+                    #single images and effects behave differently
+                    sequence.frame_final_end = seq[2]
+                else:
+                    sequence.frame_start = seq[3]
+            if sequence.select_left_handle or sequence.select_right_handle:
+                #make sequences that are having the handles adjusted behave better
+                new_channel = seq[4]
+                new_start = sequence.frame_final_start
+                new_end = sequence.frame_final_end
+                if sequence.select_left_handle and sequence.select_right_handle and sequence.type in ['MOVIE', 'SCENE', 'MOVIECLIP']:
+                    if sequence.frame_duration - sequence.frame_offset_start == 1:
+                        #sequence has been slipped beyond the right edges it can be, try to fix
+                        duration = seq[2] - seq[1]
+                        new_end = sequence.frame_final_start + duration
+                        sequence.frame_final_end = new_end
+                    if sequence.frame_duration - sequence.frame_offset_end == 1:
+                        #sequence has been slipped beyond the left edges it can be, try to fix
+                        duration = seq[2] - seq[1]
+                        new_start = sequence.frame_final_end - duration
+                        sequence.frame_final_start = new_start
+                while sequencer_area_filled(new_start, new_end, new_channel, new_channel, [sequence]):
+                    new_channel = new_channel + 1
+                old_channel = sequence.channel
+                old_position = sequence.frame_start
+                sequence.channel = new_channel
+                #fix sequence position, sometimes can get spazzed out when slipping
+                if new_channel != old_channel:
+                    sequence.frame_start = old_position
+
+        for seq in self.child_sequences:
+            sequence = seq[0]
+            new_start = seq[1]
+            new_end = seq[2]
+            new_pos = seq[3]
+            if sequence.parent in self.grabbed_names:
+                #this sequence's parent is selected
+                parent_data = seq[9]
+                parent = parent_data[0]
+                new_channel = seq[4] + offset_y
+                if new_channel < 1:
+                    new_channel = 1
+                if parent_data[3] != parent.frame_start:
+                    #parent was moved, move child too
+                    offset = parent.frame_start - parent_data[3]
+                    new_pos = new_pos + offset
+                    new_start = new_start + offset
+                    new_end = new_end + offset
+                if parent_data[0].select_left_handle and parent_data[1] == seq[1]:
+                    #parent sequence's left edge was changed, child's edge should match it
+                    new_start = parent.frame_final_start
+                if parent_data[0].select_right_handle and parent_data[2] == seq[2]:
+                    #parent sequence's right edge was changed, child's edge should match it
+                    new_end = parent.frame_final_end
+            else:
+                #this is a child of a child, just move it the same amount that the grab is moved
+                new_channel = seq[4] + offset_y
+                if new_channel < 1:
+                    new_channel = 1
+                new_start = seq[1] + offset_x
+                new_end = seq[2] + offset_x
+                new_pos = seq[3] + offset_x
+            while sequencer_area_filled(new_start, new_end, new_channel, new_channel, [sequence]):
+                new_channel = new_channel + 1
+            sequence.channel = new_channel
+            sequence.frame_start = new_pos
+            sequence.frame_final_start = new_start
+            sequence.frame_final_end = new_end
+
+        for seq in self.ripple_sequences:
+            #unparented, unselected sequences - need to ripple if enabled
+            sequence = seq[0]
+            if self.ripple:
+                seq[8] = True
+                new_channel = seq[4]
+                while sequencer_area_filled(seq[1] + ripple_offset, seq[2] + ripple_offset, new_channel, new_channel, [sequence]):
+                    new_channel = new_channel + 1
+                sequence.channel = new_channel
+                sequence.frame_start = seq[3] + ripple_offset
+            if seq[8] and not self.ripple:
+                #fix sequence locations when ripple is disabled
+                new_channel = seq[4]
+                new_start = seq[1]
+                new_end = seq[2]
+                while sequencer_area_filled(new_start, new_end, new_channel, new_channel, [sequence]):
+                    new_channel = new_channel + 1
+                sequence.channel = new_channel
+                sequence.frame_start = seq[3]
+                if sequence.frame_start == seq[3] and sequence.channel == seq[4]:
+                    #unfortunately, there seems to be a limitation in blender preventing me from putting the strip back where it should be... keep trying until the grabbed strips are out of the way.
+                    seq[8] = False
 
     def modal(self, context, event):
         if event.type == 'TIMER':
@@ -2102,15 +2091,18 @@ class VSEQFGrabAdd(bpy.types.Operator):
                         else:
                             overlay_frame = self.secondary_snap_edge_sequence.frame_final_end - 1
                         context.scene.sequence_editor.overlay_frame = overlay_frame - frame
-        pos_x = 0
+        offset_x = 0
         pos_y = self.target_grab_sequence.channel
         if self.target_grab_variable == 'frame_start':
             pos_x = self.target_grab_sequence.frame_start
-        elif self.target_grab_variable == 'frame_final_start':
-            pos_x = self.target_grab_sequence.frame_final_start
-        elif self.target_grab_variable == 'frame_final_end':
-            pos_x = self.target_grab_sequence.frame_final_end
-        offset_x = pos_x - self.target_grab_start
+            offset_x = pos_x - self.target_grab_start
+        #elif self.target_grab_variable == 'frame_final_start':
+        #    pos_x = self.target_grab_sequence.frame_final_start
+        #    offset_x = pos_x - self.target_grab_start
+        #elif self.target_grab_variable == 'frame_final_end':
+        #    pos_x = self.target_grab_sequence.frame_final_end
+        #    offset_x = pos_x - self.target_grab_start
+
         if self.target_grab_sequence.select_left_handle or self.target_grab_sequence.select_right_handle:
             offset_y = 0
         else:
@@ -2121,10 +2113,10 @@ class VSEQFGrabAdd(bpy.types.Operator):
         if event.type in {'LEFTMOUSE', 'RET'}:
             self.remove_draw_handler()
             self.move_sequences(offset_x, offset_y)  #check sequences one last time, just to be sure
-            for seq in self.sequences:
-                sequence = seq[0]
-                if self.prefs.fades:
-                    #Fix fades in sequence if they exist
+            if self.prefs.fades:
+                #Fix fades in sequence if they exist
+                for seq in self.sequences:
+                    sequence = seq[0]
                     if sequence.frame_final_start != seq[1]:
                         #fix fade in
                         fade_in = fades(sequence, mode='detect', direction='in', fade_low_point_frame=seq[1])
@@ -2135,9 +2127,13 @@ class VSEQFGrabAdd(bpy.types.Operator):
                         fade_out = fades(sequence, mode='detect', direction='out', fade_low_point_frame=seq[2])
                         if fade_out > 0:
                             fades(sequence, mode='set', direction='out', fade_length=fade_out)
-            if not context.screen.is_animation_playing and self.snap_edge:
-                context.scene.frame_current = self.start_frame
-                context.scene.sequence_editor.overlay_frame = self.start_overlay_frame
+            if not context.screen.is_animation_playing:
+                if self.snap_edge:
+                    context.scene.frame_current = self.start_frame
+                    context.scene.sequence_editor.overlay_frame = self.start_overlay_frame
+                elif self.ripple and self.ripple_pop:
+                    print(self.ripple_start)
+                    context.scene.frame_current = self.ripple_left
             return {'FINISHED'}
 
         elif event.type in {'RIGHTMOUSE', 'ESC'}:
@@ -2147,7 +2143,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
                 current_frame = context.scene.frame_current
                 self.ripple = False
                 self.ripple_pop = False
-                self.move_sequences(0, 0, reset=True)
+                self.reset_sequences()
                 #bpy.ops.ed.undo()
                 if not context.screen.is_animation_playing:
                     context.scene.frame_current = self.start_frame
@@ -2176,8 +2172,8 @@ class VSEQFGrabAdd(bpy.types.Operator):
         #   6 select_left_handle
         #   7 select_right_handle
         #   8 rippled
-        #   9 child
-        return [sequence, sequence.frame_final_start, sequence.frame_final_end, sequence.frame_start, sequence.channel, sequence.select, sequence.select_left_handle, sequence.select_right_handle, False, False]
+        #   9 parent data
+        return [sequence, sequence.frame_final_start, sequence.frame_final_end, sequence.frame_start, sequence.channel, sequence.select, sequence.select_left_handle, sequence.select_right_handle, False, []]
 
     def invoke(self, context, event):
         self.start_frame = context.scene.frame_current
@@ -2192,37 +2188,46 @@ class VSEQFGrabAdd(bpy.types.Operator):
         self.pos_y_start = self.pos_y
         self.sequences = []
         self.grabbed_sequences = []
+        self.child_sequences = []
+        self.ripple_sequences = []
         self.grabbed_names = []
-        parenting = vseqf_parenting()
-        to_move = []
-        selected_sequences = current_selected(context)
-        for seq in selected_sequences:
-            if parenting:
-                if not (seq.select_left_handle or seq.select_right_handle):
-                    to_move = get_recursive(seq, to_move)
-                else:
-                    to_move.append(seq)
-                    children = find_children(seq)
-                    to_move.extend(children)
-            else:
-                to_move.append(seq)
         sequences = current_sequences(context)
         self.timeline_start = find_sequences_start(sequences)
         self.timeline_end = find_sequences_end(sequences)
+        self.ripple_start = self.timeline_end
         self.timeline_height = find_timeline_height(sequences)
-        for seq in sequences:
-            sequence_data = self.get_sequence_data(seq)
-            if parenting and seq in to_move:
-                sequence_data[9] = True
-            if seq.select:
-                self.grabbed_names.append(seq.name)
-                self.grabbed_sequences.append(sequence_data)
+        parenting = vseqf_parenting()
+        to_move = []
+        selected_sequences = current_selected(context)
+        for sequence in selected_sequences:
+            if sequence.frame_final_start < self.ripple_start and not hasattr(sequence, 'input_1') and not sequence.lock:
+                self.ripple_start = sequence.frame_final_end
+                self.ripple_left = sequence.frame_final_start
+            if parenting:
+                to_move = get_recursive(sequence, to_move)
             else:
+                to_move.append(sequence)
+
+        #generate grabbed sequences, child sequences and ripple sequences lists
+        for sequence in sequences:
+            if not sequence.lock and not hasattr(sequence, 'input_1'):
+                sequence_data = self.get_sequence_data(sequence)
                 self.sequences.append(sequence_data)
+                if sequence.select:
+                    self.grabbed_names.append(sequence.name)
+                    self.grabbed_sequences.append(sequence_data)
+                else:
+                    if parenting and sequence in to_move:
+                        self.child_sequences.append(sequence_data)
+                    elif sequence.frame_final_start >= self.ripple_start:
+                        self.ripple_sequences.append(sequence_data)
+        for seq in self.child_sequences:
+            sequence = seq[0]
+            parent_data = self.find_by_name(sequence.parent)
+            seq[9] = parent_data
         self._timer = context.window_manager.event_timer_add(time_step=0.01, window=context.window)
-        self.sequences.sort(key=lambda x: x[1])
+        self.ripple_sequences.sort(key=lambda x: x[1])
         self.grabbed_sequences.sort(key=lambda x: x[1])
-        self.sequences = self.grabbed_sequences + self.sequences  #ensure that the grabbed sequences are processed first to prevent issues with ripple
         grabbed_left = False
         grabbed_right = False
         grabbed_center = False
