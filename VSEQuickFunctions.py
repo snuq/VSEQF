@@ -18,6 +18,7 @@
 
 """
 Known Issues:
+   Ending cursor following causes inputs to not work until left mouse is clicked... sometimes??
    Sometimes undo pushing breaks... not sure what's going on there
    Uncut does not work on movieclip type sequences... there appears to be no way of getting the sequence's source file.
    Right now the script cannot apply a vertical zoom level, as far as I can tell this is missing functionality in Blenders python api.
@@ -75,7 +76,6 @@ Changelog:
    Various optimizations to ripple and grabbing
 
 Todo: quick 3point causing recursion errors sometimes when adjusting in/out
-Todo: ending cursor following causes inputs to not work until left mouse is clicked
 Todo: check and improve tooltips on all buttons, make sure shortcuts are listed
 """
 
@@ -501,7 +501,7 @@ def draw_quicksettings_menu(self, context):
 
     del context
     layout = self.layout
-    layout.menu('vseqf.settings_menu', text="Quick Functions Settings")
+    layout.menu('VSEQF_MT_settings_menu', text="Quick Functions Settings")
 
 
 def sequences_after_frame(sequences, frame, add_locked=True, add_parented=True, add_effect=True):
@@ -719,7 +719,7 @@ def timecode_from_frames(frame, fps, levels=0, subsecond_type='miliseconds', mod
         return time_text
 
 
-class VSEQFCompactEdit(bpy.types.Panel):
+class VSEQF_PT_CompactEdit(bpy.types.Panel):
     """Panel for displaying QuickList"""
     bl_label = "Edit Strip Compact"
     bl_space_type = 'SEQUENCE_EDITOR'
@@ -1388,7 +1388,7 @@ def three_point_draw_callback(self, context):
     draw_text(out_text_x, height - double_scale + 2, scale - 2, "Length: "+str(self.out_frame - self.in_frame), colorfg)
 
 
-class VSEQFThreePointBrowserPanel(bpy.types.Panel):
+class VSEQF_PT_ThreePointBrowserPanel(bpy.types.Panel):
     bl_label = "3Point Edit"
     bl_space_type = 'FILE_BROWSER'
     bl_region_type = 'TOOLS'
@@ -1442,7 +1442,7 @@ class VSEQFThreePointImportToClip(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class VSEQFThreePointPanel(bpy.types.Panel):
+class VSEQF_PT_ThreePointPanel(bpy.types.Panel):
     bl_label = "3 Point Edit"
     bl_space_type = 'CLIP_EDITOR'
     bl_region_type = 'UI'
@@ -2393,25 +2393,25 @@ class VSEQFSelectGrab(bpy.types.Operator):
 
             if abs(click_frame - context.scene.frame_current) <= distance:
                 #clicked on cursor
-                bpy.ops.wm.call_menu(name='vseqf.context_cursor')
+                bpy.ops.wm.call_menu(name='VSEQF_MT_context_cursor')
             elif event.mouse_region_y <= self.marker_area_height:
                 near_marker = self.near_marker(context, click_frame)
                 if near_marker:
                     #clicked on marker
                     context.scene.vseqf.current_marker_frame = near_marker.frame
-                    bpy.ops.wm.call_menu(name='vseqf.context_marker')
+                    bpy.ops.wm.call_menu(name='VSEQF_MT_context_marker')
             elif active and self.on_sequence(click_frame, click_channel, active):
                 #clicked on sequence
                 active_size = active.frame_final_duration * frame_px
                 if abs(click_frame - active.frame_final_start) <= distance * 2 and active_size > 60:
-                    bpy.ops.wm.call_menu(name='vseqf.context_sequence_left')
+                    bpy.ops.wm.call_menu(name='VSEQF_MT_context_sequence_left')
                 elif abs(click_frame - active.frame_final_end) <= distance * 2 and active_size > 60:
-                    bpy.ops.wm.call_menu(name='vseqf.context_sequence_right')
+                    bpy.ops.wm.call_menu(name='VSEQF_MT_context_sequence_right')
                 else:
-                    bpy.ops.wm.call_menu(name="vseqf.context_sequence")
+                    bpy.ops.wm.call_menu(name="VSEQF_MT_context_sequence")
             else:
                 #clicked on empty area
-                bpy.ops.wm.call_menu(name='vseqf.context_none')
+                bpy.ops.wm.call_menu(name='VSEQF_MT_context_none')
             return {'FINISHED'}
         move_target = 10
         if event.type == 'MOUSEMOVE':
@@ -2504,7 +2504,7 @@ class VSEQFDoubleUndo(bpy.types.Operator):
 
 
 class VSEQFContextMarker(bpy.types.Menu):
-    bl_idname = 'vseqf.context_marker'
+    bl_idname = 'VSEQF_MT_context_marker'
     bl_label = 'Marker Operations'
 
     def draw(self, context):
@@ -2529,7 +2529,7 @@ class VSEQFContextMarker(bpy.types.Menu):
 
 
 class VSEQFContextCursor(bpy.types.Menu):
-    bl_idname = "vseqf.context_cursor"
+    bl_idname = "VSEQF_MT_context_cursor"
     bl_label = "Cursor Operations"
 
     def draw(self, context):
@@ -2558,7 +2558,7 @@ class VSEQFContextCursor(bpy.types.Menu):
 
 
 class VSEQFContextNone(bpy.types.Menu):
-    bl_idname = 'vseqf.context_none'
+    bl_idname = 'VSEQF_MT_context_none'
     bl_label = "Operations On Sequence Editor"
 
     def draw(self, context):
@@ -2570,11 +2570,11 @@ class VSEQFContextNone(bpy.types.Menu):
             layout.operator('vseqf.meta_exit')
             layout.separator()
         layout.menu('SEQUENCER_MT_add')
-        layout.menu('vseqf.quickzooms_menu')
+        layout.menu('VSEQF_MT_quickzooms_menu')
 
 
 class VSEQFContextSequenceLeft(bpy.types.Menu):
-    bl_idname = "vseqf.context_sequence_left"
+    bl_idname = "VSEQF_MT_context_sequence_left"
     bl_label = "Operations On Left Handle"
 
     def draw(self, context):
@@ -2594,7 +2594,7 @@ class VSEQFContextSequenceLeft(bpy.types.Menu):
 
 
 class VSEQFContextSequenceRight(bpy.types.Menu):
-    bl_idname = "vseqf.context_sequence_right"
+    bl_idname = "VSEQF_MT_context_sequence_right"
     bl_label = "Operations On Right Handle"
 
     def draw(self, context):
@@ -2614,7 +2614,7 @@ class VSEQFContextSequenceRight(bpy.types.Menu):
 
 
 class VSEQFContextSequence(bpy.types.Menu):
-    bl_idname = "vseqf.context_sequence"
+    bl_idname = "VSEQF_MT_context_sequence"
     bl_label = "Operations On Sequence"
 
     def draw(self, context):
@@ -2632,7 +2632,7 @@ class VSEQFContextSequence(bpy.types.Menu):
             layout.prop(strip, 'mute')
             layout.prop(strip, 'lock')
             if prefs.tags:
-                layout.menu('vseqf.quicktags_menu')
+                layout.menu('VSEQF_MT_quicktags_menu')
             if strip.type == 'META':
                 layout.operator('sequencer.meta_toggle', text='Enter Meta Strip')
                 layout.operator('sequencer.meta_separate')
@@ -2641,9 +2641,9 @@ class VSEQFContextSequence(bpy.types.Menu):
             layout.label(text='Selected Sequence(s):')
             layout.operator('sequencer.meta_make')
             if prefs.cuts:
-                layout.menu('vseqf.quickcuts_menu')
+                layout.menu('VSEQF_MT_quickcuts_menu')
             if prefs.parenting:
-                layout.menu('vseqf.quickparents_menu')
+                layout.menu('VSEQF_MT_quickparents_menu')
             layout.operator('sequencer.duplicate_move', text='Duplicate')
             layout.operator('vseqf.grab', text='Grab/Move')
 
@@ -2699,7 +2699,7 @@ def draw_quickzoom_menu(self, context):
     """Draws the submenu for the QuickZoom shortcuts, placed in the sequencer view menu"""
     del context
     layout = self.layout
-    layout.menu('vseqf.quickzooms_menu', text="Quick Zoom")
+    layout.menu('VSEQF_MT_quickzooms_menu', text="Quick Zoom")
 
 
 def zoom_custom(begin, end, bottom=None, top=None, preroll=True):
@@ -2767,7 +2767,7 @@ def zoom_cursor(self=None, context=None):
 
 class VSEQFQuickZoomsMenu(bpy.types.Menu):
     """Pop-up menu for sequencer zoom shortcuts"""
-    bl_idname = "vseqf.quickzooms_menu"
+    bl_idname = "VSEQF_MT_quickzooms_menu"
     bl_label = "Quick Zooms"
 
     def draw(self, context):
@@ -2785,7 +2785,7 @@ class VSEQFQuickZoomsMenu(bpy.types.Menu):
         layout.prop(scene.vseqf, 'zoom_size', text="Size")
         layout.operator('vseqf.quickzoom_add', text='Save Current Zoom')
         if len(scene.vseqf.zoom_presets) > 0:
-            layout.menu('vseqf.quickzoom_preset_menu')
+            layout.menu('VSEQF_MT_quickzoom_preset_menu')
 
         layout.separator()
         layout.operator('vseqf.quickzooms', text='Zoom 2 Seconds').area = '2'
@@ -2799,7 +2799,7 @@ class VSEQFQuickZoomsMenu(bpy.types.Menu):
 
 class VSEQFQuickZoomPresetMenu(bpy.types.Menu):
     """Menu for saved zoom presets"""
-    bl_idname = "vseqf.quickzoom_preset_menu"
+    bl_idname = "VSEQF_MT_quickzoom_preset_menu"
     bl_label = "Zoom Presets"
 
     def draw(self, context):
@@ -3216,7 +3216,7 @@ def set_fade(fade_keyframes, direction, fade_low_point_frame, fade_high_point_fr
             fade_keyframes.insert(frame=fade_low_point_frame, value=0)
 
 
-class VSEQFQuickFadesPanel(bpy.types.Panel):
+class VSEQF_PT_QuickFadesPanel(bpy.types.Panel):
     """Panel for QuickFades operators and properties.  Placed in the VSE properties area."""
     bl_label = "Quick Fades"
     bl_space_type = 'SEQUENCE_EDITOR'
@@ -3283,7 +3283,7 @@ class VSEQFQuickFadesPanel(bpy.types.Panel):
 
 class VSEQFQuickFadesMenu(bpy.types.Menu):
     """Pop-up menu for QuickFade operators"""
-    bl_idname = "vseqf.quickfades_menu"
+    bl_idname = "VSEQF_MT_quickfades_menu"
     bl_label = "Quick Fades"
 
     @classmethod
@@ -3620,7 +3620,7 @@ class VSEQFMeta(bpy.types.Operator):
 
 class VSEQFQuickParentsMenu(bpy.types.Menu):
     """Pop-up menu for QuickParents, displays parenting operators, and relationships"""
-    bl_idname = "vseqf.quickparents_menu"
+    bl_idname = "VSEQF_MT_quickparents_menu"
     bl_label = "Quick Parents"
 
     @classmethod
@@ -3973,7 +3973,7 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
 #Classes related to QuickSnaps
 class VSEQFQuickSnapsMenu(bpy.types.Menu):
     """QuickSnaps pop-up menu listing snapping operators"""
-    bl_idname = "vseqf.quicksnaps_menu"
+    bl_idname = "VSEQF_MT_quicksnaps_menu"
     bl_label = "Quick Snaps"
 
     def draw(self, context):
@@ -4266,7 +4266,7 @@ def swap_sequence(first, second):
                 child.channel = channel
 
 
-class VSEQFQuickListPanel(bpy.types.Panel):
+class VSEQF_PT_QuickListPanel(bpy.types.Panel):
     """Panel for displaying QuickList"""
     bl_label = "Quick List"
     bl_space_type = 'SEQUENCE_EDITOR'
@@ -4511,10 +4511,10 @@ def draw_quickmarker_menu(self, context):
     """Draws the submenu for the QuickMarker presets, placed in the sequencer markers menu"""
     layout = self.layout
     if len(context.scene.vseqf.marker_presets) > 0:
-        layout.menu('vseqf.quickmarkers_menu', text="Quick Markers")
+        layout.menu('VSEQF_MT_quickmarkers_menu', text="Quick Markers")
 
 
-class VSEQFQuickMarkersPanel(bpy.types.Panel):
+class VSEQF_PT_QuickMarkersPanel(bpy.types.Panel):
     """Panel for QuickMarkers operators and properties"""
     bl_label = "Quick Markers"
     bl_space_type = 'SEQUENCE_EDITOR'
@@ -4536,16 +4536,16 @@ class VSEQFQuickMarkersPanel(bpy.types.Panel):
         split.prop(vseqf, 'current_marker')
         split.operator('vseqf.quickmarkers_add_preset', text="", icon="PLUS").preset = vseqf.current_marker
         row = layout.row()
-        row.template_list("VSEQFQuickMarkerPresetList", "", vseqf, 'marker_presets', vseqf, 'marker_index', rows=2)
+        row.template_list("VSEQF_UL_QuickMarkerPresetList", "", vseqf, 'marker_presets', vseqf, 'marker_index', rows=2)
         row = layout.row()
         row.prop(vseqf, 'marker_deselect', toggle=True)
         row = layout.row()
         row.label(text="Marker List:")
         row = layout.row()
-        row.template_list("VSEQFQuickMarkerList", "", scene, "timeline_markers", scene.vseqf, "marker_index", rows=4)
+        row.template_list("VSEQF_UL_QuickMarkerList", "", scene, "timeline_markers", scene.vseqf, "marker_index", rows=4)
 
 
-class VSEQFQuickMarkerPresetList(bpy.types.UIList):
+class VSEQF_UL_QuickMarkerPresetList(bpy.types.UIList):
     """Draws an editable list of QuickMarker presets"""
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         del context, data, icon, active_data, active_propname
@@ -4564,7 +4564,7 @@ class VSEQFQuickMarkerPresetList(bpy.types.UIList):
         return [], flt_neworder
 
 
-class VSEQFQuickMarkerList(bpy.types.UIList):
+class VSEQF_UL_QuickMarkerList(bpy.types.UIList):
     """Draws an editable list of current markers in the timeline"""
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         del data, icon, active_data, active_propname
@@ -4669,7 +4669,7 @@ class VSEQFQuickMarkerJump(bpy.types.Operator):
 
 class VSEQFQuickMarkersMenu(bpy.types.Menu):
     """Menu for adding QuickMarkers to the current frame of the timeline"""
-    bl_idname = "vseqf.quickmarkers_menu"
+    bl_idname = "VSEQF_MT_quickmarkers_menu"
     bl_label = "Quick Markers"
 
     @classmethod
@@ -4796,7 +4796,7 @@ def populate_tags(sequences=False, tags=False):
 
 
 class VSEQFQuickTagsMenu(bpy.types.Menu):
-    bl_idname = 'vseqf.quicktags_menu'
+    bl_idname = 'VSEQF_MT_quicktags_menu'
     bl_label = "Tags"
 
     @classmethod
@@ -4818,7 +4818,7 @@ class VSEQFQuickTagsMenu(bpy.types.Menu):
                 layout.operator('vseqf.quicktags_select', text=tag.text).text = tag.text
 
 
-class VSEQFQuickTagsPanel(bpy.types.Panel):
+class VSEQF_PT_QuickTagsPanel(bpy.types.Panel):
     """Panel for displaying, removing and adding tags"""
 
     bl_label = "Quick Tags"
@@ -4845,7 +4845,7 @@ class VSEQFQuickTagsPanel(bpy.types.Panel):
         row = layout.row()
         row.label(text='All Tags:')
         row = layout.row()
-        row.template_list("VSEQFQuickTagListAll", "", vseqf, 'tags', vseqf, 'marker_index')
+        row.template_list("VSEQF_UL_QuickTagListAll", "", vseqf, 'tags', vseqf, 'marker_index')
         row = layout.row()
         row.separator()
 
@@ -4856,7 +4856,7 @@ class VSEQFQuickTagsPanel(bpy.types.Panel):
         if vseqf.show_tags == 'SELECTED':
             populate_selected_tags()
             row = layout.row()
-            row.template_list("VSEQFQuickTagList", "", vseqf, 'selected_tags', vseqf, 'marker_index', rows=2)
+            row.template_list("VSEQF_UL_QuickTagList", "", vseqf, 'selected_tags', vseqf, 'marker_index', rows=2)
             row = layout.row()
             split = row.split(factor=.9, align=True)
             split.prop(vseqf, 'current_tag', text='New Tag')
@@ -4865,7 +4865,7 @@ class VSEQFQuickTagsPanel(bpy.types.Panel):
             row.operator('vseqf.quicktags_clear', text='Clear Selected Strip Tags').mode = 'selected'
         else:
             row = layout.row()
-            row.template_list("VSEQFQuickTagList", "", sequence, 'tags', vseqf, 'marker_index', rows=2)
+            row.template_list("VSEQF_UL_QuickTagList", "", sequence, 'tags', vseqf, 'marker_index', rows=2)
             row = layout.row()
             split = row.split(factor=.9, align=True)
             split.prop(vseqf, 'current_tag', text='New Tag')
@@ -4876,7 +4876,7 @@ class VSEQFQuickTagsPanel(bpy.types.Panel):
             row.operator('vseqf.quicktags_clear', text='Clear Active Strip Tags').mode = 'active'
 
 
-class VSEQFQuickTagListAll(bpy.types.UIList):
+class VSEQF_UL_QuickTagListAll(bpy.types.UIList):
     """Draws a list of tags"""
 
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
@@ -4889,7 +4889,7 @@ class VSEQFQuickTagListAll(bpy.types.UIList):
         pass
 
 
-class VSEQFQuickTagList(bpy.types.UIList):
+class VSEQF_UL_QuickTagList(bpy.types.UIList):
     """Draws an editable list of tags"""
 
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
@@ -5430,7 +5430,7 @@ class VSEQFCut(bpy.types.Operator):
 
 
 class VSEQFQuickTimelineMenu(bpy.types.Menu):
-    bl_idname = "vsqf.quicktimeline_menu"
+    bl_idname = "VSEQF_MT_quicktimeline_menu"
     bl_label = "Timeline"
 
     def draw(self, context):
@@ -5451,7 +5451,7 @@ class VSEQFQuickTimelineMenu(bpy.types.Menu):
 class VSEQFQuickCutsMenu(bpy.types.Menu):
     """Popup Menu for QuickCuts operators and properties"""
 
-    bl_idname = "vseqf.quickcuts_menu"
+    bl_idname = "VSEQF_MT_quickcuts_menu"
     bl_label = "Quick Cuts"
 
     @classmethod
@@ -5486,7 +5486,7 @@ class VSEQFQuickCutsMenu(bpy.types.Menu):
         layout.menu(VSEQFQuickTimelineMenu.bl_idname)
 
 
-class VSEQFQuickCutsPanel(bpy.types.Panel):
+class VSEQF_PT_QuickCutsPanel(bpy.types.Panel):
     """Panel for QuickCuts operators and properties"""
 
     bl_label = "Quick Cuts"
@@ -5695,7 +5695,7 @@ class VSEQFMarkerPreset(bpy.types.PropertyGroup):
 
 class VSEQFSettingsMenu(bpy.types.Menu):
     """Pop-up menu for settings related to QuickContinuous"""
-    bl_idname = "vseqf.settings_menu"
+    bl_idname = "VSEQF_MT_settings_menu"
     bl_label = "Quick Settings"
 
     def draw(self, context):
@@ -6011,7 +6011,7 @@ class VSEQFTempSettings(object):
 
 #Replaced Blender Menus
 class VSEQFDeleteConfirm(bpy.types.Menu):
-    bl_idname = "vseqf.delete_menu"
+    bl_idname = "VSEQF_MT_delete_menu"
     bl_label = "Delete Selected?"
 
     def draw(self, context):
@@ -6021,7 +6021,7 @@ class VSEQFDeleteConfirm(bpy.types.Menu):
 
 
 class VSEQFDeleteRippleConfirm(bpy.types.Menu):
-    bl_idname = "vseqf.delete_ripple_menu"
+    bl_idname = "VSEQF_MT_delete_ripple_menu"
     bl_label = "Ripple Delete Selected?"
 
     def draw(self, context):
@@ -6196,23 +6196,23 @@ class SEQUENCER_MT_add(bpy.types.Menu):
 
 
 #Register properties, operators, menus and shortcuts
-classes = (SEQUENCER_MT_add, SEQUENCER_MT_strip, VSEQFAddZoom, VSEQFClearZooms, VSEQFCompactEdit, VSEQFContextCursor,
+classes = (SEQUENCER_MT_add, SEQUENCER_MT_strip, VSEQFAddZoom, VSEQFClearZooms, VSEQF_PT_CompactEdit, VSEQFContextCursor,
            VSEQFContextMarker, VSEQFContextNone, VSEQFContextSequence, VSEQFContextSequenceLeft, VSEQFDoubleUndo,
            VSEQFContextSequenceRight, VSEQFCut, VSEQFDelete, VSEQFDeleteConfirm, VSEQFDeleteRippleConfirm,
            VSEQFFollow, VSEQFGrab, VSEQFGrabAdd, VSEQFImport, VSEQFMarkerPreset, VSEQFMeta, VSEQFQuickCutsMenu,
-           VSEQFQuickCutsPanel, VSEQFQuickFadesClear,
-           VSEQFQuickFadesCross, VSEQFQuickFadesMenu, VSEQFQuickFadesPanel, VSEQFQuickFadesSet, VSEQFQuickListDown,
-           VSEQFQuickListPanel, VSEQFQuickListSelect, VSEQFQuickListUp, VSEQFQuickMarkerDelete, VSEQFQuickMarkerJump,
-           VSEQFQuickMarkerList, VSEQFQuickMarkerMove, VSEQFQuickMarkerPresetList, VSEQFQuickMarkerRename,
-           VSEQFQuickMarkersAddPreset, VSEQFQuickMarkersMenu, VSEQFQuickMarkersPanel, VSEQFQuickMarkersPlace,
+           VSEQF_PT_QuickCutsPanel, VSEQFQuickFadesClear,
+           VSEQFQuickFadesCross, VSEQFQuickFadesMenu, VSEQF_PT_QuickFadesPanel, VSEQFQuickFadesSet, VSEQFQuickListDown,
+           VSEQF_PT_QuickListPanel, VSEQFQuickListSelect, VSEQFQuickListUp, VSEQFQuickMarkerDelete, VSEQFQuickMarkerJump,
+           VSEQF_UL_QuickMarkerList, VSEQFQuickMarkerMove, VSEQF_UL_QuickMarkerPresetList, VSEQFQuickMarkerRename,
+           VSEQFQuickMarkersAddPreset, VSEQFQuickMarkersMenu, VSEQF_PT_QuickMarkersPanel, VSEQFQuickMarkersPlace,
            VSEQFQuickMarkersRemovePreset, VSEQFQuickParents, VSEQFQuickParentsClear, VSEQFQuickParentsMenu,
-           VSEQFQuickSnaps, VSEQFQuickSnapsMenu, VSEQFQuickTagList, VSEQFQuickTagListAll, VSEQFQuickTagsAdd,
+           VSEQFQuickSnaps, VSEQFQuickSnapsMenu, VSEQF_UL_QuickTagList, VSEQF_UL_QuickTagListAll, VSEQFQuickTagsAdd,
            VSEQFQuickTagsAddActive, VSEQFQuickTagsAddMarker,
-           VSEQFQuickTagsClear, VSEQFQuickTagsMenu, VSEQFQuickTagsPanel, VSEQFQuickTagsRemove, VSEQFQuickTagsRemoveFrom,
+           VSEQFQuickTagsClear, VSEQFQuickTagsMenu, VSEQF_PT_QuickTagsPanel, VSEQFQuickTagsRemove, VSEQFQuickTagsRemoveFrom,
            VSEQFQuickTagsSelect, VSEQFQuickTimeline, VSEQFQuickTimelineMenu, VSEQFQuickZoomPreset,
            VSEQFQuickZoomPresetMenu, VSEQFQuickZooms, VSEQFQuickZoomsMenu, VSEQFRemoveZoom, VSEQFSelectGrab,
-           VSEQFSettingsMenu, VSEQFTags, VSEQFThreePointBrowserPanel, VSEQFThreePointImport,
-           VSEQFThreePointImportToClip, VSEQFThreePointOperator, VSEQFThreePointPanel, VSEQFZoomPreset,
+           VSEQFSettingsMenu, VSEQFTags, VSEQF_PT_ThreePointBrowserPanel, VSEQFThreePointImport,
+           VSEQFThreePointImportToClip, VSEQFThreePointOperator, VSEQF_PT_ThreePointPanel, VSEQFZoomPreset,
            VSEQFQuickShortcutsNudge, VSEQFQuickShortcutsSpeed, VSEQFQuickShortcutsSkip, VSEQFQuickShortcutsResetPlay,
            VSEQFQuick3PointValues, VSEQFSetting, VSEQFMetaExit)
 
@@ -6258,22 +6258,22 @@ def register():
         if (keymapitem.type == 'Z') | (keymapitem.type == 'F') | (keymapitem.type == 'S') | (keymapitem.type == 'G') | (keymapitem.type == 'RIGHTMOUSE') | (keymapitem.type == 'K') | (keymapitem.type == 'E') | (keymapitem.type == 'X') | (keymapitem.type == 'DEL') | (keymapitem.type == 'M'):
             keymapitems.remove(keymapitem)
     keymapmarker = keymapitems.new('wm.call_menu', 'M', 'PRESS', alt=True)
-    keymapmarker.properties.name = 'vseqf.quickmarkers_menu'
+    keymapmarker.properties.name = 'VSEQF_MT_quickmarkers_menu'
     keymapitems.new('vseqf.meta_make', 'G', 'PRESS', ctrl=True)
     keymapzoom = keymapitems.new('wm.call_menu', 'Z', 'PRESS')
-    keymapzoom.properties.name = 'vseqf.quickzooms_menu'
+    keymapzoom.properties.name = 'VSEQF_MT_quickzooms_menu'
     keymapfade = keymapitems.new('wm.call_menu', 'F', 'PRESS')
-    keymapfade.properties.name = 'vseqf.quickfades_menu'
+    keymapfade.properties.name = 'VSEQF_MT_quickfades_menu'
     keymapsnap = keymapitems.new('wm.call_menu', 'S', 'PRESS')
     keymapsnapto = keymapitems.new('vseqf.quicksnaps', 'S', 'PRESS', shift=True)
     keymapsnapto.properties.type = 'selection_to_cursor'
-    keymapsnap.properties.name = 'vseqf.quicksnaps_menu'
+    keymapsnap.properties.name = 'VSEQF_MT_quicksnaps_menu'
     keymapparent = keymapitems.new('wm.call_menu', 'P', 'PRESS', ctrl=True)
-    keymapparent.properties.name = 'vseqf.quickparents_menu'
+    keymapparent.properties.name = 'VSEQF_MT_quickparents_menu'
     keymapparentselect = keymapitems.new('vseqf.quickparents', 'P', 'PRESS', shift=True)
     keymapparentselect.properties.action = 'select_children'
     keymapcuts = keymapitems.new('wm.call_menu', 'K', 'PRESS', ctrl=True)
-    keymapcuts.properties.name = 'vseqf.quickcuts_menu'
+    keymapcuts.properties.name = 'VSEQF_MT_quickcuts_menu'
     keymapitems.new('vseqf.cut', 'K', 'PRESS')
     keymapcuthard = keymapitems.new('vseqf.cut', 'K', 'PRESS', shift=True)
     keymapcuthard.properties.type = 'HARD'
@@ -6286,13 +6286,13 @@ def register():
     keymapslip = keymapitems.new('vseqf.grab', 'S', 'PRESS', alt=True)
     keymapslip.properties.mode = 'SLIP'
     keymapdelete1 = keymapitems.new('wm.call_menu', 'X', 'PRESS')
-    keymapdelete1.properties.name = 'vseqf.delete_menu'
+    keymapdelete1.properties.name = 'VSEQF_MT_delete_menu'
     keymapdelete2 = keymapitems.new('wm.call_menu', 'DEL', 'PRESS')
-    keymapdelete2.properties.name = 'vseqf.delete_menu'
+    keymapdelete2.properties.name = 'VSEQF_MT_delete_menu'
     keymapdelete3 = keymapitems.new('wm.call_menu', 'X', 'PRESS', alt=True)
-    keymapdelete3.properties.name = 'vseqf.delete_ripple_menu'
+    keymapdelete3.properties.name = 'VSEQF_MT_delete_ripple_menu'
     keymapdelete4 = keymapitems.new('wm.call_menu', 'DEL', 'PRESS', alt=True)
-    keymapdelete4.properties.name = 'vseqf.delete_ripple_menu'
+    keymapdelete4.properties.name = 'VSEQF_MT_delete_ripple_menu'
 
     #QuickShortcuts Shortcuts
     keymapitems.new('vseqf.cut', 'NUMPAD_0', 'PRESS')
