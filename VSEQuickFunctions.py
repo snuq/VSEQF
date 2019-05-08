@@ -75,6 +75,8 @@ Changelog:
    Disabled ripple and edge snap while in slip mode
    Various optimizations to ripple and grabbing
 
+Todo: right click no longer deselects strips in latest 2.8 versions
+Todo: add shortcuts for cut-trim
 Todo: quick 3point causing recursion errors sometimes when adjusting in/out
 Todo: check and improve tooltips on all buttons, make sure shortcuts are listed
 """
@@ -1049,8 +1051,7 @@ def nudge_selected(frame=0, channel=0):
     to_nudge = []
     for sequence in bpy.context.selected_sequences:
         if vseqf_parenting():
-            children = get_recursive(sequence, [])
-            to_nudge.extend(children)
+            get_recursive(sequence, to_nudge)
         else:
             to_nudge.append(sequence)
     if channel > 0:
