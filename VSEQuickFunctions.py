@@ -75,8 +75,7 @@ Changelog:
    Disabled ripple and edge snap while in slip mode
    Various optimizations to ripple and grabbing
 
-Todo: right click no longer deselects strips in latest 2.8 versions
-Todo: add shortcuts for cut-trim
+Todo: when left/right click are swapped in settings, my operators are not used...
 Todo: quick 3point causing recursion errors sometimes when adjusting in/out
 Todo: check and improve tooltips on all buttons, make sure shortcuts are listed
 """
@@ -2459,7 +2458,7 @@ class VSEQFSelectGrab(bpy.types.Operator):
         for sequence in selected_sequences:
             self.selected.append([sequence, sequence.select_left_handle, sequence.select_right_handle])
         if event.mouse_region_y > self.marker_area_height:
-            bpy.ops.sequencer.select('INVOKE_DEFAULT')
+            bpy.ops.sequencer.select('INVOKE_DEFAULT', deselect_all=True)
         prefs = get_prefs()
         if prefs.threepoint:
             active = current_active(context)
@@ -6273,6 +6272,7 @@ def register():
     keymapparent.properties.name = 'VSEQF_MT_quickparents_menu'
     keymapparentselect = keymapitems.new('vseqf.quickparents', 'P', 'PRESS', shift=True)
     keymapparentselect.properties.action = 'select_children'
+
     keymapcuts = keymapitems.new('wm.call_menu', 'K', 'PRESS', ctrl=True)
     keymapcuts.properties.name = 'VSEQF_MT_quickcuts_menu'
     keymapitems.new('vseqf.cut', 'K', 'PRESS')
@@ -6280,6 +6280,9 @@ def register():
     keymapcuthard.properties.type = 'HARD'
     keymapcutripple = keymapitems.new('vseqf.cut', 'K', 'PRESS', alt=True)
     keymapcutripple.properties.type = 'RIPPLE'
+    keymapcuttrim = keymapitems.new('vseqf.cut', 'K', 'PRESS', alt=True, shift=True)
+    keymapcuttrim.properties.type = 'TRIM'
+
     keymapitems.new('vseqf.grab', 'G', 'PRESS')
     keymapitems.new('vseqf.select_grab', 'RIGHTMOUSE', 'PRESS')
     keymapgrabextend = keymapitems.new('vseqf.grab', 'E', 'PRESS')
@@ -6297,8 +6300,14 @@ def register():
 
     #QuickShortcuts Shortcuts
     keymapitems.new('vseqf.cut', 'NUMPAD_0', 'PRESS')
+    keymapitem = keymapitems.new('wm.call_menu', 'NUMPAD_0', 'PRESS', ctrl=True)
+    keymapitem.properties.name = 'VSEQF_MT_quickcuts_menu'
     keymapitem = keymapitems.new('vseqf.cut', 'NUMPAD_0', 'PRESS', alt=True)
     keymapitem.properties.type = 'RIPPLE'
+    keymapitem = keymapitems.new('vseqf.cut', 'NUMPAD_0', 'PRESS', shift=True)
+    keymapitem.properties.type = 'HARD'
+    keymapitem = keymapitems.new('vseqf.cut', 'NUMPAD_0', 'PRESS', alt=True, shift=True)
+    keymapitem.properties.type = 'TRIM'
 
     #Numpad: basic movement and playback
     keymapitem = keymapitems.new('screen.frame_offset', 'NUMPAD_1', 'PRESS')
