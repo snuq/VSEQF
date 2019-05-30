@@ -19,18 +19,18 @@
 """
 Known Issues:
    Ending cursor following causes inputs to not work until left mouse is clicked... sometimes??
-   Sometimes undo pushing breaks... not sure what's going on there
+   Quick 3point causes recursion errors sometimes when adjusting in/out
    Uncut does not work on movieclip type sequences... there appears to be no way of getting the sequence's source file.
    Right now the script cannot apply a vertical zoom level, as far as I can tell this is missing functionality in Blenders python api.
 
 Future Possibilities:
+   Remove multiple drag feature (Apparently it will be implemented in blender at some point?)
    Add a way to drag over an area of a strip and have it cut out or ripple-cut out
    Add special tags with time index and length, displayed in overlay as clip markers - need to implement display, and interface in panel
    Ripple insert in real-time while grabbing... need to think about how to do this, but I want it!
    Ability to ripple cut beyond the edge of the selected strips to ADD to the clip
    Copy/paste wrapper that copies strip animation data
    Showing a visual offset on the active audio sequence, showing how far out of sync it is from it's video parent
-   Update the cursor based on context, maybe add icon under it, or add a 'help' area at bottom of vse
 
 Changelog:
 0.93
@@ -56,7 +56,7 @@ Changelog:
    Right-click context menu option added, hold right click to activate it.  Options will differ depending on what is clicked on - cursor, sequence, sequence handles, markers, empty area
 
 0.94 (In progress)
-   Updated for Blender 2.8 - lots of code changes, lots of bug fixes, updated menus
+   Updated for Blender 2.8 - lots of code changes, lots of bug fixes, updated menus, updated panels
    Frame skipping now works with reverse playback as well, and fixed poor behavior
    Added QuickShortcuts - timeline and sequence movement using the numpad.  Thanks to tintwotin for the ideas!
    Added option to snap cursor to a dragged edge if one edge is grabbed, if two are grabbed, the second edge will be set to the overlay frame.
@@ -74,10 +74,8 @@ Changelog:
    Reworked ripple delete, it should now behave properly with overlapping sequences
    Disabled ripple and edge snap while in slip mode
    Various optimizations to ripple and grabbing
+   Added support for left and right click mouse moves
 
-Todo: when left/right click are swapped in settings, my operators are not used...
-Todo: quick 3point causing recursion errors sometimes when adjusting in/out
-Todo: check and improve tooltips on all buttons, make sure shortcuts are listed
 """
 
 
@@ -418,83 +416,6 @@ def under_cursor(sequence, frame):
         return True
     else:
         return False
-
-
-def edit_panel(self, context):
-    """Used to add extra information and variables to the VSE 'Edit Strip' panel"""
-
-    #load up preferences
-    prefs = get_prefs()
-
-    scene = context.scene
-    active_sequence = current_active(context)
-    if not active_sequence:
-        return
-    vseqf = scene.vseqf
-    layout = self.layout
-    row = layout.row()
-    fps = get_fps(scene)
-    row.label(text="Final Offset: "+timecode_from_frames(active_sequence.frame_offset_start, fps)+" : "+timecode_from_frames(active_sequence.frame_offset_end, fps))
-    row = layout.row()
-    row.label(text="Final Start: "+timecode_from_frames(active_sequence.frame_final_start, fps))
-
-    if prefs.fades:
-        #display info about the fade in and out of the current sequence
-        fadein = fades(sequence=active_sequence, mode='detect', direction='in')
-        fadeout = fades(sequence=active_sequence, mode='detect', direction='out')
-
-        row = layout.row()
-        if fadein > 0:
-            row.label(text="Fadein: "+str(round(fadein))+" Frames")
-        else:
-            row.label(text="No Fadein Detected")
-        if fadeout > 0:
-            row.label(text="Fadeout: "+str(round(fadeout))+" Frames")
-        else:
-            row.label(text="No Fadeout Detected")
-
-    if prefs.parenting:
-        #display info about parenting relationships
-        selected = context.selected_sequences
-        sequences = current_sequences(context)
-
-        children = find_children(active_sequence, sequences=sequences)
-        parent = find_parent(active_sequence)
-
-        box = layout.box()
-        #List relationships for active sequence
-        if parent:
-            row = box.row()
-            split = row.split(factor=.8, align=True)
-            split.label(text="Parent: "+parent.name)
-            split.operator('vseqf.quickparents', text='', icon="ARROW_LEFTRIGHT").action = 'select_parent'
-            split.operator('vseqf.quickparents', text='', icon="X").action = 'clear_parent'
-        if len(children) > 0:
-            row = box.row()
-            split = row.split(factor=.8, align=True)
-            subsplit = split.split(factor=.1)
-            subsplit.prop(scene.vseqf, 'expanded_children', icon="TRIA_DOWN" if scene.vseqf.expanded_children else "TRIA_RIGHT", icon_only=True, emboss=False)
-            subsplit.label(text="Children: "+children[0].name)
-            split.operator('vseqf.quickparents', text='', icon="ARROW_LEFTRIGHT").action = 'select_children'
-            split.operator('vseqf.quickparents', text='', icon="X").action = 'clear_children'
-            if scene.vseqf.expanded_children:
-                index = 1
-                while index < len(children):
-                    row = box.row()
-                    split = row.split(factor=.1)
-                    split.label(text='')
-                    split.label(text=children[index].name)
-                    index = index + 1
-
-        row = box.row()
-        split = row.split()
-        if len(selected) <= 1:
-            split.enabled = False
-        split.operator('vseqf.quickparents', text='Set Active As Parent').action = 'add'
-        row.prop(vseqf, 'children', toggle=True)
-        row = box.row()
-        row.prop(vseqf, 'select_children', toggle=True)
-        row.prop(vseqf, 'delete_children', toggle=True)
 
 
 def draw_quicksettings_menu(self, context):
@@ -863,6 +784,58 @@ class VSEQFMetaExit(bpy.types.Operator):
             bpy.ops.sequencer.select_all(action='DESELECT')
             bpy.ops.sequencer.meta_toggle()
         return{'FINISHED'}
+
+
+class VSEQF_PT_Parenting(bpy.types.Panel):
+    bl_label = 'Parenting'
+    bl_parent_id = "SEQUENCER_PT_adjust"
+    bl_space_type = 'SEQUENCE_EDITOR'
+    bl_region_type = 'UI'
+    bl_category = "Strip"
+
+    @classmethod
+    def poll(cls, context):
+        prefs = get_prefs()
+        if prefs.fades:
+            active_sequence = current_active(context)
+            if active_sequence:
+                return True
+        return False
+
+    def draw(self, context):
+        #display info about parenting relationships
+        sequences = current_sequences(context)
+        active_sequence = current_active(context)
+        scene = context.scene
+        layout = self.layout
+
+        children = find_children(active_sequence, sequences=sequences)
+        parent = find_parent(active_sequence)
+
+        row = layout.row()
+        row.operator('vseqf.quickparents', text='Set Active As Parent').action = 'add'
+
+        #List relationships for active sequence
+        if parent:
+            box = layout.box()
+            row = box.row()
+            row.label(text="Parent: ")
+            row.label(text=parent.name)
+            row = box.row()
+            row.operator('vseqf.quickparents', text='Select Parent').action = 'select_parent'
+            row.operator('vseqf.quickparents', text='Remove Parent', icon="X").action = 'clear_parent'
+        if len(children) > 0:
+            box = layout.box()
+            for index, child in enumerate(children):
+                row = box.row()
+                if index == 0:
+                    row.label(text='Children:')
+                else:
+                    row.label(text='')
+                row.label(text=child.name)
+            row = box.row()
+            row.operator('vseqf.quickparents', text='Select Children').action = 'select_children'
+            row.operator('vseqf.quickparents', text='Remove Children', icon="X").action = 'clear_children'
 
 
 #Functions related to continuous update
@@ -2343,7 +2316,7 @@ class VSEQFGrab(bpy.types.Operator):
 
 
 class VSEQFSelectGrab(bpy.types.Operator):
-    """Replacement for the right-click select operator"""
+    """Replacement for the right and left-click select operator and context menu"""
     bl_idname = "vseqf.select_grab"
     bl_label = "Replacement for the sequncer.tf_select operator"
 
@@ -2356,6 +2329,7 @@ class VSEQFSelectGrab(bpy.types.Operator):
     marker_area_height = 40
     marker_grab_distance = 100
     _timer = None
+    click_mode = None
 
     def on_sequence(self, frame, channel, sequence):
         if frame >= sequence.frame_final_start and frame <= sequence.frame_final_end and int(channel) == sequence.channel:
@@ -2371,47 +2345,53 @@ class VSEQFSelectGrab(bpy.types.Operator):
                 return marker
         return None
 
+    def context_menu(self, context, event):
+        #Show a context menu
+
+        region = context.region
+        view = region.view2d
+        distance_multiplier = 15
+        location = view.region_to_view(event.mouse_region_x, event.mouse_region_y)
+        click_frame, click_channel = location
+        self.restore_selected()
+        active = current_active(context)
+
+        #determine distance scale
+        width = region.width
+        left, bottom = view.region_to_view(0, 0)
+        right, bottom = view.region_to_view(width, 0)
+        shown_width = right - left
+        frame_px = width / shown_width
+        distance = distance_multiplier / frame_px
+
+        if abs(click_frame - context.scene.frame_current) <= distance:
+            #clicked on cursor
+            bpy.ops.wm.call_menu(name='VSEQF_MT_context_cursor')
+        elif event.mouse_region_y <= self.marker_area_height:
+            near_marker = self.near_marker(context, click_frame)
+            if near_marker:
+                #clicked on marker
+                context.scene.vseqf.current_marker_frame = near_marker.frame
+                bpy.ops.wm.call_menu(name='VSEQF_MT_context_marker')
+        elif active and self.on_sequence(click_frame, click_channel, active):
+            #clicked on sequence
+            active_size = active.frame_final_duration * frame_px
+            if abs(click_frame - active.frame_final_start) <= distance * 2 and active_size > 60:
+                bpy.ops.wm.call_menu(name='VSEQF_MT_context_sequence_left')
+            elif abs(click_frame - active.frame_final_end) <= distance * 2 and active_size > 60:
+                bpy.ops.wm.call_menu(name='VSEQF_MT_context_sequence_right')
+            else:
+                bpy.ops.wm.call_menu(name="VSEQF_MT_context_sequence")
+        else:
+            #clicked on empty area
+            bpy.ops.wm.call_menu(name='VSEQF_MT_context_none')
+
     def modal(self, context, event):
         run_time = time.time() - self.start_time
         region = context.region
         view = region.view2d
-        distance_multiplier = 15
-        if context.scene.vseqf.context and run_time > right_click_time:
-            #Show a context menu
-            location = view.region_to_view(event.mouse_region_x, event.mouse_region_y)
-            click_frame, click_channel = location
-            self.restore_selected()
-            active = current_active(context)
-
-            #determine distance scale
-            width = region.width
-            left, bottom = view.region_to_view(0, 0)
-            right, bottom = view.region_to_view(width, 0)
-            shown_width = right - left
-            frame_px = width / shown_width
-            distance = distance_multiplier / frame_px
-
-            if abs(click_frame - context.scene.frame_current) <= distance:
-                #clicked on cursor
-                bpy.ops.wm.call_menu(name='VSEQF_MT_context_cursor')
-            elif event.mouse_region_y <= self.marker_area_height:
-                near_marker = self.near_marker(context, click_frame)
-                if near_marker:
-                    #clicked on marker
-                    context.scene.vseqf.current_marker_frame = near_marker.frame
-                    bpy.ops.wm.call_menu(name='VSEQF_MT_context_marker')
-            elif active and self.on_sequence(click_frame, click_channel, active):
-                #clicked on sequence
-                active_size = active.frame_final_duration * frame_px
-                if abs(click_frame - active.frame_final_start) <= distance * 2 and active_size > 60:
-                    bpy.ops.wm.call_menu(name='VSEQF_MT_context_sequence_left')
-                elif abs(click_frame - active.frame_final_end) <= distance * 2 and active_size > 60:
-                    bpy.ops.wm.call_menu(name='VSEQF_MT_context_sequence_right')
-                else:
-                    bpy.ops.wm.call_menu(name="VSEQF_MT_context_sequence")
-            else:
-                #clicked on empty area
-                bpy.ops.wm.call_menu(name='VSEQF_MT_context_none')
+        if self.click_mode == 'RIGHT' and context.scene.vseqf.context and run_time > right_click_time:
+            self.context_menu(context, event)
             return {'FINISHED'}
         move_target = 10
         if event.type == 'MOUSEMOVE':
@@ -2451,44 +2431,49 @@ class VSEQFSelectGrab(bpy.types.Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
-        bpy.ops.ed.undo_push()
-        self.start_time = time.time()
-        self.selected = []
-        selected_sequences = current_selected(context)
-        for sequence in selected_sequences:
-            self.selected.append([sequence, sequence.select_left_handle, sequence.select_right_handle])
-        if event.mouse_region_y > self.marker_area_height:
-            bpy.ops.sequencer.select('INVOKE_DEFAULT', deselect_all=True)
-        prefs = get_prefs()
-        if prefs.threepoint:
-            active = current_active(context)
-            if active and active.type == 'MOVIE':
-                #look for a clip editor area and set the active clip to the selected sequence if one exists that shares the same source.
-                newclip = None
-                for clip in bpy.data.movieclips:
-                    if os.path.normpath(bpy.path.abspath(clip.filepath)) == os.path.normpath(bpy.path.abspath(active.filepath)):
-                        newclip = clip
-                        break
-                if newclip:
-                    for area in context.screen.areas:
-                        if area.type == 'CLIP_EDITOR':
-                            area.spaces[0].clip = newclip
-
-        if context.scene.vseqf.select_children:
-            to_select = []
+        self.click_mode = context.window_manager.keyconfigs.active.preferences.select_mouse
+        if (event.type == 'RIGHTMOUSE' and self.click_mode == 'LEFT') or event.type == 'W':
+            self.context_menu(context, event)
+            return {'FINISHED'}
+        else:
+            bpy.ops.ed.undo_push()
+            self.start_time = time.time()
+            self.selected = []
+            selected_sequences = current_selected(context)
             for sequence in selected_sequences:
-                to_select = get_recursive(sequence, to_select)
-                for seq in to_select:
-                    seq.select = sequence.select
-                    seq.select_left_handle = sequence.select_left_handle
-                    seq.select_right_handle = sequence.select_right_handle
-        self.mouse_start_x = event.mouse_x
-        self.mouse_start_y = event.mouse_y
-        self.mouse_start_region_x = event.mouse_region_x
-        self.mouse_start_region_y = event.mouse_region_y
-        self._timer = context.window_manager.event_timer_add(time_step=0.05, window=context.window)
-        context.window_manager.modal_handler_add(self)
-        return {'RUNNING_MODAL'}
+                self.selected.append([sequence, sequence.select_left_handle, sequence.select_right_handle])
+            if event.mouse_region_y > self.marker_area_height:
+                bpy.ops.sequencer.select('INVOKE_DEFAULT', deselect_all=True)
+            prefs = get_prefs()
+            if prefs.threepoint:
+                active = current_active(context)
+                if active and active.type == 'MOVIE':
+                    #look for a clip editor area and set the active clip to the selected sequence if one exists that shares the same source.
+                    newclip = None
+                    for clip in bpy.data.movieclips:
+                        if os.path.normpath(bpy.path.abspath(clip.filepath)) == os.path.normpath(bpy.path.abspath(active.filepath)):
+                            newclip = clip
+                            break
+                    if newclip:
+                        for area in context.screen.areas:
+                            if area.type == 'CLIP_EDITOR':
+                                area.spaces[0].clip = newclip
+
+            if context.scene.vseqf.select_children:
+                to_select = []
+                for sequence in selected_sequences:
+                    to_select = get_recursive(sequence, to_select)
+                    for seq in to_select:
+                        seq.select = sequence.select
+                        seq.select_left_handle = sequence.select_left_handle
+                        seq.select_right_handle = sequence.select_right_handle
+            self.mouse_start_x = event.mouse_x
+            self.mouse_start_y = event.mouse_y
+            self.mouse_start_region_x = event.mouse_region_x
+            self.mouse_start_region_y = event.mouse_region_y
+            self._timer = context.window_manager.event_timer_add(time_step=0.05, window=context.window)
+            context.window_manager.modal_handler_add(self)
+            return {'RUNNING_MODAL'}
 
 
 class VSEQFDoubleUndo(bpy.types.Operator):
@@ -3218,7 +3203,8 @@ def set_fade(fade_keyframes, direction, fade_low_point_frame, fade_high_point_fr
 
 class VSEQF_PT_QuickFadesPanel(bpy.types.Panel):
     """Panel for QuickFades operators and properties.  Placed in the VSE properties area."""
-    bl_label = "Quick Fades"
+    bl_label = "Fade In/Out"
+    bl_parent_id = "SEQUENCER_PT_adjust"
     bl_space_type = 'SEQUENCE_EDITOR'
     bl_region_type = 'UI'
     bl_category = "Strip"
@@ -3898,6 +3884,7 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
         to_parent = []
         last_frame = context.scene.frame_current
         if self.type == 'MOVIE':
+            #iterate through files and import them
             for file in self.files:
                 filename = os.path.join(dirname, file.name)
                 bpy.ops.sequencer.movie_strip_add(filepath=filename, frame_start=frame, relative_path=self.relative_path, channel=self.channel, replace_sel=True, sound=self.sound, use_framerate=self.use_movie_framerate)
@@ -6061,8 +6048,12 @@ class SEQUENCER_MT_strip(bpy.types.Menu):
 
         layout.separator()
         layout.menu("SEQUENCER_MT_strip_transform")
-        layout.operator("sequencer.snap")
-        layout.operator("sequencer.offset_clear")
+
+        layout.separator()
+        #layout.operator("sequencer.cut", text="Cut").type = 'SOFT'
+        #layout.operator("sequencer.cut", text="Hold Cut").type = 'HARD'
+        layout.operator("vseqf.cut", text="Cut").type = 'SOFT'
+        layout.operator("vseqf.cut", text="Hold Cut").type = 'HARD'
 
         layout.separator()
         layout.operator("sequencer.copy", text="Copy")
@@ -6071,19 +6062,18 @@ class SEQUENCER_MT_strip(bpy.types.Menu):
         layout.operator("sequencer.delete", text="Delete...")
 
         layout.separator()
-        #layout.operator("sequencer.cut", text="Cut (Hard) at frame").type = 'HARD'
-        #layout.operator("sequencer.cut", text="Cut (Soft) at frame").type = 'SOFT'
-        layout.operator("vseqf.cut", text="Cut (hard) at frame").type = 'HARD'
-        layout.operator("vseqf.cut", text="Cut (soft) at frame").type = 'SOFT'
+        layout.menu("SEQUENCER_MT_strip_lock_mute")
 
-        layout.separator()
-        layout.operator("sequencer.deinterlace_selected_movies")
-        layout.operator("sequencer.rebuild_proxy")
-
+        #strip = act_strip(context)
         strip = current_active(context)
 
         if strip:
             stype = strip.type
+
+            if stype != 'SOUND':
+                layout.separator()
+                layout.operator_menu_enum("sequencer.strip_modifier_add", "type", text="Add Modifier")
+                layout.operator("sequencer.strip_modifier_copy", text = "Copy Modifiers to Selection")
 
             if stype in {
                     'CROSS', 'ADD', 'SUBTRACT', 'ALPHA_OVER', 'ALPHA_UNDER',
@@ -6100,9 +6090,7 @@ class SEQUENCER_MT_strip(bpy.types.Menu):
                 layout.separator()
                 layout.operator("sequencer.rendersize")
                 layout.operator("sequencer.images_separate")
-            elif stype == 'SOUND':
-                layout.separator()
-                layout.operator("sequencer.crossfade_sounds")
+                layout.operator("sequencer.deinterlace_selected_movies")
             elif stype == 'META':
                 layout.separator()
                 layout.operator("sequencer.meta_separate")
@@ -6110,24 +6098,24 @@ class SEQUENCER_MT_strip(bpy.types.Menu):
         layout.separator()
         #layout.operator("sequencer.meta_make")
         layout.operator("vseqf.meta_make")
+        layout.operator("sequencer.meta_toggle", text="Toggle Meta")
 
         layout.separator()
         layout.menu("SEQUENCER_MT_strip_input")
 
         layout.separator()
-        layout.menu("SEQUENCER_MT_strip_lock_mute")
+        layout.operator("sequencer.rebuild_proxy")
 
-        try:
-            #Display only if active sequence is set
-            sequence = current_active(context)
-            if sequence:
-                layout.separator()
-                layout.operator('vseqf.quicksnaps', text='Snap Sequence Beginning To Cursor').type = 'begin_to_cursor'
-                layout.operator('vseqf.quicksnaps', text='Snap Sequence End To Cursor').type = 'end_to_cursor'
-                layout.operator('vseqf.quicksnaps', text='Snap Sequence To Previous Sequence').type = 'sequence_to_previous'
-                layout.operator('vseqf.quicksnaps', text='Snap Sequence To Next Sequence').type = 'sequence_to_next'
-        except:
-            pass
+
+def strip_menu_add(self, context):
+    layout = self.layout
+    strip = current_active(context)
+    if strip:
+        layout.separator()
+        layout.operator('vseqf.quicksnaps', text='Snap Beginning To Cursor').type = 'begin_to_cursor'
+        layout.operator('vseqf.quicksnaps', text='Snap End To Cursor').type = 'end_to_cursor'
+        layout.operator('vseqf.quicksnaps', text='Snap To Previous Strip').type = 'sequence_to_previous'
+        layout.operator('vseqf.quicksnaps', text='Snap To Next Strip').type = 'sequence_to_next'
 
 
 def sel_sequences(context):
@@ -6188,10 +6176,10 @@ class SEQUENCER_MT_add(bpy.types.Menu):
         layout.operator("sequencer.effect_strip_add", text="Adjustment Layer", icon='COLOR').type = 'ADJUSTMENT'
 
         layout.operator_context = 'INVOKE_DEFAULT'
-        layout.menu("SEQUENCER_MT_add_effect")
+        layout.menu("SEQUENCER_MT_add_effect", icon='SHADERFX')
 
         col = layout.column()
-        col.menu("SEQUENCER_MT_add_transitions")
+        col.menu("SEQUENCER_MT_add_transitions", icon='ARROW_LEFTRIGHT')
         col.enabled = sel_sequences(context) >= 2
 
 
@@ -6214,7 +6202,7 @@ classes = (SEQUENCER_MT_add, SEQUENCER_MT_strip, VSEQFAddZoom, VSEQFClearZooms, 
            VSEQFSettingsMenu, VSEQFTags, VSEQF_PT_ThreePointBrowserPanel, VSEQFThreePointImport,
            VSEQFThreePointImportToClip, VSEQFThreePointOperator, VSEQF_PT_ThreePointPanel, VSEQFZoomPreset,
            VSEQFQuickShortcutsNudge, VSEQFQuickShortcutsSpeed, VSEQFQuickShortcutsSkip, VSEQFQuickShortcutsResetPlay,
-           VSEQFQuick3PointValues, VSEQFSetting, VSEQFMetaExit)
+           VSEQFQuick3PointValues, VSEQFSetting, VSEQFMetaExit, VSEQF_PT_Parenting)
 
 
 def register():
@@ -6224,7 +6212,6 @@ def register():
     for cls in classes:
         bpy.utils.register_class(cls)
 
-    bpy.types.SEQUENCER_PT_edit.append(edit_panel)
     global vseqf_draw_handler
     if vseqf_draw_handler:
         try:
@@ -6239,6 +6226,7 @@ def register():
     bpy.types.SEQUENCER_MT_view.append(draw_quickzoom_menu)
     bpy.types.SEQUENCER_MT_view.prepend(draw_quicksettings_menu)
     bpy.types.SEQUENCER_MT_marker.prepend(draw_quickmarker_menu)
+    bpy.types.SEQUENCER_MT_strip.append(strip_menu_add)
 
     #New variables
     bpy.types.Scene.vseqf_skip_interval = bpy.props.IntProperty(default=0, min=0)
@@ -6255,7 +6243,7 @@ def register():
 
     for keymapitem in keymapitems:
         #Iterate through keymaps and delete old shortcuts
-        if (keymapitem.type == 'Z') | (keymapitem.type == 'F') | (keymapitem.type == 'S') | (keymapitem.type == 'G') | (keymapitem.type == 'RIGHTMOUSE') | (keymapitem.type == 'K') | (keymapitem.type == 'E') | (keymapitem.type == 'X') | (keymapitem.type == 'DEL') | (keymapitem.type == 'M'):
+        if (keymapitem.type == 'Z') | (keymapitem.type == 'F') | (keymapitem.type == 'S') | (keymapitem.type == 'G') | (keymapitem.type == 'W') | (keymapitem.type == 'LEFTMOUSE') | (keymapitem.type == 'RIGHTMOUSE') | (keymapitem.type == 'K') | (keymapitem.type == 'E') | (keymapitem.type == 'X') | (keymapitem.type == 'DEL') | (keymapitem.type == 'M'):
             keymapitems.remove(keymapitem)
     keymapmarker = keymapitems.new('wm.call_menu', 'M', 'PRESS', alt=True)
     keymapmarker.properties.name = 'VSEQF_MT_quickmarkers_menu'
@@ -6284,7 +6272,10 @@ def register():
     keymapcuttrim.properties.type = 'TRIM'
 
     keymapitems.new('vseqf.grab', 'G', 'PRESS')
+    keymapitems.new('vseqf.select_grab', 'W', 'PRESS')
+    keymapitems.new('vseqf.select_grab', 'LEFTMOUSE', 'PRESS')
     keymapitems.new('vseqf.select_grab', 'RIGHTMOUSE', 'PRESS')
+
     keymapgrabextend = keymapitems.new('vseqf.grab', 'E', 'PRESS')
     keymapgrabextend.properties.mode = 'TIME_EXTEND'
     keymapslip = keymapitems.new('vseqf.grab', 'S', 'PRESS', alt=True)
@@ -6397,7 +6388,6 @@ def unregister():
     bpy.types.SEQUENCER_MT_view.remove(draw_quickzoom_menu)
     bpy.types.SEQUENCER_MT_view.remove(draw_quicksettings_menu)
     bpy.types.SEQUENCER_HT_header.remove(draw_follow_header)
-    bpy.types.SEQUENCER_PT_edit.remove(edit_panel)
 
     #Remove shortcuts
     keymapitems = bpy.context.window_manager.keyconfigs.addon.keymaps['Sequencer'].keymap_items
