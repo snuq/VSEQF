@@ -86,6 +86,7 @@ import blf
 import math
 import time
 import os
+from mathutils import Vector
 from bpy.app.handlers import persistent
 from bpy_extras.io_utils import ImportHelper
 from gpu_extras.batch import batch_for_shader
@@ -3201,6 +3202,83 @@ def set_fade(fade_keyframes, direction, fade_low_point_frame, fade_high_point_fr
             fade_keyframes.insert(frame=fade_low_point_frame, value=0)
 
 
+def fade_find_or_create_fcurve(context, sequence, animated_property):
+    """
+    Iterates over all the fcurves until it finds an fcurve with a data path
+    that corresponds to the sequence.
+    Returns the matching FCurve or creates a new one if the function can't find a match.
+    """
+    fade_fcurve = None
+    fcurves = context.scene.animation_data.action.fcurves
+    searched_data_path = sequence.path_from_id(animated_property)
+    for fcurve in fcurves:
+        if fcurve.data_path == searched_data_path:
+            fade_fcurve = fcurve
+            break
+    if not fade_fcurve:
+        fade_fcurve = fcurves.new(data_path=searched_data_path)
+    return fade_fcurve
+
+
+def fade_calculate_max_value(sequence, fade_fcurve):
+    """
+    Returns the maximum Y coordinate the fade animation should use for a given sequence
+    """
+    property = fade_fcurve.data_path.rsplit('.', 1)[-1]
+    if not fade_fcurve.keyframe_points:
+        max_value = getattr(sequence, property, 1.0)
+    else:
+        highest_keyframe = max(fade_fcurve.keyframe_points, key=lambda k: k.co[1])
+        max_value = highest_keyframe.co[1]
+    max_value = max_value if max_value > 0.0 else 1.0
+    return max_value
+
+
+def fade_animation_clear(context, fade_fcurve, fades):
+    """
+    Removes existing keyframes in the fades' time range
+    """
+    keyframe_points = fade_fcurve.keyframe_points
+    for keyframe in keyframe_points:
+        frame = keyframe.co[0]
+        for fade in fades:
+            if fade.start.x < frame < fade.end.x:
+                keyframe_points.remove(keyframe)
+
+
+def fade_animation_create(fade_fcurve, fades):
+    for fade in fades:
+        for point in (fade.start, fade.end):
+            fade_fcurve.keyframe_points.insert(frame=point.x, value=point.y)
+
+
+class Fade:
+    """
+    Data structure to represent fades
+    """
+    type = ''
+    animated_property = ''
+    duration = -1
+    max_value = 1.0
+    start, end = Vector((0, 0)), Vector((0, 0))
+
+    def __init__(self, sequence, type, animated_property, duration, max_value):
+        self.type = type
+        self.animated_property = animated_property
+        self.duration = duration
+        self.max_value = max_value
+
+        if type == 'in':
+            self.start = Vector((sequence.frame_final_start, 0.0))
+            self.end = Vector((sequence.frame_final_start + self.duration, max_value))
+        elif type == 'out':
+            self.start = Vector((sequence.frame_final_end - self.duration, max_value))
+            self.end = Vector((sequence.frame_final_end, 0.0))
+
+    def __repr__(self):
+        return "Fade {}: {} to {}".format(self.type, self.start, self.end)
+
+
 class VSEQF_PT_QuickFadesPanel(bpy.types.Panel):
     """Panel for QuickFades operators and properties.  Placed in the VSE properties area."""
     bl_label = "Fade In/Out"
@@ -3320,33 +3398,75 @@ class VSEQFQuickFadesMenu(bpy.types.Menu):
 
 class VSEQFQuickFadesSet(bpy.types.Operator):
     """Operator to add fades to selected sequences
-    Uses the vseqf fade_length variable for length
     Argument:
         type: String, determines if a fadein or fadeout should be set
             'in': sets a fadein
             'out': sets a fadeout
-            'both': sets fadein and fadeout"""
+            'both': sets fadein and fadeout
+        duration_seconds: duration of the fade in seconds
+    """
 
     bl_idname = 'vseqf.quickfades_set'
     bl_label = 'VSEQF Quick Fades Set Fade'
     bl_description = 'Adds or changes fade for selected sequences'
+    bl_options = {'UNDO'}
 
-    #Should be set to 'in' or 'out'
-    type: bpy.props.StringProperty()
+    type: bpy.props.EnumProperty(
+        items=[('both', 'Fade in and out', 'Fade selected strips in and out'),
+               ('in', 'Fade in', 'Fade in selected strips'),
+               ('out', 'Fade out', 'Fade out selected strips')],
+        name="Fade type",
+        description="Fade in, out, or both in and out. Default is both",
+        default='both')
+
+    duration = -1
+
+    @classmethod
+    def poll(cls, context):
+        return context.selected_sequences
 
     def execute(self, context):
-        bpy.ops.ed.undo_push()
-        #iterate through selected sequences and apply fades to them
-        selected_sequences = current_selected(context)
-        for sequence in selected_sequences:
-            if self.type == 'both':
-                fades(sequence=sequence, mode='set', direction='in', fade_length=context.scene.vseqf.fade)
-                fades(sequence=sequence, mode='set', direction='out', fade_length=context.scene.vseqf.fade)
-            else:
-                fades(sequence=sequence, mode='set', direction=self.type, fade_length=context.scene.vseqf.fade)
+        # We must create a scene action first if there's none
+        scene = context.scene
+        if not scene.animation_data:
+            scene.animation_data_create()
+        if not scene.animation_data.action:
+            action = bpy.data.actions.new(scene.name + "Action")
+            scene.animation_data.action = action
+
+        self.duration = context.scene.vseqf.fade
+        for sequence in context.selected_sequences:
+            if not self.is_long_enough(sequence, self.duration):
+                continue
+
+            animated_property = 'volume' if hasattr(sequence, 'volume') else 'blend_alpha'
+            fade_fcurve = fade_find_or_create_fcurve(context, sequence, animated_property)
+            max_value = fade_calculate_max_value(sequence, fade_fcurve)
+            fades = self.calculate_fades(sequence, animated_property, self.duration, max_value)
+            fade_animation_clear(context, fade_fcurve, fades)
+            fade_animation_create(fade_fcurve, fades)
 
         redraw_sequencers()
-        return{'FINISHED'}
+        return {"FINISHED"}
+
+    def is_long_enough(self, sequence, duration=0):
+        minimum_duration = (self.duration * 2
+                            if self.type == 'IN_OUT' else
+                            self.duration)
+        return sequence.frame_final_duration >= minimum_duration
+
+    def calculate_fades(self, sequence, animated_property, duration, max_value):
+        """
+        Returns a list of Fade objects
+        """
+        fades = []
+        if self.type in ['in', 'both']:
+            fade = Fade(sequence, 'in', animated_property, self.duration, max_value)
+            fades.append(fade)
+        if self.type in ['out', 'both']:
+            fade = Fade(sequence, 'out', animated_property, self.duration, max_value)
+            fades.append(fade)
+        return fades
 
 
 class VSEQFQuickFadesClear(bpy.types.Operator):
@@ -3354,31 +3474,28 @@ class VSEQFQuickFadesClear(bpy.types.Operator):
     bl_idname = 'vseqf.quickfades_clear'
     bl_label = 'VSEQF Quick Fades Clear Fades'
     bl_description = 'Clears fade in and out for selected sequences'
+    bl_options = {'UNDO'}
 
     direction: bpy.props.StringProperty('both')
     active_only: bpy.props.BoolProperty(False)
 
     def execute(self, context):
-        bpy.ops.ed.undo_push()
-        if self.active_only:
-            if self.direction != 'both':
-                fades(sequence=current_active(context), mode='set', direction=self.direction, fade_length=0)
-            else:
-                fades(sequence=current_active(context), mode='clear', direction=self.direction, fade_length=context.scene.vseqf.fade)
-        else:
-            selected_sequences = current_selected(context)
-            for sequence in selected_sequences:
-                #iterate through selected sequences, remove fades, and set opacity to full
-                if self.direction != 'both':
-                    fades(sequence=sequence, mode='set', direction=self.direction, fade_length=0)
-                else:
-                    fades(sequence=sequence, mode='clear', direction=self.direction, fade_length=context.scene.vseqf.fade)
-                sequence.blend_alpha = 1
+        fcurves = context.scene.animation_data.action.fcurves
+        sequences = context.selected_sequences if not self.active_only else current_active(context)
 
-        redraw_sequencers()
-        self.direction = 'both'
+        for sequence in sequences:
+            animated_property = 'volume' if hasattr(sequence, 'volume') else 'blend_alpha'
+            for curve in fcurves:
+                if not curve.data_path.endswith(animated_property):
+                    continue
+                # Ensure the fcurve corresponds to the selected sequence
+                if sequence == eval("bpy.context.scene." + curve.data_path.replace('.' + animated_property, '')):
+                    fcurves.remove(curve)
+                setattr(sequence, animated_property, 1.0)
+
         self.active_only = False
-        return{'FINISHED'}
+        redraw_sequencers()
+        return {'FINISHED'}
 
 
 class VSEQFQuickFadesCross(bpy.types.Operator):
