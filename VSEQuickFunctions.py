@@ -75,6 +75,7 @@ Changelog:
    Disabled ripple and edge snap while in slip mode
    Various optimizations to ripple and grabbing
    Added support for left and right click mouse moves
+   Updated frame skipping to work with new limitations in Blender
 
 """
 
@@ -1136,20 +1137,25 @@ class VSEQFQuickShortcutsSpeed(bpy.types.Operator):
     def execute(self, context):
         if self.speed_change == 'UP':
             if not context.screen.is_animation_playing:
+                #playback is stopped, start at speed 1
                 bpy.ops.screen.animation_play()
                 context.scene.vseqf.step = 1
             elif context.scene.vseqf.step == 0:
-                bpy.ops.screen.animation_play()
-            elif context.scene.vseqf.step < 7:
+                bpy.ops.screen.animation_cancel(restore_frame=False)
+            elif context.scene.vseqf.step < 4:
                 context.scene.vseqf.step = context.scene.vseqf.step + 1
         elif self.speed_change == 'DOWN':
             if not context.screen.is_animation_playing:
+                #playback is stopped, start at speed -1
                 bpy.ops.screen.animation_play(reverse=True)
                 context.scene.vseqf.step = -1
             elif context.scene.vseqf.step == 0:
-                bpy.ops.screen.animation_play()
-            elif context.scene.vseqf.step > -7:
+                bpy.ops.screen.animation_cancel(restore_frame=False)
+            elif context.scene.vseqf.step > -4:
                 context.scene.vseqf.step = context.scene.vseqf.step - 1
+                if context.scene.vseqf.step == 1:
+                    bpy.ops.screen.animation_cancel(restore_frame=False)
+                    bpy.ops.screen.animation_play()
         if context.screen.is_animation_playing and context.scene.vseqf.step == 0:
             bpy.ops.screen.animation_play()
         return{'FINISHED'}
@@ -1195,10 +1201,10 @@ class VSEQFQuickShortcutsResetPlay(bpy.types.Operator):
 
     def execute(self, context):
         if self.direction == 'BACKWARD':
-            context.scene.vseqf.step = 0
+            context.scene.vseqf.step = -1
             bpy.ops.screen.animation_play(reverse=True)
         else:
-            context.scene.vseqf.step = 0
+            context.scene.vseqf.step = 1
             bpy.ops.screen.animation_play()
         return{'FINISHED'}
 
@@ -2105,7 +2111,6 @@ class VSEQFGrabAdd(bpy.types.Operator):
                     context.scene.frame_current = self.start_frame
                     context.scene.sequence_editor.overlay_frame = self.start_overlay_frame
                 elif self.ripple and self.ripple_pop:
-                    print(self.ripple_start)
                     context.scene.frame_current = self.ripple_left
             return {'FINISHED'}
 
@@ -2642,20 +2647,17 @@ def frame_step(scene):
 
     if bpy.context.scene != scene:
         return
-    step = abs(scene.vseqf.step) - 1
+    if scene.vseqf.step in [-1, 0, 1]:
+        return
     difference = scene.frame_current - scene.vseqf.last_frame
     if difference == -1 or difference == 1:
-        if step == 1:
-            #Skip every 4th frame
-            if scene.frame_current % 4 == 0:
-                scene.frame_current = scene.frame_current + difference
-        if step == 2:
-            #Skip every 3rd frame
-            if scene.frame_current % 3 == 0:
-                scene.frame_current = scene.frame_current + difference
-        if step > 2:
-            #Skip step - 1 frames
-            scene.frame_current = scene.frame_current + (difference * (step - 1))
+        frame_skip = difference * (abs(scene.vseqf.step) - 1)
+        bpy.ops.screen.animation_cancel(restore_frame=False)
+        scene.frame_current = scene.frame_current + frame_skip
+        if frame_skip < 0:
+            bpy.ops.screen.animation_play(reverse=True)
+        else:
+            bpy.ops.screen.animation_play()
     scene.vseqf.last_frame = scene.frame_current
 
 
@@ -3059,6 +3061,7 @@ def fades(sequence, mode, direction, fade_length=0, fade_low_point_frame=False):
             fade_curve = curve
 
             #delete keyframes and end function
+            #Todo: need to only delete fade start and end keyframes, not entire curve
             if mode == 'clear':
                 all_curves.remove(fade_curve)
                 return 0
@@ -3887,7 +3890,10 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
             #iterate through files and import them
             for file in self.files:
                 filename = os.path.join(dirname, file.name)
-                bpy.ops.sequencer.movie_strip_add(filepath=filename, frame_start=frame, relative_path=self.relative_path, channel=self.channel, replace_sel=True, sound=self.sound, use_framerate=self.use_movie_framerate)
+                if self.channel <= 1:  #Needed to get around a bug in blender. blah.
+                    bpy.ops.sequencer.movie_strip_add('INVOKE_DEFAULT', filepath=filename, frame_start=frame, relative_path=self.relative_path, replace_sel=True, sound=self.sound, use_framerate=self.use_movie_framerate)
+                else:
+                    bpy.ops.sequencer.movie_strip_add(filepath=filename, frame_start=frame, relative_path=self.relative_path, channel=self.channel, replace_sel=True, sound=self.sound, use_framerate=self.use_movie_framerate)
                 imported = current_selected(context)
                 if len(imported) > 1:
                     #this included a sound strip, maybe other types?
@@ -5886,8 +5892,8 @@ class VSEQFSetting(bpy.types.PropertyGroup):
     step: bpy.props.IntProperty(
         name="Frame Step",
         default=0,
-        min=-7,
-        max=7)
+        min=-4,
+        max=4)
     skip_index: bpy.props.IntProperty(
         default=0)
 
