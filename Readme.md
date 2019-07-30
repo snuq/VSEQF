@@ -243,7 +243,7 @@ Enables one-click adding or changing a fade-in or fade-out.
 Also enables one-click crossfading between multiple strips.
 Adds a fade adjustment function to provide visual feedback while editing fades directly in the sequencer.
 
-###Fades Panel
+#### Fades Panel
 The 'QuickFades' panel provides buttons for setting and removing fades.  
 Can be found in the sequence editor properties panel, or by pressing the 'shift-f' key over the sequencer.  
 Detected fades will also be shown on the active strip in the timeline, or in the edit strip properties panel.  Fades will be automatically moved if the edges of the strip are changed.
@@ -276,7 +276,7 @@ If context menus are enabled, fades can be set by right clicking on the edges of
    Adjust the length of the active sequence and the next sequence to create a transition of the target fade length.  
    This will also attempt to avoid extending the sequences past their end points if possible.
 
-###Fades Modal Operator
+#### Fades Modal Operator
 The Modal Fades Operator can be activated by pressing the 'f' key over the sequencer.  
 This will apply fades to all selected strips. If only the strip is selected, it will default to applying fades to both edges, if a strip edge is selected, it will default to applying a fade only to that edge.  
 To effectively use this operator, you must be able to see the beginning or and of the selected strips.  
