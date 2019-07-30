@@ -59,7 +59,7 @@ Changelog:
    Now can save and recall zoom levels in the vse.  No way to do vertical (channel) zooms yet tho...
    Right-click context menu option added, hold right click to activate it.  Options will differ depending on what is clicked on - cursor, sequence, sequence handles, markers, empty area
 
-0.94 (In progress)
+0.94
    Frame skipping now works with reverse playback as well, and fixed poor behavior
    Added QuickShortcuts - timeline and sequence movement using the numpad.  Thanks to tintwotin for the ideas!
    Added option to snap cursor to a dragged edge if one edge is grabbed, if two are grabbed, the second edge will be set to the overlay frame.
@@ -76,8 +76,6 @@ Changelog:
    Improved QuickTags interface
    Reworked ripple delete, it should now behave properly with overlapping sequences
 
-Todo: check and improve tooltips on all buttons, make sure shortcuts are listed
-Todo: update readme: add QuickShortcuts, Quick3Point, snap to grabbed edge
 """
 
 

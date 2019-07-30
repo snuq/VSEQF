@@ -1,5 +1,7 @@
 # VSE Quick Functions Addon For Blender
 
+This is the final version of VSEQF for the blender 2.79 releases.  
+
 This script is designed to make Blender's VSE easier to use by implementing features often found in other video editors, or features that I find useful as a video editor.  
 
 Watch the demo video:  
