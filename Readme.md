@@ -59,7 +59,8 @@ The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' o
 
 * __Right-Click Context Menus__
 
-   Right-click and hold to open a popup menu allowing different operations to be performed depending on what is clicked on.  
+   Makes the right-click context menus more contextual, allowing different operations to be performed depending on what is clicked on.  
+   Right-click and hold will open context menus when blender is in right-click to select mode.  
    See the QuickContext section for more information.
 
 * __Making Meta Strip Additions__
@@ -149,9 +150,9 @@ Enables quick navigation of the timeline using the number pad.
 
 
 ## QuickContext
-Enables right-click and hold in the sequencer to pop up a context menu allowing for different operations depending on what is clicked on.
+Right-click in the sequencer to pop up a context menu allowing for different operations depending on what is clicked on.
 
-'Enable Context Menu' must be checked in the Quick Functions Settings menu.
+In right-click to select mode, 'Enable Context Menu' must be checked in the Quick Functions Settings menu.
 
 None of the menu options are unique, some are built-in in blender, some are provided by other parts of this script.
 
@@ -240,12 +241,13 @@ To use the following options, the clip does not need to have been loaded via the
 ## QuickFades
 Enables one-click adding or changing a fade-in or fade-out.  
 Also enables one-click crossfading between multiple strips.
+Adds a fade adjustment function to provide visual feedback while editing fades directly in the sequencer.
 
-Can be found in the sequence editor properties panel, or by pressing the 'f' key over the sequencer.  
+####Fades Panel
+The 'QuickFades' panel provides buttons for setting and removing fades.  
+Can be found in the sequence editor properties panel, or by pressing the 'shift-f' key over the sequencer.  
 Detected fades will also be shown on the active strip in the timeline, or in the edit strip properties panel.  Fades will be automatically moved if the edges of the strip are changed.
 If context menus are enabled, fades can be set by right clicking on the edges of a strip.  
-
-The 'QuickFades' panel provides buttons for setting and removing fades.
 
 * __Fade Length__
 
@@ -273,6 +275,20 @@ The 'QuickFades' panel provides buttons for setting and removing fades.
 
    Adjust the length of the active sequence and the next sequence to create a transition of the target fade length.  
    This will also attempt to avoid extending the sequences past their end points if possible.
+
+####Fades Modal Operator
+The Modal Fades Operator can be activated by pressing the 'f' key over the sequencer.  
+This will apply fades to all selected strips. If only the strip is selected, it will default to applying fades to both edges, if a strip edge is selected, it will default to applying a fade only to that edge.  
+To effectively use this operator, you must be able to see the beginning or and of the selected strips.  
+
+While the operator is running:
+* Move the mouse up to increase the fades on all edges.
+* Move the mouse down to decrease fades on all edges.
+* Move the mouse left or right to slide fades left or right.
+* Press 'F' or Middle-Mouse to switch fade mode (both edges, only one edge).
+* Type in an integer value to set all fades to that value.  
+
+When you are satisfied with the fade positions, left-click or press enter to confirm, or right-click or press escape to cancel.  
 
 
 
