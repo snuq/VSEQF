@@ -32,30 +32,7 @@ Future Possibilities:
    Showing a visual offset on the active audio sequence, showing how far out of sync it is from it's video parent
 
 Changelog:
-0.93
-   Added seconds offset and seconds position display to edit panel
-   Added 'compact' edit strip panel, displays more information in a smaller space than the original.
-   Added categories to panels
-   Implemented new function wrappers, many features should now be more reliable, and new small features are added
-      New 'Grab' operator - parenting and ripple features are reliable now, press 'Alt' to toggle ripple mode
-      New 'Select' operator - can now right-click-drag multiple files
-      New 'Cut' operator - parenting and ripple is now properly handled
-      New 'Delete' operator - can ripple delete, and can remove children, New ripple delete shortcut - Alt-Delete and Alt-X
-      New 'Meta Make' operator - automatically adds child strips to new metastrip
-      New strip importer operator - has some new features and will auto-parent and auto-generate proxies
-   Replaced the sequencer Strip and Add menus so they can use the custom operators, also new option to simplify strip menu by removing some items
-   New ripple cut shortcuts - Alt-K will ripple trim the strip based on which side the mouse is on
-   Minimized continuous function handler, only needs to detect new strips and renames now
-   Implemented graphic display of fades and parent/child relationships of the active strip
-   Cursor following is back, works properly at all zoom levels now!
-   Implemented Quick3Point - a basic 3point editing workflow, import from the file browser to the clip editor, then to the sequencer.
-   Auto-Set Timeline Operator - move strips up to frame 1, set timeline start to frame 1, set timeline end to last frame of last strip
-   The new cut operator now fixes effect sequence chains - it will duplicate single input effects (such as speed control) to the newly cut sequence, and it will fix crossfades that should be applied to the right cut sequence.  See https://developer.blender.org/T50877 for more info on the bug.
-   Now can save and recall zoom levels in the vse.  No way to do vertical (channel) zooms yet tho...
-   Right-click context menu option added, hold right click to activate it.  Options will differ depending on what is clicked on - cursor, sequence, sequence handles, markers, empty area
-
 0.94
-   Updated for Blender 2.8 - lots of code changes, lots of bug fixes, updated menus, updated panels
    Frame skipping now works with reverse playback as well, and fixed poor behavior
    Added QuickShortcuts - timeline and sequence movement using the numpad.  Thanks to tintwotin for the ideas!
    Added option to snap cursor to a dragged edge if one edge is grabbed, if two are grabbed, the second edge will be set to the overlay frame.
@@ -71,6 +48,9 @@ Changelog:
    Fixed canceled grabs causing waveforms to redraw
    Improved QuickTags interface
    Reworked ripple delete, it should now behave properly with overlapping sequences
+
+0.95
+   Updated for Blender 2.8 - lots of code changes, lots of bug fixes, updated menus, updated panels
    Disabled ripple and edge snap while in slip mode
    Various optimizations to ripple and grabbing
    Added support for left and right click mouse moves
@@ -97,7 +77,7 @@ bl_info = {
     "name": "VSE Quick Functions",
     "description": "Improves functionality of the sequencer by adding new menus and functions for snapping, adding fades, zooming, sequence parenting, ripple editing, playback speed, and more.",
     "author": "Hudson Barkley (Snu/snuq/Aritodo)",
-    "version": (0, 9, 4),
+    "version": (0, 9, 5),
     "blender": (2, 80, 0),
     "location": "Sequencer Panels; Sequencer Menus; Sequencer S, F, Shift-F, Z, Ctrl-P, Shift-P, Alt-M, Alt-K Shortcuts",
     "wiki_url": "https://github.com/snuq/VSEQF",
