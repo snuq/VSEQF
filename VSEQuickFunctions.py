@@ -2143,9 +2143,10 @@ class VSEQFGrabAdd(bpy.types.Operator):
                     if sequence.frame_final_end != seq[2]:
                         #fix fade out
                         fade_curve = get_fade_curve(context, sequence, create=False)
-                        fade_out = fades(fade_curve, sequence, 'detect', 'out', fade_low_point_frame=seq[2])
-                        if fade_out > 0:
-                            fades(fade_curve, sequence, 'set', 'out', fade_length=fade_out)
+                        if fade_curve:
+                            fade_out = fades(fade_curve, sequence, 'detect', 'out', fade_low_point_frame=seq[2])
+                            if fade_out > 0:
+                                fades(fade_curve, sequence, 'set', 'out', fade_length=fade_out)
             if not context.screen.is_animation_playing:
                 if self.snap_edge:
                     context.scene.frame_current = self.start_frame
@@ -2301,10 +2302,10 @@ class VSEQFGrabAdd(bpy.types.Operator):
                 self.secondary_snap_edge = selected_edges[1][1]
                 self.secondary_snap_edge_sequence = selected_edges[1][0]
             elif selected_edges[1][0] == active and selected_edges[0][0] != active:
-                    self.snap_edge = selected_edges[1][1]
-                    self.snap_edge_sequence = selected_edges[1][0]
-                    self.secondary_snap_edge = selected_edges[0][1]
-                    self.secondary_snap_edge_sequence = selected_edges[0][0]
+                self.snap_edge = selected_edges[1][1]
+                self.snap_edge_sequence = selected_edges[1][0]
+                self.secondary_snap_edge = selected_edges[0][1]
+                self.secondary_snap_edge_sequence = selected_edges[0][0]
             else:
                 #neither sequence is active, or both are the same sequence, make rightmost primary, leftmost secondary
                 if selected_edges[0][1] == 'left':
