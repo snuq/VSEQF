@@ -3077,7 +3077,14 @@ def get_fade_curve(context, sequence, create=False):
             animation_data = context.scene.animation_data
         else:
             return None
-    all_curves = animation_data.action.fcurves
+    action = animation_data.action
+    if not action:
+        if create:
+            action = bpy.data.actions.new(sequence.name+'Action')
+            animation_data.action = action
+        else:
+            return None
+    all_curves = action.fcurves
     fade_curve = None  #curve for the fades
     for curve in all_curves:
         if curve.data_path == 'sequence_editor.sequences_all["'+sequence.name+'"].'+fade_variable:
