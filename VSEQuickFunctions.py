@@ -6336,33 +6336,15 @@ class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
 
 class VSEQFTempSettings(object):
     """Substitute for the addon preferences when this script isn't loaded as an addon"""
-    parenting = bpy.props.BoolProperty(
-        name="Enable Quick Parenting",
-        default=True)
-    fades = bpy.props.BoolProperty(
-        name="Enable Quick Fades",
-        default=True)
-    list = bpy.props.BoolProperty(
-        name="Enable Quick List",
-        default=True)
-    proxy = bpy.props.BoolProperty(
-        name="Enable Quick Proxy",
-        default=True)
-    markers = bpy.props.BoolProperty(
-        name="Enable Quick Markers",
-        default=True)
-    tags = bpy.props.BoolProperty(
-        name="Enable Quick Tags",
-        default=True)
-    cuts = bpy.props.BoolProperty(
-        name="Enable Quick Cuts",
-        default=True)
-    edit = bpy.props.BoolProperty(
-        name="Enable Compact Edit Panel",
-        default=True)
-    threepoint = bpy.props.BoolProperty(
-        name="Enable Quick Three Point",
-        default=True)
+    parenting = True
+    fades = True
+    list = True
+    proxy = True
+    markers = True
+    tags = True
+    cuts = True
+    edit = True
+    threepoint = True
 
 
 #Replaced Blender Menus
