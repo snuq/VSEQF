@@ -150,9 +150,9 @@ Enables quick navigation of the timeline using the number pad.
 
 
 ## QuickContext
-Right-click in the sequencer to pop up a context menu allowing for different operations depending on what is clicked on.
-
-In right-click to select mode, 'Enable Context Menu' must be checked in the Quick Functions Settings menu.
+Context menus in the sequencer are more contextual based on what the mouse is over.  
+Pressing the 'W' or '`' key on the sequencer will open the menu.  
+When Blender is in Left-click mode, the Right-click will open this menu.  
 
 None of the menu options are unique, some are built-in in blender, some are provided by other parts of this script.
 
@@ -751,4 +751,29 @@ These are things I want to add, but I don't yet know how to do so.
    * Now can save and recall zoom levels in the vse.  No way to do vertical (channel) zooms yet tho...
    * Right-click context menu option added, hold right click to activate it.  Options will differ depending on what is clicked on - cursor, sequence, sequence handles, markers, empty area
 
+### 0.94
+   * Frame skipping now works with reverse playback as well, and fixed poor behavior
+   * Added QuickShortcuts - timeline and sequence movement using the numpad.  Thanks to tintwotin for the ideas!
+   * Added option to snap cursor to a dragged edge if one edge is grabbed, if two are grabbed, the second edge will be set to the overlay frame.
+   * Many improvements to Quick3Point interface
+   * Fixed a bug that would cause slipped sequences to jump around
+   * Split Quick Batch Render off into its own addon
+   * Fixed bug where adjusting the left edge of single images would cause odd behavior
+   * Significant improvements to cursor following
+   * Improvements to ripple behavior, fixed bugs relating to it as well
+   * Improved marker grabbing behavior
+   * Improvements to Quick3Point
+   * Added display of current strip length under center of strip
+   * Fixed canceled grabs causing waveforms to redraw
+   * Improved QuickTags interface
+   * Reworked ripple delete, it should now behave properly with overlapping sequences
+
+### 0.95
+   * Updated for Blender 2.8 - lots of code changes, lots of bug fixes, updated menus, updated panels
+   * Disabled ripple and edge snap while in slip mode
+   * Various optimizations to ripple and grabbing
+   * Added support for left and right click mouse moves
+   * Updated frame skipping to work with new limitations in Blender
+   * Added a modal fade operator for easily setting/changing fades, moved fades menu to shift-f
+   * Strip information is now drawn for all selected strips, not just active
 
