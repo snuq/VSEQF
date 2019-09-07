@@ -18,65 +18,67 @@
 
 """
 Known Issues:
-   Ending cursor following causes inputs to not work until left mouse is clicked... sometimes??
-   Quick 3point causes recursion errors sometimes when adjusting in/out
-   Uncut does not work on movieclip type sequences... there appears to be no way of getting the sequence's source file.
-   Right now the script cannot apply a vertical zoom level, as far as I can tell this is missing functionality in Blenders python api.
+    Ending cursor following causes inputs to not work until left mouse is clicked... sometimes??
+    Quick 3point causes recursion errors sometimes when adjusting in/out
+    Uncut does not work on movieclip type sequences... there appears to be no way of getting the sequence's source file.
+    Right now the script cannot apply a vertical zoom level, as far as I can tell this is missing functionality in Blender's python api.
 
 Future Possibilities:
-   Remove multiple drag feature (Apparently it will be implemented in blender at some point?)
-   Add special tags with time index and length, displayed in overlay as clip markers - need to implement display, and interface in panel
-   Ripple insert in real-time while grabbing... need to think about how to do this, but I want it!
-   Ability to ripple cut beyond the edge of the selected strips to ADD to the clip
-   Copy/paste wrapper that copies strip animation data
-   Showing a visual offset on the active audio sequence, showing how far out of sync it is from it's video parent
+    Add grab mode options for marker moving (press m while grabbing to change, show real-time updates of position)
+    Remove multiple drag feature (Apparently it will be implemented in blender at some point?)
+    Add special tags with time index and length, displayed in overlay as clip markers - need to implement display, and interface in panel
+    Ripple insert in real-time while grabbing... need to think about how to do this, but I want it!
+    Ability to ripple cut beyond the edge of the selected strips to ADD to the clip
+    Copy/paste wrapper that copies strip animation data
+    Showing a visual offset on the active audio sequence, showing how far out of sync it is from it's video parent
+
+Todo:
+    Once the tools panel is implemented in sequencer, rework all panels and menus to make better use of it.
 
 Changelog:
 0.94
-   Frame skipping now works with reverse playback as well, and fixed poor behavior
-   Added QuickShortcuts - timeline and sequence movement using the numpad.  Thanks to tintwotin for the ideas!
-   Added option to snap cursor to a dragged edge if one edge is grabbed, if two are grabbed, the second edge will be set to the overlay frame.
-   Many improvements to Quick3Point interface
-   Fixed a bug that would cause slipped sequences to jump around
-   Split Quick Batch Render off into its own addon
-   Fixed bug where adjusting the left edge of single images would cause odd behavior
-   Significant improvements to cursor following
-   Improvements to ripple behavior, fixed bugs relating to it as well
-   Improved marker grabbing behavior
-   Improvements to Quick3Point
-   Added display of current strip length under center of strip
-   Fixed canceled grabs causing waveforms to redraw
-   Improved QuickTags interface
-   Reworked ripple delete, it should now behave properly with overlapping sequences
+    Frame skipping now works with reverse playback as well, and fixed poor behavior
+    Added QuickShortcuts - timeline and sequence movement using the numpad.  Thanks to tintwotin for the ideas!
+    Added option to snap cursor to a dragged edge if one edge is grabbed, if two are grabbed, the second edge will be set to the overlay frame.
+    Many improvements to Quick3Point interface
+    Fixed a bug that would cause slipped sequences to jump around
+    Split Quick Batch Render off into its own addon
+    Fixed bug where adjusting the left edge of single images would cause odd behavior
+    Significant improvements to cursor following
+    Improvements to ripple behavior, fixed bugs relating to it as well
+    Improved marker grabbing behavior
+    Improvements to Quick3Point
+    Added display of current strip length under center of strip
+    Fixed canceled grabs causing waveforms to redraw
+    Improved QuickTags interface
+    Reworked ripple delete, it should now behave properly with overlapping sequences
 
 0.95
-   Updated for Blender 2.8 - lots of code changes, lots of bug fixes, updated menus, updated panels
-   Disabled ripple and edge snap while in slip mode
-   Various optimizations to ripple and grabbing
-   Added support for left and right click mouse moves
-   Updated frame skipping to work with new limitations in Blender
-   Added a modal fade operator for easily setting/changing fades, moved fades menu to shift-f
-   Strip information is now drawn for all selected strips, not just active
+    Updated for Blender 2.8 - lots of code changes, lots of bug fixes, updated menus, updated panels
+    Disabled ripple and edge snap while in slip mode
+    Various optimizations to ripple and grabbing
+    Added support for left and right click mouse moves
+    Updated frame skipping to work with new limitations in Blender
+    Added a modal fade operator for easily setting/changing fades, moved fades menu to shift-f
+    Strip information is now drawn for all selected strips, not just active
 
 0.96 (in progress)
-   Fixed bug where box select wouldn't work.
-   Removed right-click hold menus - too buggy and blocked box select.  New context menu shortcut: '`'
-   Improved frame skipping
+    Fixed bug where box select wouldn't work.
+    Removed right-click hold menus - too buggy and blocked box select.  New context menu shortcut: '`'
+    Improved frame skipping
+    Fixed bug where cut strips with deleted parents could have their old parent 'replaced' by a new cut
+    Fixed bug in fade operator where waveforms for strips with no animation data would vanish
+    Removed QuickList
+    Fixed a bug where clearing fades could cause an error - thanks jaggz
+    Improved fades - should be better about maintaining the original curve, and not leave extra points when fades are cleared
 
 """
-
-"""
-Todo:
-    think about how to better convey selected/active in quicklist
-"""
-
 
 import bpy
 import bgl
 import gpu
 import blf
 import math
-import time
 import os
 from bpy.app.handlers import persistent
 from bpy_extras.io_utils import ImportHelper
@@ -2962,6 +2964,7 @@ class VSEQFQuickZooms(bpy.types.Operator):
     area: bpy.props.StringProperty()
 
     def execute(self, context):
+        #return bpy.ops.view2d.smoothview("INVOKE_DEFAULT", xmin=0, xmax=10, ymin=0, ymax=10, wait_for_input=False)
         if self.area.isdigit():
             #Zoom value is a number of seconds
             scene = context.scene
@@ -3063,23 +3066,6 @@ def vseqf_crossfade(first_sequence, second_sequence):
     bpy.context.scene.sequence_editor.sequences.new_effect(name=transition_type, type=transition_type, channel=channel,  frame_start=frame_start, frame_end=frame_end, seq1=first_sequence, seq2=second_sequence)
 
 
-def check_animation_data(context, create=False):
-    if context.scene.animation_data is None:
-        #No animation data in scene, create it
-        if create:
-            context.scene.animation_data_create()
-        else:
-            return False
-    if context.scene.animation_data.action is None:
-        #No action in scene, create it
-        if create:
-            action = bpy.data.actions.new(context.scene.name+"Action")
-            context.scene.animation_data.action = action
-        else:
-            return False
-    return True
-
-
 def get_fade_curve(context, sequence, create=False):
     #Returns the fade curve for a given sequence.  If create is True, a curve will always be returned, if False, None will be returned if no curve is found.
     if sequence.type == 'SOUND':
@@ -3102,6 +3088,7 @@ def get_fade_curve(context, sequence, create=False):
             animation_data.action = action
         else:
             return None
+
     all_curves = action.fcurves
     fade_curve = None  #curve for the fades
     for curve in all_curves:
@@ -3114,6 +3101,12 @@ def get_fade_curve(context, sequence, create=False):
     if fade_curve is None and create:
         fade_curve = all_curves.new(data_path=sequence.path_from_id(fade_variable))
 
+        #add a single keyframe to prevent blender from making the waveform invisible (bug)
+        volume = sequence.volume
+        fade_curve.keyframe_points.add(1)
+        point = fade_curve.keyframe_points[0]
+        point.co = (sequence.frame_final_start, volume)
+
     return fade_curve
 
 
@@ -3125,7 +3118,6 @@ def fades(fade_curve, sequence, mode, direction, fade_length=0, fade_low_point_f
         mode: String, determines the operation that will be done
             detect: determines the fade length set to the sequence
             set: sets a desired fade length to the sequence
-            clear: removes all fades from the sequence
         direction: String, determines if the function works with fadein or fadeout
             in: fadein is operated on
             out: fadeout is operated on
@@ -3154,7 +3146,7 @@ def fades(fade_curve, sequence, mode, direction, fade_length=0, fade_low_point_f
         #no keyframes found, create them if instructed to do so
         if mode == 'set':
             fade_max_value = getattr(sequence, fade_variable)
-            set_fade(fade_keyframes, direction, fade_low_point_frame, fade_high_point_frame, fade_max_value)
+            set_fade(fade_curve, direction, fade_low_point_frame, fade_high_point_frame, fade_max_value)
         else:
             return 0
 
@@ -3166,9 +3158,8 @@ def fades(fade_curve, sequence, mode, direction, fade_length=0, fade_low_point_f
             if fade_max_value == 0:
                 fade_max_value = 1
 
-            #remove lone keyframe, then add new fade
-            fade_keyframes.remove(fade_keyframes[0])
-            set_fade(fade_keyframes, direction, fade_low_point_frame, fade_high_point_frame, fade_max_value)
+            #add new fade
+            set_fade(fade_curve, direction, fade_low_point_frame, fade_high_point_frame, fade_max_value)
         else:
             return 0
 
@@ -3190,7 +3181,7 @@ def fades(fade_curve, sequence, mode, direction, fade_length=0, fade_low_point_f
                     #both fade points are valid
                     if mode == 'set':
                         fade_max_value = fade_high_point.co[1]
-                        set_fade(fade_keyframes, direction, fade_low_point_frame, fade_high_point_frame, fade_max_value, fade_low_point=fade_low_point, fade_high_point=fade_high_point)
+                        set_fade(fade_curve, direction, fade_low_point_frame, fade_high_point_frame, fade_max_value, fade_low_point=fade_low_point, fade_high_point=fade_high_point)
                         return fade_length
                     else:
                         #fade detected!
@@ -3199,7 +3190,7 @@ def fades(fade_curve, sequence, mode, direction, fade_length=0, fade_low_point_f
                     #fade high point is not valid, low point is tho
                     if mode == 'set':
                         fade_max_value = fade_curve.evaluate(fade_high_point_frame)
-                        set_fade(fade_keyframes, direction, fade_low_point_frame, fade_high_point_frame, fade_max_value, fade_low_point=fade_low_point)
+                        set_fade(fade_curve, direction, fade_low_point_frame, fade_high_point_frame, fade_max_value, fade_low_point=fade_low_point)
                         return fade_length
                     else:
                         return 0
@@ -3210,12 +3201,12 @@ def fades(fade_curve, sequence, mode, direction, fade_length=0, fade_low_point_f
                     if fade_high_point.co[1] > fade_low_point.co[1]:
                         #fade exists, but is not set up properly
                         fade_max_value = fade_high_point.co[1]
-                        set_fade(fade_keyframes, direction, fade_low_point_frame, fade_high_point_frame, fade_max_value, fade_low_point=fade_low_point, fade_high_point=fade_high_point)
+                        set_fade(fade_curve, direction, fade_low_point_frame, fade_high_point_frame, fade_max_value, fade_low_point=fade_low_point, fade_high_point=fade_high_point)
                         return fade_length
                     else:
                         #no valid fade high point
                         fade_max_value = fade_curve.evaluate(fade_high_point_frame)
-                        set_fade(fade_keyframes, direction, fade_low_point_frame, fade_high_point_frame, fade_max_value, fade_low_point=fade_low_point)
+                        set_fade(fade_curve, direction, fade_low_point_frame, fade_high_point_frame, fade_max_value, fade_low_point=fade_low_point)
                         return fade_length
                 else:
                     return 0
@@ -3224,16 +3215,16 @@ def fades(fade_curve, sequence, mode, direction, fade_length=0, fade_low_point_f
             #no valid fade detected, other keyframes are on the curve tho
             if mode == 'set':
                 fade_max_value = fade_curve.evaluate(fade_high_point_frame)
-                set_fade(fade_keyframes, direction, fade_low_point_frame, fade_high_point_frame, fade_max_value)
+                set_fade(fade_curve, direction, fade_low_point_frame, fade_high_point_frame, fade_max_value)
                 return fade_length
             else:
                 return 0
 
 
-def set_fade(fade_keyframes, direction, fade_low_point_frame, fade_high_point_frame, fade_max_value, fade_low_point=None, fade_high_point=None):
+def set_fade(fade_curve, direction, fade_low_point_frame, fade_high_point_frame, fade_max_value, fade_low_point=None, fade_high_point=None):
     """Create or change a fadein or fadeout on  a set of keyframes
     Arguments:
-        fade_keyframes: keyframe curve to operate on
+        fade_curve: the curve that the keyframes belong to
         direction: String, determines if a fadein or fadeout will be set
             'in': Set a fadein
             'out': Set a fadeout
@@ -3242,6 +3233,8 @@ def set_fade(fade_keyframes, direction, fade_low_point_frame, fade_high_point_fr
         fade_max_value: Float, the y value for the high point of the fade
         fade_low_point: Optional, a keyframe point for the low point of the fade curve that should be moved, instead of creating a new one
         fade_high_point: Optional, a keyframe point for the high point of the fade curve that should be moved, instead of creating a new one"""
+
+    fade_keyframes = fade_curve.keyframe_points
 
     #check if any keyframe points other than the fade high and low points are in the fade area, delete them if needed
     for keyframe in fade_keyframes:
@@ -3261,6 +3254,21 @@ def set_fade(fade_keyframes, direction, fade_low_point_frame, fade_high_point_fr
                         pass
     fade_length = abs(fade_high_point_frame - fade_low_point_frame)
     handle_offset = fade_length * .38
+    if fade_length == 0:
+        #remove fade
+        if direction == 'in' and fade_high_point:
+            fade_keyframes.remove(fade_high_point)
+        fade_keyframes.remove(fade_low_point)
+        if direction == 'out' and fade_high_point:
+            fade_keyframes.remove(fade_high_point)
+        if len(fade_keyframes) == 0:
+            #curve is empty, remove it
+            try:
+                bpy.context.scene.animation_data.action.fcurves.remove(fade_curve)
+            except:
+                pass
+        return
+
     if fade_high_point:
         #move fade high point to where it should be
         fade_high_point.co = (fade_high_point_frame, fade_max_value)
@@ -3270,18 +3278,13 @@ def set_fade(fade_keyframes, direction, fade_low_point_frame, fade_high_point_fr
         #create new fade high point
         fade_keyframes.insert(frame=fade_high_point_frame, value=fade_max_value)
     if fade_low_point:
-        if fade_length != 0:
-            #move fade low point to where it should be
-            fade_low_point.co = (fade_low_point_frame, 0)
-            fade_low_point.handle_left = (fade_low_point_frame - handle_offset, 0)
-            fade_low_point.handle_right = (fade_low_point_frame + handle_offset, 0)
-        else:
-            #remove fade low point
-            fade_keyframes.remove(fade_low_point)
+        #move fade low point to where it should be
+        fade_low_point.co = (fade_low_point_frame, 0)
+        fade_low_point.handle_left = (fade_low_point_frame - handle_offset, 0)
+        fade_low_point.handle_right = (fade_low_point_frame + handle_offset, 0)
     else:
-        if fade_high_point_frame != fade_low_point_frame:
-            #create new fade low point
-            fade_keyframes.insert(frame=fade_low_point_frame, value=0)
+        #create new fade low point
+        fade_keyframes.insert(frame=fade_low_point_frame, value=0)
 
 
 def fade_operator_draw(self, context):
@@ -3490,7 +3493,7 @@ class VSEQFModalFades(bpy.types.Operator):
             self.remove_draw_handler()
             area.header_text_set(None)
             context.workspace.status_text_set(None)
-            #bpy.ops.ed.undo()
+            bpy.ops.ed.undo()
             self.mode = 'DEFAULT'
             return {'CANCELLED'}
 
@@ -3503,13 +3506,11 @@ class VSEQFModalFades(bpy.types.Operator):
             return {'CANCELLED'}
 
         bpy.ops.ed.undo_push()
+        bpy.ops.ed.undo_push()
 
         self.mouse_move_x = 0
         self.mouse_move_y = 0
         self.value = ''
-
-        #Ensure that animation data exists in the scene
-        check_animation_data(context, create=True)
 
         #Store strip data for quick access, and to prevent it from being overwritten
         self.strip_data = []
@@ -3733,27 +3734,23 @@ class VSEQFQuickFadesClear(bpy.types.Operator):
     def execute(self, context):
         bpy.ops.ed.undo_push()
         if self.active_only:
-            active_sequence = current_active(context)
-            fade_curve = get_fade_curve(context, active_sequence, create=False)
+            sequences = [current_active(context)]
+        else:
+            sequences = current_selected(context)
+
+        for sequence in sequences:
+            fade_curve = get_fade_curve(context, sequence, create=False)
+            #iterate through selected sequences and remove fades
             if fade_curve:
                 if self.direction != 'both':
-                    fades(fade_curve, active_sequence, 'set', self.direction, fade_length=0)
+                    fades(fade_curve, sequence, 'set', self.direction, fade_length=0)
                 else:
-                    fades(fade_curve, active_sequence, 'clear', self.direction, fade_length=context.scene.vseqf.fade)
-        else:
-            selected_sequences = current_selected(context)
-            for sequence in selected_sequences:
-                fade_curve = get_fade_curve(context, sequence, create=False)
-                #iterate through selected sequences, remove fades, and set opacity to full
-                if fade_curve:
-                    if self.direction != 'both':
-                        fades(fade_curve, sequence, 'set', self.direction, fade_length=0)
-                    else:
-                        fades(fade_curve, sequence, 'clear', self.direction, fade_length=context.scene.vseqf.fade)
-                    if sequence.type == 'SOUND':
-                        sequence.volume = 1
-                    else:
-                        sequence.blend_alpha = 1
+                    fades(fade_curve, sequence, 'set', 'in', fade_length=0)
+                    fades(fade_curve, sequence, 'set', 'out', fade_length=0)
+                #if sequence.type == 'SOUND':
+                #    sequence.volume = 1
+                #else:
+                #    sequence.blend_alpha = 1
 
         redraw_sequencers()
         self.direction = 'both'
@@ -3906,10 +3903,12 @@ def find_parent(child_sequence):
     """Gets the parent sequence of a child sequence
     Argument:
         child_sequence: VSE Sequence object to search for the parent of
-    
+
     Returns: VSE Sequence object if match found, Boolean False if no match found"""
+
+    if not child_sequence.parent:
+        return False
     sequences = current_sequences(bpy.context)
-    #sequences = bpy.context.scene.sequence_editor.sequences_all
     for sequence in sequences:
         if sequence.name == child_sequence.parent:
             return sequence
@@ -4534,351 +4533,6 @@ class VSEQFQuickSnaps(bpy.types.Operator):
         return{'FINISHED'}
 
 
-#Functions and classes related to QuickList
-def quicklist_sorted_strips(sequences=None, sortmode=None):
-    """Gets a list of current VSE Sequences sorted by the vseqf 'quicklist_sort' mode
-    Arguments:
-        sequences: Optional, list of sequences to sort
-        sortmode: Optional, overrides the sort method, can be set to any of the sort methods in the vseqf setting 'quicklist_sort'
-
-    Returns: List of VSE Sequence objects"""
-
-    if not sequences:
-        sequences = current_sequences(bpy.context)
-    if not sortmode:
-        sortmode = bpy.context.scene.vseqf.quicklist_sort
-    reverse = bpy.context.scene.vseqf.quicklist_sort_reverse
-
-    #sort the sequences
-    if sortmode == 'TITLE':
-        sequences.sort(key=lambda seq: seq.name)
-        if sequences and reverse:
-            sequences.reverse()
-    elif sortmode == 'LENGTH':
-        sequences.sort(key=lambda seq: seq.frame_final_duration)
-        if sequences and not reverse:
-            sequences.reverse()
-    else:
-        sequences.sort(key=lambda seq: seq.frame_final_start)
-        if sequences and reverse:
-            sequences.reverse()
-
-    #Check for effect sequences and move them next to their parent sequence
-    for sequence in sequences:
-        if hasattr(sequence, 'input_1'):
-            resort = sequences.pop(sequences.index(sequence))
-            parentindex = sequences.index(sequence.input_1)
-            sequences.insert(parentindex + 1, resort)
-
-    return sequences
-
-
-def swap_sequence(first, second):
-    """Swaps two sequences in the VSE, attempts to maintain channels.
-    Arguments:
-        first: First sequence, must be the one to the left
-        second: Second sequence, must be the one to the right"""
-
-    end_frame = find_sequences_end(current_sequences(bpy.context))
-    first_forward_offset = end_frame - first.frame_final_start
-    first_offset = second.frame_final_duration
-    new_first_final_start = first.frame_final_start + first_offset
-    new_first_final_end = first.frame_final_end + first_offset
-    new_first_start_forward = first.frame_start + first_forward_offset
-    new_first_start = first.frame_start + first_offset
-    first_channel_offset = second.channel - first.channel
-    new_first_channel = first.channel + first_channel_offset
-    while sequencer_area_filled(new_first_final_start, new_first_final_end, new_first_channel, new_first_channel, [second, first]):
-        new_first_channel = new_first_channel + 1
-
-    second_offset = first.frame_final_start - second.frame_final_start
-    new_second_final_start = second.frame_final_start + second_offset
-    new_second_final_end = second.frame_final_end + second_offset
-    new_second_start = second.frame_start + second_offset
-    second_channel_offset = first.channel - second.channel
-    new_second_channel = second.channel + second_channel_offset
-    while sequencer_area_filled(new_second_final_start, new_second_final_end, new_second_channel, new_second_channel, [first, second]):
-        new_second_channel = new_second_channel + 1
-
-    first.frame_start = new_first_start_forward
-    first.channel = new_first_channel
-    second.frame_start = new_second_start
-    second.channel = new_second_channel
-    first.frame_start = new_first_start
-    to_check = []
-    if vseqf_parenting():
-        first_children = get_recursive(first, [])
-        second_children = get_recursive(second, [])
-        for child in first_children:
-            if child != first:
-                new_start = child.frame_final_start + first_offset
-                new_pos = child.frame_start + first_offset
-                new_end = child.frame_final_end + first_offset
-                new_channel = child.channel + first_channel_offset
-                to_check.append([child, new_channel])
-                while sequencer_area_filled(new_start, new_end, new_channel, new_channel, [child]):
-                    new_channel = new_channel + 1
-                child.frame_start = new_pos
-                child.channel = new_channel
-                child.frame_start = new_pos
-        for child in second_children:
-            if child != second:
-                new_start = child.frame_final_start + second_offset
-                new_pos = child.frame_start + second_offset
-                new_end = child.frame_final_end + second_offset
-                new_channel = child.channel + second_channel_offset
-                to_check.append([child, new_channel])
-                while sequencer_area_filled(new_start, new_end, new_channel, new_channel, [child]):
-                    new_channel = new_channel + 1
-                child.frame_start = new_pos
-                child.channel = new_channel
-                child.frame_start = new_pos
-        for check in to_check:
-            child, channel = check
-            if not sequencer_area_filled(child.frame_final_start, child.frame_final_end, channel, channel, []):
-                child.channel = channel
-
-
-class VSEQF_PT_QuickListPanel(bpy.types.Panel):
-    """Panel for displaying QuickList"""
-    bl_label = "Quick List"
-    bl_space_type = 'SEQUENCE_EDITOR'
-    bl_region_type = 'UI'
-    bl_category = "Quick List"
-
-    @classmethod
-    def poll(cls, context):
-        del context
-        prefs = get_prefs()
-
-        if not bpy.context.sequences:
-            return False
-        if len(bpy.context.sequences) > 0:
-            return prefs.list
-        else:
-            return False
-
-    def draw(self, context):
-        prefs = get_prefs()
-        scene = bpy.context.scene
-        sequences = current_sequences(context)
-        active = current_active(context)
-        vseqf = scene.vseqf
-
-        #Sort the sequences
-        sorted_sequences = quicklist_sorted_strips()
-
-        layout = self.layout
-
-        #Display Mode
-        row = layout.row(align=True)
-        row.label(text='Display:')
-        row.prop(vseqf, 'quicklist_editing', toggle=True)
-        if prefs.parenting:
-            row.prop(vseqf, 'quicklist_parenting', toggle=True)
-        if prefs.tags:
-            row.prop(vseqf, 'quicklist_tags', toggle=True)
-
-        #Select all and sort buttons
-        row = layout.row()
-        row.operator('vseqf.quicklist_select', text='Select/Deselect All Sequences').sequence = ''
-        row = layout.row(align=True)
-        row.label(text='Sort By:')
-        row.prop(vseqf, 'quicklist_sort', expand=True)
-        if vseqf.quicklist_sort_reverse:
-            reverse_icon = 'TRIA_UP'
-        else:
-            reverse_icon = 'TRIA_DOWN'
-        row.prop(vseqf, 'quicklist_sort_reverse', text='', icon=reverse_icon, toggle=True)
-        box = None
-
-        #Display all sequences
-        for index, sequence in enumerate(sorted_sequences):
-            if vseqf.quicklist_sort == 'POSITION':
-                column = layout.split(factor=0.93, align=True)
-            else:
-                column = layout
-            if hasattr(sequence, 'input_1') and box is not None:
-                #Effect sequence, add an indent
-                row = box.row()
-                row.separator()
-                row.separator()
-                outline = row.box()
-            else:
-                outline = column.box()
-            box = outline.column()
-
-            #First row - mute, lock, type and title
-            if sequence == active:
-                subbox = box.box()
-                row = subbox.row(align=True)
-            else:
-                row = box.row(align=True)
-            split = row.split(align=True)
-            split.prop(sequence, 'mute', text='')
-            split.prop(sequence, 'lock', text='')
-            split = row.split(align=True, factor=0.2)
-            col = split.column(align=True)
-            col.operator('vseqf.quicklist_select', text="("+sequence.type+")").sequence = sequence.name
-            col.active = sequence.select
-            col = split.column(align=True)
-            col.prop(sequence, 'name', text='')
-
-            #Second row - length and position in time index
-            row = box.row()
-            split = row.split(factor=0.8)
-            col = split.row()
-            fps = get_fps(scene)
-            col.label(text="Len: "+timecode_from_frames(sequence.frame_final_duration, fps, levels=4))
-            col.label(text="Pos: "+timecode_from_frames(sequence.frame_start, fps, levels=4))
-
-            #Third row - length, position and proxy toggle
-            if vseqf.quicklist_editing:
-                subbox = box.box()
-                row = subbox.row()
-                split = row.split(factor=0.8)
-                col = split.row(align=True)
-                col.prop(sequence, 'frame_final_duration', text="Len")
-                col.prop(sequence, 'frame_start', text="Pos")
-                col = split.row()
-                if (sequence.type != 'SOUND') and (sequence.type != 'MOVIECLIP') and (not hasattr(sequence, 'input_1')):
-                    col.prop(sequence, 'use_proxy', text='Proxy', toggle=True)
-                    if sequence.use_proxy:
-                        #Proxy is enabled, add row for proxy settings
-                        row = subbox.row()
-                        split = row.split(factor=0.33)
-                        col = split.row(align=True)
-                        col.prop(sequence.proxy, 'quality')
-                        col = split.row(align=True)
-                        col.prop(sequence.proxy, 'build_25', toggle=True)
-                        col.prop(sequence.proxy, 'build_50', toggle=True)
-                        col.prop(sequence.proxy, 'build_75', toggle=True)
-                        col.prop(sequence.proxy, 'build_100', toggle=True)
-
-            #list tags if there are any
-            if prefs.tags and len(sequence.tags) > 0 and vseqf.quicklist_tags:
-                line = 1
-                linemax = 4
-                subbox = box.box()
-                row = subbox.row()
-                row.label(text='Tags:')
-                for tag in sequence.tags:
-                    if line > linemax:
-                        row = subbox.row()
-                        row.label(text='')
-                        line = 1
-                    split = row.split(factor=.8, align=True)
-                    split.operator('vseqf.quicktags_select', text=tag.text).text = tag.text
-                    split.operator('vseqf.quicktags_remove_from', text='', icon='X').tag = tag.text+'\n'+sequence.name
-                    line = line + 1
-
-            #List children sequences if found
-            children = find_children(sequence, sequences=sequences)
-            if len(children) > 0 and vseqf.quicklist_parenting and prefs.parenting:
-                subbox = box.box()
-                row = subbox.row()
-                split = row.split(factor=0.25)
-                col = split.column()
-                col.label(text='Children:')
-                col = split.column()
-                for child in children:
-                    subsplit = col.split(factor=0.85)
-                    subsplit.label(text=child.name)
-                    subsplit.operator('vseqf.quickparents_clear_parent', text="", icon='X').strip = child.name
-
-            #List sub-sequences in a meta sequence
-            if sequence.type == 'META':
-                row = box.row()
-                split = row.split(factor=0.25)
-                col = split.column()
-                col.label(text='Sub-sequences:')
-                col = split.column()
-                for i, subsequence in enumerate(sequence.sequences):
-                    if i > 6:
-                        #Stops listing sub-sequences if list is too long
-                        col.label(text='...')
-                        break
-                    col.label(text=subsequence.name)
-            if vseqf.quicklist_sort == 'POSITION' and not hasattr(sequence, 'input_1'):
-                col = column.column(align=True)
-                col.operator('vseqf.quicklist_up', text='', icon='TRIA_UP').sequence = sequence.name
-                col.operator('vseqf.quicklist_down', text='', icon='TRIA_DOWN').sequence = sequence.name
-
-
-class VSEQFQuickListUp(bpy.types.Operator):
-    """Attempts to switch a sequence with the previous sequence
-    If no previous sequence is found, nothing is done
-
-    Argument:
-        sequence: String, the name of the sequence to switch"""
-
-    bl_idname = "vseqf.quicklist_up"
-    bl_label = "VSEQF Quick List Move Sequence Up"
-    bl_description = "Move Sequence Up One"
-
-    sequence: bpy.props.StringProperty()
-
-    def execute(self, context):
-        sequences = current_sequences(context)
-        for sequence in sequences:
-            if sequence.name == self.sequence:
-                switchwith = find_close_sequence(sequences=sequences, selected_sequence=sequence, direction='previous', mode='simple', sounds=True, effects=False, children=not context.scene.vseqf.children)
-                if switchwith:
-                    bpy.ops.ed.undo_push()
-                    swap_sequence(switchwith, sequence)
-                break
-        return {'FINISHED'}
-
-
-class VSEQFQuickListDown(bpy.types.Operator):
-    """Attempts to switch a sequence with the next sequence
-    If no next sequence is found, nothing is done
-
-    Argument:
-        sequence: String, the name of the sequence to switch"""
-
-    bl_idname = "vseqf.quicklist_down"
-    bl_label = "VSEQF Quick List Move Sequence Down"
-    bl_description = "Move Sequence Down One"
-
-    sequence: bpy.props.StringProperty()
-
-    def execute(self, context):
-        sequences = current_sequences(context)
-        for sequence in sequences:
-            if sequence.name == self.sequence:
-                switchwith = find_close_sequence(sequences=sequences, selected_sequence=sequence, direction='next', mode='simple', sounds=True, effects=False, children=not context.scene.vseqf.children)
-                if switchwith:
-                    bpy.ops.ed.undo_push()
-                    swap_sequence(sequence, switchwith)
-                break
-        return {'FINISHED'}
-
-
-class VSEQFQuickListSelect(bpy.types.Operator):
-    """Toggle-selects a sequence by its name
-    Argument:
-        sequence: String, name of the sequence to select.  If blank, all sequences will be toggle-selected"""
-
-    bl_idname = "vseqf.quicklist_select"
-    bl_label = "VSEQF Quick List Select Sequence"
-
-    sequence: bpy.props.StringProperty()
-
-    def execute(self, context):
-        sequences = current_sequences(context)
-        if self.sequence == '':
-            bpy.ops.ed.undo_push()
-            bpy.ops.sequencer.select_all(action='TOGGLE')
-        else:
-            for sequence in sequences:
-                if sequence.name == self.sequence:
-                    bpy.ops.ed.undo_push()
-                    sequence.select = not sequence.select
-                    break
-        return {'FINISHED'}
-
-
 #Functions and classes related to QuickMarkers
 def draw_quickmarker_menu(self, context):
     """Draws the submenu for the QuickMarker presets, placed in the sequencer markers menu"""
@@ -5482,6 +5136,11 @@ class VSEQFQuickTagsAddActive(bpy.types.Operator):
 
 #Functions and Classes related to QuickCuts
 def vseqf_cut(sequence, frame=0, cut_type="SOFT"):
+    #Check parenting settings, remove if parent strip doesnt exist (prevents cut strips from getting false parents)
+    parent = find_parent(sequence)
+    if not parent:
+        sequence.parent = ''
+
     bpy.ops.sequencer.select_all(action='DESELECT')
     left_sequence = False
     right_sequence = False
@@ -6199,27 +5858,6 @@ class VSEQFSetting(bpy.types.PropertyGroup):
         min=0,
         description="Current Fade Out Length In Frames")
 
-    quicklist_parenting: bpy.props.BoolProperty(
-        name="Parenting",
-        default=True,
-        description='Display parenting information')
-    quicklist_tags: bpy.props.BoolProperty(
-        name="Tags",
-        default=True,
-        description='Display tags')
-    quicklist_editing: bpy.props.BoolProperty(
-        name="Settings",
-        default=False,
-        description='Display position, length and proxy settings')
-    quicklist_sort_reverse: bpy.props.BoolProperty(
-        name='Reverse Sort',
-        default=False,
-        description='Reverse sort')
-    quicklist_sort: bpy.props.EnumProperty(
-        name="Sort Method",
-        default='POSITION',
-        items=[('POSITION', 'Position', '', 1), ('TITLE', 'Title', '', 2), ('LENGTH', 'Length', '', 3)])
-
     enable_proxy: bpy.props.BoolProperty(
         name="Enable Proxy On Import",
         default=False)
@@ -6299,7 +5937,7 @@ class VSEQFSetting(bpy.types.PropertyGroup):
         default=False)
     snap_cursor_to_edge: bpy.props.BoolProperty(
         name='Snap Cursor When Dragging Edges',
-        default=True)
+        default=False)
 
 
 class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
@@ -6311,9 +5949,6 @@ class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
     fades: bpy.props.BoolProperty(
         name="Enable Quick Fades",
         default=True)
-    list: bpy.props.BoolProperty(
-        name="Enable Quick List",
-        default=False)
     proxy: bpy.props.BoolProperty(
         name="Enable Quick Proxy",
         default=True)
@@ -6338,7 +5973,6 @@ class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
         layout = self.layout
         layout.prop(self, "parenting")
         layout.prop(self, "fades")
-        layout.prop(self, "list")
         layout.prop(self, "proxy")
         layout.prop(self, "markers")
         layout.prop(self, "tags")
@@ -6351,7 +5985,6 @@ class VSEQFTempSettings(object):
     """Substitute for the addon preferences when this script isn't loaded as an addon"""
     parenting = True
     fades = True
-    list = True
     proxy = True
     markers = True
     tags = True
@@ -6548,8 +6181,8 @@ classes = (SEQUENCER_MT_add, SEQUENCER_MT_strip, SEQUENCER_MT_strip_transform, V
            VSEQFContextSequenceRight, VSEQFCut, VSEQFDelete, VSEQFDeleteConfirm, VSEQFDeleteRippleConfirm,
            VSEQFFollow, VSEQFGrab, VSEQFGrabAdd, VSEQFImport, VSEQFMarkerPreset, VSEQFMeta, VSEQFQuickCutsMenu,
            VSEQF_PT_QuickCutsPanel, VSEQFQuickFadesClear, VSEQFModalFades, VSEQFContextMenu,
-           VSEQFQuickFadesCross, VSEQFQuickFadesMenu, VSEQF_PT_QuickFadesPanel, VSEQFQuickFadesSet, VSEQFQuickListDown,
-           VSEQF_PT_QuickListPanel, VSEQFQuickListSelect, VSEQFQuickListUp, VSEQFQuickMarkerDelete, VSEQFQuickMarkerJump,
+           VSEQFQuickFadesCross, VSEQFQuickFadesMenu, VSEQF_PT_QuickFadesPanel, VSEQFQuickFadesSet,
+           VSEQFQuickMarkerDelete, VSEQFQuickMarkerJump,
            VSEQF_UL_QuickMarkerList, VSEQFQuickMarkerMove, VSEQF_UL_QuickMarkerPresetList, VSEQFQuickMarkerRename,
            VSEQFQuickMarkersAddPreset, VSEQFQuickMarkersMenu, VSEQF_PT_QuickMarkersPanel, VSEQFQuickMarkersPlace,
            VSEQFQuickMarkersRemovePreset, VSEQFQuickParents, VSEQFQuickParentsClear, VSEQFQuickParentsMenu,
