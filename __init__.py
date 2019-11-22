@@ -78,16 +78,7 @@ Features:
 
 
 Changelog:
-0.95
-    Updated for Blender 2.8 - lots of code changes, lots of bug fixes, updated menus, updated panels
-    Disabled ripple and edge snap while in slip mode
-    Various optimizations to ripple and grabbing
-    Added support for left and right click mouse moves
-    Updated frame skipping to work with new limitations in Blender
-    Added a modal fade operator for easily setting/changing fades, moved fades menu to shift-f
-    Strip information is now drawn for all selected strips, not just active
-
-0.96 (in progress)
+0.96
     Fixed bug where box select wouldn't work.
     Removed right-click hold menus - too buggy and blocked box select.  New context menu shortcut: '`' and 'w'
     Improved frame skipping

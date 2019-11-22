@@ -760,3 +760,22 @@ These are things I want to add, but I don't yet know how to do so.
    * Added a modal fade operator for easily setting/changing fades, moved fades menu to shift-f
    * Strip information is now drawn for all selected strips, not just active
 
+### 0.96
+   * Fixed bug where box select wouldn't work.
+   * Removed right-click hold menus - too buggy and blocked box select.  New context menu shortcut: '`' and 'w'
+   * Improved frame skipping
+   * Fixed bug where cut strips with deleted parents could have their old parent 'replaced' by a new cut
+   * Fixed bug in fade operator where waveforms for strips with no animation data would vanish
+   * Removed QuickList
+   * Fixed a bug where clearing fades could cause an error - thanks jaggz
+   * Improved fades - should be better about maintaining the original curve, and not leave extra points when fades are cleared
+   * Refactored code to make it easier to maintain
+   * Added option to disable/enable child edges following parents
+   * Rewrote grab and snapping functions, should be more reliable and correct now
+   * Fixed some bugs in 3point
+   * Added variable to change skipped frames in Numpad 7 and 8 shortcuts
+   * Implemented an operator to draw keyframes for active sound strip directly in the vse (press 'V')
+   * Fixed bug where filled sequencer areas were not detected properly
+   * Greatly improved strip tags interface, added ability for tags to become strip markers
+   * Moved some panels to the new 'Sequencer' tab
+   * Fixed some api bugs introduced from Blender 2.81
