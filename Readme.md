@@ -1,6 +1,6 @@
 # VSE Quick Functions Addon For Blender
 
-This script is designed to make Blender's VSE easier to use by implementing features often found in other video editors, or features that I find useful as a video editor.  
+VSEQF is an overhaul for Blender's VSE that can completely change your workflow.  Designed for quick, mouse and keyboard balanced editing with a focus on real-time feedback.
 
 Watch the demo video:  
 [![Demo Video](https://img.youtube.com/vi/rJg8xH8PyGc/0.jpg)](https://www.youtube.com/watch?v=rJg8xH8PyGc)
@@ -26,6 +26,71 @@ Or support me by hiring Creative Life Productions if you have a need for the ser
 * Now, below the addon information, disable or enable features by clicking the checkbox next to the name of the feature.
 * Click the 'Save User Settings' button to ensure this addon is loaded next time Blender starts.
 
+
+## What Can VSEQF Do?
+VSEQF is designed to speed up your editing by giving you new tools, and improving the usability of Blender's built-in tools.
+
+#### Parenting
+![Parenting](Manual/parenting.gif)  
+Connect two (or more) strips together and have them behave as one.  Children will move along with the parent, be cut when the parent is cut, and even synchronize edge adjustments.
+
+Open the parenting menu with 'Ctrl-P', or press 'Shift-P' to select children, or find parenting options in the sequencer sidebar under the 'Adjust' panel.
+
+#### Timeline Ripple
+![Ripple](Manual/ripple.gif)  
+Automatically adjust the position of strips following the current one.  Keep all the following strips in sync while you make cuts, deletes and movements.
+
+Press 'Alt' while grabbing a strip to toggle ripple mode, or press 'Alt-Delete' to ripple delete strips.
+
+#### Strip Cutting
+![Trims](Manual/trims.gif)  
+New strip cutting menu and panel, quickly trim strips in a variety of time-saving ways.  
+
+Press 'Ctrl-K' to open the cuts menu, or find the 'Quick Cuts' panel in the sequencer sidebar.
+
+#### Fades And Audio Adjustments
+![Fades](Manual/fades.gif)  
+Add, adjust or remove fades with a single click, and quickly add crossfades between strips.
+
+Press 'F' to add or adjust fades on selected strips, press 'Shift-F' to open the fades menu, or find the 'Quick Fades' panel in the sequencer sidebar.
+
+![Draw Curve](Manual/drawfcurve.gif)  
+Draw a volume curve directly over an audio strip.
+
+Press 'V' while an audio strip is active.
+
+#### Markers
+![Markers](Manual/markers.gif)  
+Create marker presets to organize your timeline, jump to any markers in the timeline.
+
+Find the 'Quick Markers' panel in the sequencer sidebar, add marker presets with 'Alt-M'.
+
+#### Tags And Strip Markers
+![Tags](Manual/tags.gif)  
+Organize strips with tags, select strips based on a tag.
+
+![Strip Markers](Manual/stripmarkers.gif)  
+Convert tags into strip markers to highlight a section of a strip.
+
+Found in the 'Quick Tags' panel in the sequencer sidebar, or press 'Shift-M' to add and modifiy marker tags.
+
+#### Context Menus
+![Context Menus](Manual/context.gif)  
+More contextual context menus.  Easy access to options that really matter depending on what the mouse is over.
+
+Right click while in left-click mode, or press 'W' or '`'.
+
+#### Zoom Menus
+![Zoom Menus](Manual/zooms.gif)  
+Quickly jump to useful zoom sizes, or save and load the best zoom levels for your current project.
+
+Press 'Z' to open the Quick Zooms menu.
+
+#### Three Point Editing
+![Three Point Editing](Manual/3point.gif)  
+Use movie clips like a file bin, import clips and store in/out points based on time indexes, then drop them into the timeline when you want.  
+
+Found in the '3 Point Edit' panel in sidebar in the file browser and movie clip editor areas.
 
 
 ## Sequence Editor Additions
@@ -115,37 +180,37 @@ Enables quick navigation of the timeline using the number pad.
 
 | | | |
 | :---: | :---: | :---: |
+| <br> | __/__<br>Cut | __*__<br> |
 | __7__<br>Cursor back one second | __8__<br> | __9__<br>Cursor forward one second |
 | __4__<br>Reverse/slower playback | __5__<br>Play/pause | __6__<br>Forward/faster playback |
 | __1__<br>Cursor back one frame | __2__<br> | __3__<br>Cursor forward one frame |
-| __0__<br>Cut | <br> | <br> |
 
 * __Ctrl+Numpad: Advanced Movement And Jumps__
 
 | | | |
 | :---: | :---: | :---: |
+| <br> | __/__<br>Cut menu | __*__<br> |
 | __7__<br>Previous marker | __8__<br> | __9__<br>Next marker |
 | __4__<br>Previous sequence edge | __5__<br> | __6__<br>Next sequence edge |
 | __1__<br>Previous keyframe | __2__<br> | __3__<br>Next keyframe |
-| __0__<br> | <br> | <br> |
 
 * __Alt+Numpad: Move Selected Strips__
 
 | | | |
 | :---: | :---: | :---: |
+| <br> | __/__<br>Ripple cut | __*__<br> |
 | __7__<br>Left one second | __8__<br>Up one channel | __9__<br>Right one second |
 | __4__<br>Left 1/2 second | __5__<br>Grab/move | __6__<br>Right 1/2 second |
 | __1__<br>Left one frame | __2__<br>Down one channel | __3__<br>Right one frame |
-| __0__<br>Ripple cut | <br> | <br> |
 
 * __Shift+Numpad: Zoom Timeline__
 
 | | | |
 | :---: | :---: | :---: |
+| <br> | __/__<br>Cut trim | __*__<br> |
 | __7__<br>Zoom to 10 minutes | __8__<br>Zoom to selected | __9__<br>Zoom to all |
 | __4__<br>Zoom to 1 minute | __5__<br>Zoom to 2 minutes | __6__<br>Zoom to 5 minutes |
 | __1__<br>Zoom to 2 seconds | __2__<br>Zoom to 10 seconds | __3__<br>Zoom to 30 seconds |
-| __0__<br> | <br> | <br> |
 
 
 
@@ -401,88 +466,6 @@ Parenting relationships are show in the timeline view for the active sequence, a
    When a parent sequence is deleted, all children will be deleted as well.
 
 These settings can also be found in the Quick Functions Settings menu.
-
-
-
-## QuickList
-Displays a list of loaded sequences and allows you to change various settings.
-
-Can be found in the sequence editor properties panel on the QuickList tab.
-
-* __Display__
-
-   Changes the details that are displayed for each sequence:  
-
-   * Settings
-
-      Adds an extra area for editing the length, position, and proxy settings of each sequence.
-
-   * Parenting
-
-      Adds an extra area that displays children of each sequence.
-   
-   * Tags
-   
-      Adds an extra area that displays tags for each sequence.
-
-* __Select/Deselect All Sequences__
-
-   Like pressing the 'a' key in the sequencer, this will toggle the selection of all sequences.
-
-* __Sort by__
-
-   Reorders the list based on timeline position, title, or length.  
-   Click the small arrow to change the sorting order.
-
-
-Settings For Each Sequence:
-
-* __Eye Icon__
-
-   Mutes/unmutes sequence.
-
-* __Padlock Icon__
-
-   Locks/unlocks sequence.
-
-* __Sequence Type Button__
-
-   Allows selecting and deselecting the sequence.
-
-* __Sequence Title__
-
-   Allows editing of sequence name.
-
-* __Len__
-
-   See the sequence length in HH:MM:SS:FF format, and adjust the length.
-
-* __Pos__
-
-   See the sequence position in HH:MM:SS:FF, and adjust the position.
-
-* __Proxy settings (Only visible when 'Settings' display is enabled)__
-
-   Enable/disable proxy and sizes.  
-
-* __Sub-Sequences (Only visible on meta sequences)__
-
-   Displays sequences inside the meta sequence.
-
-* __Tags (Only visible if 'Tags' display is enabled)__
-
-   A list of tags for this sequence is shown.  
-   Click the tag to select all sequences with this tag.
-   Click the 'X' next to the tag to remove it from this sequence.
-
-* __Children (Only visible if 'Parenting' display is enabled)__
-
-   The child sequences will be displayed here.  
-   Click the 'X' next to a child sequence to remove it from this sequence's children.
-
-If a sequence is an effect, and it is applied to another sequence, it will be indented and placed below it's parent.
-
-If QuickList is in Position sorting mode, up and down arrows will be displayed next to each strip, these can be used to swap position of a strip with the previous or next strip in the timeline.  If parenting is enabled, this will ignore child strips.  This may cause unpredictable behavior if strips are highly layered, it is best used on a very linear timeline.
 
 
 
