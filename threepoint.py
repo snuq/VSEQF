@@ -191,6 +191,39 @@ class VSEQF_PT_ThreePointBrowserPanel(bpy.types.Panel):
         row.operator('vseqf.threepoint_import_to_clip', text='Import To Clip Editor')
 
 
+class ThreePointSetup:
+    clip = None
+    iterations = 0
+
+    def threepoint_setup_area(self, *_):
+        self.iterations += 1
+        areas = bpy.context.screen.areas
+        if len(areas) > 1 or areas[0].type != 'FILE_BROWSER':
+            #check if areas have changed
+            for area in areas:
+                if area.type == 'CLIP_EDITOR':
+                    for space in area.spaces:
+                        if space.type == 'CLIP_EDITOR':
+                            space.clip = self.clip
+                            override = bpy.context.copy()
+                            override['area'] = area
+                            override['space_data'] = space
+                            if bpy.context.scene.vseqf.build_proxy:
+                                bpy.ops.clip.rebuild_proxy(override)
+            self.remove_handler()
+            return
+
+        if self.iterations > 20:
+            #prevent infinite loop
+            self.remove_handler()
+
+    def remove_handler(self):
+        handlers = bpy.app.handlers.depsgraph_update_post
+        for handler in handlers:
+            if " threepoint_setup_area " in str(handler):
+                handlers.remove(handler)
+
+
 class VSEQFThreePointImportToClip(bpy.types.Operator):
     bl_idname = "vseqf.threepoint_import_to_clip"
     bl_label = "Import Movie To Clip Editor"
@@ -210,51 +243,24 @@ class VSEQFThreePointImportToClip(bpy.types.Operator):
             #User is using the fullscreen file browser, close it
             bpy.ops.file.cancel()
 
-            self.setup_all_areas(context)  #kinda sucks to do this to the user, but i cant figure out any other way to do it.
-            #now we need to delay the select clip function...
-            #self._timer = context.window_manager.event_timer_add(.1, window=context.window)
-            #context.window_manager.modal_handler_add(self)
+            clip = self.clip
+            proxy = vseqf.proxy()
+            if proxy:
+                vseqf.apply_proxy_settings(clip)
+
+            handlers = bpy.app.handlers.depsgraph_update_post
+            for handler in handlers:
+                if " threepoint_setup_area " in str(handler):
+                    handlers.remove(handler)
+            threepointsetup = ThreePointSetup()
+            threepointsetup.clip = clip
+            handlers.append(threepointsetup.threepoint_setup_area)
             return {'RUNNING_MODAL'}
 
-        self.setup_area(context)
         return {'FINISHED'}
-
-    def modal(self, context, event):
-        #Doesnt seem to work anymore... only iterates twice then exits for no reason.
-        if event.type == 'TIMER':
-            if len(context.screen.areas) > 1:
-                self.setup_area(context, context.screen)
-                self.cancel(context)
-                return {'FINISHED'}
-        if self.tries > 20:  #Hopefully 2 seconds is enough?
-            self.cancel(context)
-            return {'CANCELLED'}
-        self.tries += 1
-        return {'PASS_THROUGH'}
 
     def cancel(self, context):
         context.window_manager.event_timer_remove(self._timer)
-
-    def setup_all_areas(self, context):
-        for screen in bpy.data.screens:
-            self.setup_area(context, screen)
-
-    def setup_area(self, context, screen):
-        clip = self.clip
-        proxy = vseqf.proxy()
-        if proxy:
-            vseqf.apply_proxy_settings(clip)
-        for area in screen.areas:
-            if area.type == 'CLIP_EDITOR':
-                for space in area.spaces:
-                    if space.type == 'CLIP_EDITOR':
-                        space.clip = clip
-                        override = context.copy()
-                        override['area'] = area
-                        override['space_data'] = space
-                        if context.scene.vseqf.build_proxy:
-                            bpy.ops.clip.rebuild_proxy(override)
-
 
 
 class VSEQF_PT_ThreePointPanel(bpy.types.Panel):
