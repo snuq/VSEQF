@@ -1126,12 +1126,16 @@ class SEQUENCER_MT_strip_transform(bpy.types.Menu):
     def draw(self, context):
         layout = self.layout
 
-        #layout.operator("transform.transform", text="Move").mode = 'TRANSLATION'
+        #layout.operator("transform.seq_slide", text="Move")
         layout.operator("vseqf.grab", text="Grab/Move")
-        #layout.operator("transform.transform", text="Move/Extend from Frame").mode = 'TIME_EXTEND'
-        layout.operator("vseqf.grab", text="Grab/Extend from frame").mode = 'TIME_EXTEND'
+        #layout.operator("transform.transform", text="Move/Extend from Playhead").mode = 'TIME_EXTEND'
+        layout.operator("vseqf.grab", text="Move/Extend from frame").mode = 'TIME_EXTEND'
         #layout.operator("sequencer.slip", text="Slip Strip Contents")
         layout.operator("vseqf.grab", text="Slip Strip Contents").mode = 'SLIP'
+
+        layout.separator()
+        #layout.operator("sequencer.snap")
+        layout.operator("sequencer.offset_clear")
 
         layout.separator()
         layout.operator_menu_enum("sequencer.swap", "side")
@@ -1177,37 +1181,45 @@ class SEQUENCER_MT_strip(bpy.types.Menu):
         strip = timeline.current_active(context)
 
         if strip:
-            stype = strip.type
+            strip_type = strip.type
 
-            if stype != 'SOUND':
+            if strip_type != 'SOUND':
                 layout.separator()
                 layout.operator_menu_enum("sequencer.strip_modifier_add", "type", text="Add Modifier")
-                layout.operator("sequencer.strip_modifier_copy", text = "Copy Modifiers to Selection")
+                layout.operator("sequencer.strip_modifier_copy", text="Copy Modifiers to Selection")
 
-            if stype in {
+            if strip_type in {
                     'CROSS', 'ADD', 'SUBTRACT', 'ALPHA_OVER', 'ALPHA_UNDER',
                     'GAMMA_CROSS', 'MULTIPLY', 'OVER_DROP', 'WIPE', 'GLOW',
                     'TRANSFORM', 'COLOR', 'SPEED', 'MULTICAM', 'ADJUSTMENT',
-                    'GAUSSIAN_BLUR', 'TEXT',
+                    'GAUSSIAN_BLUR',
             }:
                 layout.separator()
-                layout.operator_menu_enum("sequencer.change_effect_input", "swap")
-                layout.operator_menu_enum("sequencer.change_effect_type", "type")
-                layout.operator("sequencer.reassign_inputs")
-                layout.operator("sequencer.swap_inputs")
-            elif stype in {'IMAGE', 'MOVIE'}:
+                layout.menu("SEQUENCER_MT_strip_effect")
+            elif strip_type == 'MOVIE':
+                layout.separator()
+                layout.menu("SEQUENCER_MT_strip_movie")
+            elif strip_type == 'IMAGE':
                 layout.separator()
                 layout.operator("sequencer.rendersize")
                 layout.operator("sequencer.images_separate")
-                layout.operator("sequencer.deinterlace_selected_movies")
-            elif stype == 'META':
+            elif strip_type == 'TEXT':
                 layout.separator()
+                layout.menu("SEQUENCER_MT_strip_effect")
+            elif strip_type == 'META':
+                layout.separator()
+                #layout.operator("sequencer.meta_make")
+                layout.operator("vseqf.meta_make")
                 layout.operator("sequencer.meta_separate")
+                layout.operator("sequencer.meta_toggle", text="Toggle Meta")
+            if strip_type != 'META':
+                layout.separator()
+                #layout.operator("sequencer.meta_make")
+                layout.operator("vseqf.meta_make")
+                layout.operator("sequencer.meta_toggle", text="Toggle Meta")
 
         layout.separator()
-        #layout.operator("sequencer.meta_make")
-        layout.operator("vseqf.meta_make")
-        layout.operator("sequencer.meta_toggle", text="Toggle Meta")
+        layout.menu("SEQUENCER_MT_strip_lock_mute")
 
         layout.separator()
         layout.menu("SEQUENCER_MT_strip_input")
@@ -1216,7 +1228,7 @@ class SEQUENCER_MT_strip(bpy.types.Menu):
         layout.operator("sequencer.rebuild_proxy")
 
 
-def sel_sequences(context):
+def selected_sequences_len(context):
     try:
         return len(context.selected_sequences) if context.selected_sequences else 0
     except AttributeError:
@@ -1231,34 +1243,41 @@ class SEQUENCER_MT_add(bpy.types.Menu):
         layout = self.layout
         layout.operator_context = 'INVOKE_REGION_WIN'
 
-        if len(bpy.data.scenes) > 10:
+        bpy_data_scenes_len = len(bpy.data.scenes)
+        if bpy_data_scenes_len > 10:
             layout.operator_context = 'INVOKE_DEFAULT'
             layout.operator("sequencer.scene_strip_add", text="Scene...", icon='SCENE_DATA')
-        elif len(bpy.data.scenes) > 1:
+        elif bpy_data_scenes_len > 1:
             layout.operator_menu_enum("sequencer.scene_strip_add", "scene", text="Scene", icon='SCENE_DATA')
         else:
             layout.menu("SEQUENCER_MT_add_empty", text="Scene", icon='SCENE_DATA')
+        del bpy_data_scenes_len
 
-        if len(bpy.data.movieclips) > 10:
+        bpy_data_movieclips_len = len(bpy.data.movieclips)
+        if bpy_data_movieclips_len > 10:
             layout.operator_context = 'INVOKE_DEFAULT'
             layout.operator("sequencer.movieclip_strip_add", text="Clip...", icon='TRACKER')
-        elif len(bpy.data.movieclips) > 1:
+        elif bpy_data_movieclips_len > 0:
             layout.operator_menu_enum("sequencer.movieclip_strip_add", "clip", text="Clip", icon='TRACKER')
         else:
             layout.menu("SEQUENCER_MT_add_empty", text="Clip", icon='TRACKER')
+        del bpy_data_movieclips_len
 
-        if len(bpy.data.masks) > 10:
+        bpy_data_masks_len = len(bpy.data.masks)
+        if bpy_data_masks_len > 10:
             layout.operator_context = 'INVOKE_DEFAULT'
             layout.operator("sequencer.mask_strip_add", text="Mask...", icon='MOD_MASK')
-        elif len(bpy.data.masks) > 1:
+        elif bpy_data_masks_len > 0:
             layout.operator_menu_enum("sequencer.mask_strip_add", "mask", text="Mask", icon='MOD_MASK')
         else:
             layout.menu("SEQUENCER_MT_add_empty", text="Mask", icon='MOD_MASK')
+        del bpy_data_masks_len
 
         layout.separator()
 
         #layout.operator("sequencer.movie_strip_add", text="Movie", icon='FILE_MOVIE')
         layout.operator("vseqf.import_strip", text="Movie", icon="FILE_MOVIE").type = 'MOVIE'
+        #layout.operator("sequencer.sound_strip_add", text="Sound", icon='FILE_SOUND')
         layout.operator("sequencer.sound_strip_add", text="Sound", icon='FILE_SOUND')
         #layout.operator("sequencer.image_strip_add", text="Image/Sequence", icon='FILE_IMAGE')
         layout.operator("vseqf.import_strip", text="Image/Sequence", icon="FILE_IMAGE").type = 'IMAGE'
@@ -1278,7 +1297,11 @@ class SEQUENCER_MT_add(bpy.types.Menu):
 
         col = layout.column()
         col.menu("SEQUENCER_MT_add_transitions", icon='ARROW_LEFTRIGHT')
-        col.enabled = sel_sequences(context) >= 2
+        col.enabled = selected_sequences_len(context) >= 2
+
+        col = layout.column()
+        col.operator_menu_enum("sequencer.fades_add", "type", text="Fade", icon="IPO_EASE_IN_OUT")
+        col.enabled = selected_sequences_len(context) >= 1
 
 
 #Register properties, operators, menus and shortcuts
