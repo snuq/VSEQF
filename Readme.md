@@ -779,3 +779,4 @@ These are things I want to add, but I don't yet know how to do so.
    * Greatly improved strip tags interface, added ability for tags to become strip markers
    * Moved some panels to the new 'Sequencer' tab
    * Fixed some api bugs introduced from Blender 2.81
+   * Added proper tooltips to all operators
