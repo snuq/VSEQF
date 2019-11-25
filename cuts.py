@@ -58,6 +58,7 @@ class VSEQFCut(bpy.types.Operator):
     bl_idname = "vseqf.cut"
     bl_label = "Wrapper for the built in sequence cut operator that maintains parenting relationships and provides extra cut operations."
 
+    tooltip: bpy.props.StringProperty("Cut the selected strips")
     use_frame: bpy.props.BoolProperty(default=False)
     frame = bpy.props.IntProperty(0)
     type: bpy.props.EnumProperty(name='Type', items=[("SOFT", "Soft", "", 1), ("HARD", "Hard", "", 2), ("INSERT", "Insert Cut", "", 3), ("INSERT_ONLY", "Insert Only", "", 4), ("TRIM", "Trim", "", 5), ("TRIM_LEFT", "Trim Left", "", 6), ("TRIM_RIGHT", "Trim Right", "", 7), ("SLIDE", "Slide", "", 8), ("SLIDE_LEFT", "Slide Left", "", 9), ("SLIDE_RIGHT", "Slide Right", "", 10), ("RIPPLE", "Ripple", "", 11), ("RIPPLE_LEFT", "Ripple Left", "", 12), ("RIPPLE_RIGHT", "Ripple Right", "", 13), ("UNCUT", "UnCut", "", 14), ("UNCUT_LEFT", "UnCut Left", "", 15), ("UNCUT_RIGHT", "UnCut Right", "", 16)], default='SOFT')
@@ -70,6 +71,10 @@ class VSEQFCut(bpy.types.Operator):
     def __init__(self):
         if not self.use_frame:
             self.frame = bpy.context.scene.frame_current
+
+    @classmethod
+    def description(cls, context, properties):
+        return properties.tooltip
 
     def reset(self):
         #resets the variables after a cut is performed
@@ -348,20 +353,48 @@ class VSEQFQuickCutsMenu(bpy.types.Menu):
             return False
 
     def draw(self, context):
+        quickcuts_all = context.scene.vseqf.quickcuts_all
+        if quickcuts_all:
+            cut_strips = 'all'
+        else:
+            cut_strips = 'selected'
         layout = self.layout
-        layout.operator('vseqf.cut', text='Cut').type = 'SOFT'
-        layout.operator('vseqf.cut', text='Cut Insert').type = 'INSERT'
-        layout.operator('vseqf.cut', text='UnCut Left', icon='BACK').type = 'UNCUT_LEFT'
-        layout.operator('vseqf.cut', text='UnCut Right', icon='FORWARD').type = 'UNCUT_RIGHT'
-        layout.operator('vseqf.delete', text='Delete', icon='X')
-        layout.operator('vseqf.delete', text='Ripple Delete', icon='X').ripple = True
+        props = layout.operator('vseqf.cut', text='Cut')
+        props.type = 'SOFT'
+        props.tooltip = 'Cut '+cut_strips+' sequences under the cursor'
+        props = layout.operator('vseqf.cut', text='Cut Insert')
+        props.type = 'INSERT'
+        props.tooltip = 'Cut '+cut_strips+' sequences under the cursor and insert '+str(context.scene.vseqf.quickcuts_insert)+' frames'
+        props = layout.operator('vseqf.cut', text='UnCut Left', icon='BACK')
+        props.type = 'UNCUT_LEFT'
+        props.tooltip = 'Merge selected sequences to those on left if they match source and position'
+        props = layout.operator('vseqf.cut', text='UnCut Right', icon='FORWARD')
+        props.type = 'UNCUT_RIGHT'
+        props.tooltip = 'Merge selected sequences to those on right if they match source and position'
+        props = layout.operator('vseqf.delete', text='Delete', icon='X')
+        props.tooltip = 'Delete selected sequences'
+        props = layout.operator('vseqf.delete', text='Ripple Delete', icon='X')
+        props.ripple = True
+        props.tooltip = 'Delete selected sequences, and slide following sequences back to close the gap'
         layout.separator()
-        layout.operator('vseqf.cut', text='Trim Left', icon='BACK').type = 'TRIM_LEFT'
-        layout.operator('vseqf.cut', text='Trim Right', icon='FORWARD').type = 'TRIM_RIGHT'
-        layout.operator('vseqf.cut', text='Slide Trim Left', icon='BACK').type = 'SLIDE_LEFT'
-        layout.operator('vseqf.cut', text='Slide Trim Right', icon='FORWARD').type = 'SLIDE_RIGHT'
-        layout.operator('vseqf.cut', text='Ripple Trim Left', icon='BACK').type = 'RIPPLE_LEFT'
-        layout.operator('vseqf.cut', text='Ripple Trim Right', icon='FORWARD').type = 'RIPPLE_RIGHT'
+        props = layout.operator('vseqf.cut', text='Trim Left', icon='BACK')
+        props.type = 'TRIM_LEFT'
+        props.tooltip = 'Cut off the left side of '+cut_strips+' sequences under the cursor'
+        props = layout.operator('vseqf.cut', text='Trim Right', icon='FORWARD')
+        props.type = 'TRIM_RIGHT'
+        props.tooltip = 'Cut off the right side of '+cut_strips+' sequences under the cursor'
+        props = layout.operator('vseqf.cut', text='Slide Trim Left', icon='BACK')
+        props.type = 'SLIDE_LEFT'
+        props.tooltip = 'Cut off the left side of '+cut_strips+' sequences under the cursor, and slide cut sequences back to close the gap'
+        props = layout.operator('vseqf.cut', text='Slide Trim Right', icon='FORWARD')
+        props.type = 'SLIDE_RIGHT'
+        props.tooltip = 'Cut off the right side of '+cut_strips+' sequences under the cursor, and slide cut sequences forward to close the gap'
+        props = layout.operator('vseqf.cut', text='Ripple Trim Left', icon='BACK')
+        props.type = 'RIPPLE_LEFT'
+        props.tooltip = 'Cut off the left side of '+cut_strips+' sequences under the cursor, and slide all sequences back to close the gap'
+        props = layout.operator('vseqf.cut', text='Ripple Trim Right', icon='FORWARD')
+        props.type = 'RIPPLE_RIGHT'
+        props.tooltip = 'Cut off the right side of '+cut_strips+' sequences under the cursor, and slide all sequences back to close the gap'
         layout.separator()
         layout.prop(context.scene.vseqf, 'quickcuts_all', toggle=True)
         layout.prop(context.scene.vseqf, 'quickcuts_insert')
@@ -390,31 +423,60 @@ class VSEQF_PT_QuickCutsPanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         row = layout.row()
+        quickcuts_all = context.scene.vseqf.quickcuts_all
+        if quickcuts_all:
+            cut_strips = 'all'
+        else:
+            cut_strips = 'selected'
         row.prop(context.scene.vseqf, 'quickcuts_all', toggle=True)
         row.prop(context.scene.vseqf, 'quickcuts_insert')
         box = layout.box()
         row = box.row()
-        row.operator('vseqf.cut', text='Cut').type = 'SOFT'
-        row.operator('vseqf.cut', text='Cut Insert').type = 'INSERT'
+        props = row.operator('vseqf.cut', text='Cut')
+        props.type = 'SOFT'
+        props.tooltip = 'Cut '+cut_strips+' sequences under the cursor'
+        props = row.operator('vseqf.cut', text='Cut Insert')
+        props.type = 'INSERT'
+        props.tooltip = 'Cut '+cut_strips+' sequences under the cursor and insert '+str(context.scene.vseqf.quickcuts_insert)+' frames'
+
         row = box.row(align=True)
-        row.operator('vseqf.cut', text='UnCut Left', icon='BACK').type = 'UNCUT_LEFT'
-        row.operator('vseqf.cut', text='UnCut Right', icon='FORWARD').type = 'UNCUT_RIGHT'
+        props = row.operator('vseqf.cut', text='UnCut Left', icon='BACK')
+        props.type = 'UNCUT_LEFT'
+        props.tooltip = 'Merge selected sequences to those on left if they match source and position'
+        props = row.operator('vseqf.cut', text='UnCut Right', icon='FORWARD')
+        props.type = 'UNCUT_RIGHT'
+        props.tooltip = 'Merge selected sequences to those on right if they match source and position'
         row = box.row()
-        row.operator('vseqf.delete', text='Delete', icon='X')
-        row.operator('vseqf.delete', text='Ripple Delete', icon='X').ripple = True
+        props = row.operator('vseqf.delete', text='Delete', icon='X')
+        props.tooltip = 'Delete selected sequences'
+        props = row.operator('vseqf.delete', text='Ripple Delete', icon='X')
+        props.ripple = True
+        props.tooltip = 'Delete selected sequences, and slide following sequences back to close the gap'
 
         box = layout.box()
         row = box.row()
         split = row.split(factor=.5, align=True)
         column = split.column(align=True)
-        column.operator('vseqf.cut', text='Trim Left', icon='BACK').type = 'TRIM_LEFT'
-        column.operator('vseqf.cut', text='Slide Trim Left', icon='BACK').type = 'SLIDE_LEFT'
-        column.operator('vseqf.cut', text='Ripple Trim Left', icon='BACK').type = 'RIPPLE_LEFT'
+        props = column.operator('vseqf.cut', text='Trim Left', icon='BACK')
+        props.type = 'TRIM_LEFT'
+        props.tooltip = 'Cut off the left side of '+cut_strips+' sequences under the cursor'
+        props = column.operator('vseqf.cut', text='Slide Trim Left', icon='BACK')
+        props.type = 'SLIDE_LEFT'
+        props.tooltip = 'Cut off the left side of '+cut_strips+' sequences under the cursor, and slide cut sequences back to close the gap'
+        props = column.operator('vseqf.cut', text='Ripple Trim Left', icon='BACK')
+        props.type = 'RIPPLE_LEFT'
+        props.tooltip = 'Cut off the left side of '+cut_strips+' sequences under the cursor, and slide all sequences back to close the gap'
 
         column = split.column(align=True)
-        column.operator('vseqf.cut', text='Trim Right', icon='FORWARD').type = 'TRIM_RIGHT'
-        column.operator('vseqf.cut', text='Slide Trim Right', icon='FORWARD').type = 'SLIDE_RIGHT'
-        column.operator('vseqf.cut', text='Ripple Trim Right', icon='FORWARD').type = 'RIPPLE_RIGHT'
+        props = column.operator('vseqf.cut', text='Trim Right', icon='FORWARD')
+        props.type = 'TRIM_RIGHT'
+        props.tooltip = 'Cut off the right side of '+cut_strips+' sequences under the cursor'
+        props = column.operator('vseqf.cut', text='Slide Trim Right', icon='FORWARD')
+        props.type = 'SLIDE_RIGHT'
+        props.tooltip = 'Cut off the right side of '+cut_strips+' sequences under the cursor, and slide cut sequences forward to close the gap'
+        props = column.operator('vseqf.cut', text='Ripple Trim Right', icon='FORWARD')
+        props.type = 'RIPPLE_RIGHT'
+        props.tooltip = 'Cut off the right side of '+cut_strips+' sequences under the cursor, and slide all sequences back to close the gap'
 
 
 class VSEQFDelete(bpy.types.Operator):
@@ -424,6 +486,11 @@ class VSEQFDelete(bpy.types.Operator):
     bl_label = 'VSEQF Delete'
 
     ripple: bpy.props.BoolProperty(default=False)
+    tooltip: bpy.props.StringProperty("Delete the selected strips")
+
+    @classmethod
+    def description(cls, context, properties):
+        return properties.tooltip
 
     def reset(self):
         self.ripple = False

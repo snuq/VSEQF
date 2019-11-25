@@ -129,7 +129,9 @@ class VSEQF_PT_Parenting(bpy.types.Panel):
         parent = find_parent(active_sequence)
 
         row = layout.row()
-        row.operator('vseqf.quickparents', text='Set Active As Parent').action = 'add'
+        prop = row.operator('vseqf.quickparents', text='Set Active As Parent')
+        prop.action = 'add'
+        prop.tooltip = "Set active sequence as the parent of all other selected sequences"
 
         #List relationships for active sequence
         if parent:
@@ -138,8 +140,12 @@ class VSEQF_PT_Parenting(bpy.types.Panel):
             row.label(text="Parent: ")
             row.label(text=parent.name)
             row = box.row()
-            row.operator('vseqf.quickparents', text='Select Parent').action = 'select_parent'
-            row.operator('vseqf.quickparents', text='Remove Parent', icon="X").action = 'clear_parent'
+            prop = row.operator('vseqf.quickparents', text='Select Parent')
+            prop.action = 'select_parent'
+            prop.tooltip = "Select the parents of all selected sequences"
+            prop = row.operator('vseqf.quickparents', text='Remove Parent', icon="X")
+            prop.action = 'clear_parent'
+            prop.tooltip = "Clear the parents of all selected sequences"
         if len(children) > 0:
             box = layout.box()
             for index, child in enumerate(children):
@@ -150,8 +156,12 @@ class VSEQF_PT_Parenting(bpy.types.Panel):
                     row.label(text='')
                 row.label(text=child.name)
             row = box.row()
-            row.operator('vseqf.quickparents', text='Select Children').action = 'select_children'
-            row.operator('vseqf.quickparents', text='Remove Children', icon="X").action = 'clear_children'
+            prop = row.operator('vseqf.quickparents', text='Select Children')
+            prop.action = 'select_children'
+            prop.tooltip = "Select children of all selected sequences"
+            prop = row.operator('vseqf.quickparents', text='Remove Children', icon="X")
+            prop.action = 'clear_children'
+            prop.tooltip = "Clear children of all selected sequences"
 
 
 class VSEQFQuickParentsMenu(bpy.types.Menu):
@@ -176,14 +186,24 @@ class VSEQFQuickParentsMenu(bpy.types.Menu):
             children = find_children(sequence, sequences=sequences)
             parent = find_parent(sequence)
 
-            layout.operator('vseqf.quickparents', text='Select Children').action = 'select_children'
-            layout.operator('vseqf.quickparents', text='Select Parent').action = 'select_parent'
+            prop = layout.operator('vseqf.quickparents', text='Select Children')
+            prop.action = 'select_children'
+            prop.tooltip = "Select children of all selected sequences"
+            prop = layout.operator('vseqf.quickparents', text='Select Parent')
+            prop.action = 'select_parent'
+            prop.tooltip = "Select the parents of all selected sequences"
             if len(selected) > 1:
                 #more than one sequence is selected, so children can be set
-                layout.operator('vseqf.quickparents', text='Set Active As Parent').action = 'add'
+                prop = layout.operator('vseqf.quickparents', text='Set Active As Parent')
+                prop.action = 'add'
+                prop.tooltip = "Set active sequence as the parent of all other selected sequences"
 
-            layout.operator('vseqf.quickparents', text='Clear Children').action = 'clear_children'
-            layout.operator('vseqf.quickparents', text='Clear Parent').action = 'clear_parent'
+            prop = layout.operator('vseqf.quickparents', text='Clear Children')
+            prop.action = 'clear_children'
+            prop.tooltip = "Clear children of all selected sequences"
+            prop = layout.operator('vseqf.quickparents', text='Clear Parent')
+            prop.action = 'clear_parent'
+            prop.tooltip = "Clear the parents of all selected sequences"
 
             if parent:
                 #Parent sequence is found, display it
@@ -220,6 +240,11 @@ class VSEQFQuickParents(bpy.types.Operator):
     bl_description = 'Sets Or Removes Strip Parents'
 
     action: bpy.props.StringProperty()
+    tooltip: bpy.props.StringProperty("")
+
+    @classmethod
+    def description(cls, context, properties):
+        return properties.tooltip
 
     def execute(self, context):
         selected = timeline.current_selected(context)

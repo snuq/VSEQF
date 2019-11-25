@@ -283,6 +283,7 @@ class VSEQF_PT_ThreePointPanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         clip = context.space_data.clip
+        scene = context.scene
 
         row = layout.row()
         row.operator('vseqf.threepoint_modal_operator', text='Set In/Out')
@@ -308,15 +309,25 @@ class VSEQF_PT_ThreePointPanel(bpy.types.Panel):
         else:
             row.label(text="Length Not Set")
         row = layout.row()
-        row.operator('vseqf.threepoint_import', text='Import At Cursor').type = 'cursor'
+        prop = row.operator('vseqf.threepoint_import', text='Import At Cursor')
+        prop.type = 'cursor'
+        prop.tooltip = "Import this video into the VSE at frame "+str(scene.frame_current)
         row = layout.row()
-        row.operator('vseqf.threepoint_import', text='Replace Active Sequence').type = 'replace'
+        prop = row.operator('vseqf.threepoint_import', text='Replace Active Sequence')
+        prop.type = 'replace'
+        prop.tooltip = "Import this video into the VSE and replace the active sequence"
         row = layout.row()
-        row.operator('vseqf.threepoint_import', text='Insert At Cursor').type = 'insert'
+        prop = row.operator('vseqf.threepoint_import', text='Insert At Cursor')
+        prop.type = 'insert'
+        prop.tooltip = "Import and insert this video into the VSE at frame "+str(scene.frame_current)
         row = layout.row()
-        row.operator('vseqf.threepoint_import', text='Cut Insert At Cursor').type = 'cut_insert'
+        prop = row.operator('vseqf.threepoint_import', text='Cut Insert At Cursor')
+        prop.type = 'cut_insert'
+        prop.tooltip = "Cut all sequences at frame "+str(scene.frame_current)+" and insert this videoe"
         row = layout.row()
-        row.operator('vseqf.threepoint_import', text='Import At End').type = 'end'
+        prop = row.operator('vseqf.threepoint_import', text='Import At End')
+        prop.type = 'end'
+        prop.tooltip = "Import this video into the VSE at the end of all sequences"
 
 
 class VSEQFThreePointImport(bpy.types.Operator):
@@ -324,6 +335,11 @@ class VSEQFThreePointImport(bpy.types.Operator):
     bl_label = "Imports a movie clip into the VSE as a movie sequence"
 
     type: bpy.props.StringProperty()
+    tooltip: bpy.props.StringProperty("Import a movie clip into the VSE s a movie sequence")
+
+    @classmethod
+    def description(cls, context, properties):
+        return properties.tooltip
 
     def execute(self, context):
         override_area = False
@@ -643,24 +659,30 @@ class VSEQFQuick3PointValues(bpy.types.PropertyGroup):
     import_minutes_in: bpy.props.IntProperty(
         default=0,
         min=0,
-        update=update_import_minutes_in)
+        update=update_import_minutes_in,
+        description="Minutes to remove from beginning of video when importing")
     import_seconds_in: bpy.props.IntProperty(
         default=0,
         min=0,
-        update=update_import_seconds_in)
+        update=update_import_seconds_in,
+        description="Seconds to remove from beginning of video when importing")
     import_frames_in: bpy.props.IntProperty(
         default=0,
         min=0,
-        update=update_import_frames_in)
+        update=update_import_frames_in,
+        description="Frames to remove from beginning of video when importing")
     import_minutes_length: bpy.props.IntProperty(
         default=0,
         min=0,
-        update=update_import_minutes_length)
+        update=update_import_minutes_length,
+        description="Minutes component of imported video length")
     import_seconds_length: bpy.props.IntProperty(
         default=0,
         min=0,
-        update=update_import_seconds_length)
+        update=update_import_seconds_length,
+        description="Seconds component of imported video length")
     import_frames_length: bpy.props.IntProperty(
         default=0,
         min=0,
-        update=update_import_frames_length)
+        update=update_import_frames_length,
+        description="Frames component of imported video length")

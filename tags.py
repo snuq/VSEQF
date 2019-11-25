@@ -339,7 +339,7 @@ class VSEQFQuickTagsRemove(bpy.types.Operator):
         text: String, tag text to remove"""
     bl_idname = 'vseqf.quicktags_remove'
     bl_label = 'VSEQF Quick Tags Remove'
-    bl_description = 'Remove this tag from all selected sequences'
+    bl_description = 'Remove the selected tag from all selected sequences'
 
     text: bpy.props.StringProperty()
 
@@ -418,7 +418,7 @@ class VSEQFQuickTagsAddActive(bpy.types.Operator):
         text: String, tag to add"""
     bl_idname = 'vseqf.quicktags_add_active'
     bl_label = 'VSEQF Quick Tags Add'
-    bl_description = 'Add this tag to the active sequence'
+    bl_description = 'Add a new tag to the active sequence'
 
     text: bpy.props.StringProperty()
 
@@ -449,15 +449,18 @@ class VSEQFTags(bpy.types.PropertyGroup):
         update=auto_populate_tags)
     use_offset: bpy.props.BoolProperty(
         name="Use Frame Offset",
-        default=False)
+        default=False,
+        description="Make this tag a strip marker")
     offset: bpy.props.IntProperty(
         name="Frame Offset",
         min=0,
-        default=0)
+        default=0,
+        description="Marker tag position, starting at sequence beginning")
     length: bpy.props.IntProperty(
         name="Frame Length",
         min=1,
-        default=1)
+        default=1,
+        description="Marker tag length")
     color: bpy.props.FloatVectorProperty(
         name="Tag Color",
         size=3,

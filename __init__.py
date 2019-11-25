@@ -97,6 +97,7 @@ Changelog:
     Greatly improved strip tags interface, added ability for tags to become strip markers
     Moved some panels to the new 'Sequencer' tab
     Fixed some api bugs introduced from Blender 2.81
+    Added proper tooltips to all operators
 
 """
 
@@ -1031,7 +1032,8 @@ class VSEQFSetting(bpy.types.PropertyGroup):
         default='')
     marker_deselect: bpy.props.BoolProperty(
         name="Deselect New Markers",
-        default=True)
+        default=True,
+        description="Markers added with this interface will not be selected when added")
 
     zoom_size: bpy.props.IntProperty(
         name='Zoom Amount',
@@ -1065,7 +1067,8 @@ class VSEQFSetting(bpy.types.PropertyGroup):
     quickcuts_insert: bpy.props.IntProperty(
         name="Frames To Insert",
         default=0,
-        min=0)
+        min=0,
+        description='Number of frames to insert when performing an insert cut')
     quickcuts_all: bpy.props.BoolProperty(
         name='Cut All Sequences',
         default=False,

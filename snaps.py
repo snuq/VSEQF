@@ -12,7 +12,9 @@ class VSEQFQuickSnapsMenu(bpy.types.Menu):
 
     def draw(self, context):
         layout = self.layout
-        layout.operator('vseqf.quicksnaps', text='Cursor To Nearest Second').type = 'cursor_to_seconds'
+        props = layout.operator('vseqf.quicksnaps', text='Cursor To Nearest Second')
+        props.type = 'cursor_to_seconds'
+        props.tooltip = 'Rounds the cursor position to the nearest second'
         props = layout.operator("sequencer.strip_jump", text="Jump to Previous Sequence")
         props.next = False
         props.center = False
@@ -23,16 +25,32 @@ class VSEQFQuickSnapsMenu(bpy.types.Menu):
             #Display only if active sequence is set
             sequence = timeline.current_active(context)
             if sequence:
-                layout.operator('vseqf.quicksnaps', text='Cursor To Beginning Of Active').type = 'cursor_to_beginning'
-                layout.operator('vseqf.quicksnaps', text='Cursor To End Of Active').type = 'cursor_to_end'
+                props = layout.operator('vseqf.quicksnaps', text='Cursor To Beginning Of Active')
+                props.type = 'cursor_to_beginning'
+                props.tooltip = 'Moves the cursor to the beginning of the active sequence'
+                props = layout.operator('vseqf.quicksnaps', text='Cursor To End Of Active')
+                props.type = 'cursor_to_end'
+                props.tooltip = 'Moves the cursor to the end of the active sequence'
                 layout.separator()
-                layout.operator('vseqf.quicksnaps', text='Selected To Cursor').type = 'selection_to_cursor'
+                props = layout.operator('vseqf.quicksnaps', text='Selected To Cursor')
+                props.type = 'selection_to_cursor'
+                props.tooltip = 'Snaps the sequence edges or sequence beginning to the cursor'
                 layout.separator()
-                layout.operator('vseqf.quicksnaps', text='Selected Beginnings To Cursor').type = 'begin_to_cursor'
-                layout.operator('vseqf.quicksnaps', text='Selected Ends To Cursor').type = 'end_to_cursor'
-                layout.operator('vseqf.quicksnaps', text='Selected To Previous Sequence').type = 'sequence_to_previous'
-                layout.operator('vseqf.quicksnaps', text='Selected To Next Sequence').type = 'sequence_to_next'
-                layout.operator('vseqf.quicksnaps', text='Selected Ripple To Cursor').type = 'sequence_ripple'
+                props = layout.operator('vseqf.quicksnaps', text='Selected Beginnings To Cursor')
+                props.type = 'begin_to_cursor'
+                props.tooltip = 'Moves the beginning of selected sequences to the cursor position'
+                props = layout.operator('vseqf.quicksnaps', text='Selected Ends To Cursor')
+                props.type = 'end_to_cursor'
+                props.tooltip = 'Moves the ending of selected sequences to the cursor position'
+                props = layout.operator('vseqf.quicksnaps', text='Selected To Previous Sequence')
+                props.type = 'sequence_to_previous'
+                props.tooltip = 'Snaps the active sequence to the closest previous sequence'
+                props = layout.operator('vseqf.quicksnaps', text='Selected To Next Sequence')
+                props.type = 'sequence_to_next'
+                props.tooltip = 'Snaps the active sequence to the closest next sequence'
+                props = layout.operator('vseqf.quicksnaps', text='Selected Ripple To Cursor')
+                props.type = 'sequence_ripple'
+                props.tooltip = 'Snaps all sequences to the cursor as if they were one sequence'
         except:
             pass
 
@@ -57,6 +75,11 @@ class VSEQFQuickSnaps(bpy.types.Operator):
     bl_description = 'Snaps selected sequences'
 
     type: bpy.props.StringProperty()
+    tooltip: bpy.props.StringProperty("")
+
+    @classmethod
+    def description(cls, context, properties):
+        return properties.tooltip
 
     def execute(self, context):
         bpy.ops.ed.undo_push()

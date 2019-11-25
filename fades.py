@@ -777,9 +777,15 @@ class VSEQF_PT_QuickFadesPanel(bpy.types.Panel):
         row = layout.row()
         row.prop(scene.vseqf, 'fade')
         row = layout.row(align=True)
-        row.operator('vseqf.quickfades_set', text='Set Fadein', icon='BACK').type = 'in'
-        row.operator('vseqf.quickfades_set', text='Set In/Out').type = 'both'
-        row.operator('vseqf.quickfades_set', text='Set Fadeout', icon='FORWARD').type = 'out'
+        prop = row.operator('vseqf.quickfades_set', text='Set Fadein', icon='BACK')
+        prop.type = 'in'
+        prop.tooltip = 'Set fade-in on selected sequences to '+str(scene.vseqf.fade)+' frames'
+        prop = row.operator('vseqf.quickfades_set', text='Set In/Out')
+        prop.type = 'both'
+        prop.tooltip = 'Set fade-in and fade-out on selected sequences to '+str(scene.vseqf.fade)+' frames'
+        prop = row.operator('vseqf.quickfades_set', text='Set Fadeout', icon='FORWARD')
+        prop.type = 'out'
+        prop.tooltip = 'Set fade-out on selected sequences to '+str(scene.vseqf.fade)+' frames'
         row = layout.row()
         row.operator('vseqf.quickfades_clear', text='Clear Fades').direction = 'both'
         row = layout.row()
@@ -789,11 +795,19 @@ class VSEQF_PT_QuickFadesPanel(bpy.types.Panel):
         row = layout.row()
         row.prop(scene.vseqf, 'transition')
         row = layout.row(align=True)
-        row.operator('vseqf.quickfades_cross', text='Crossfade Prev Clip', icon='BACK').type = 'previous'
-        row.operator('vseqf.quickfades_cross', text='Crossfade Next Clip', icon='FORWARD').type = 'next'
+        prop = row.operator('vseqf.quickfades_cross', text='Crossfade Prev Clip', icon='BACK')
+        prop.type = 'previous'
+        prop.tooltip = 'Add a basic transition from each selected sequence to the previous sequence'
+        prop = row.operator('vseqf.quickfades_cross', text='Crossfade Next Clip', icon='FORWARD')
+        prop.type = 'next'
+        prop.tooltip = 'Add a basic transition from each selected sequence to the next sequence'
         row = layout.row(align=True)
-        row.operator('vseqf.quickfades_cross', text='Smart Cross to Prev', icon='BACK').type = 'previoussmart'
-        row.operator('vseqf.quickfades_cross', text='Smart Cross to Next', icon='FORWARD').type = 'nextsmart'
+        prop = row.operator('vseqf.quickfades_cross', text='Smart Cross to Prev', icon='BACK')
+        prop.type = 'previoussmart'
+        prop.tooltip = 'Add a transition from each selected sequence to the previous sequence, ensure trasitions are '+str(scene.vseqf.fade)+' frames long'
+        prop = row.operator('vseqf.quickfades_cross', text='Smart Cross to Next', icon='FORWARD')
+        prop.type = 'nextsmart'
+        prop.tooltip = 'Add a transition from each selected sequence to the next sequence, ensure trasitions are '+str(scene.vseqf.fade)+' frames long'
 
 
 class VSEQF_PT_QuickFadesStripPanel(bpy.types.Panel):
@@ -883,17 +897,29 @@ class VSEQFQuickFadesMenu(bpy.types.Menu):
 
             #Fade length
             layout.prop(scene.vseqf, 'fade')
-            layout.operator('vseqf.quickfades_set', text='Set Fadein').type = 'in'
-            layout.operator('vseqf.quickfades_set', text='Set Fadeout').type = 'out'
+            prop = layout.operator('vseqf.quickfades_set', text='Set Fadein')
+            prop.type = 'in'
+            prop.tooltip = 'Set fade-in on selected sequences to '+str(scene.vseqf.fade)+' frames'
+            prop = layout.operator('vseqf.quickfades_set', text='Set Fadeout')
+            prop.type = 'out'
+            prop.tooltip = 'Set fade-out on selected sequences to '+str(scene.vseqf.fade)+' frames'
             layout.operator('vseqf.quickfades_clear', text='Clear Fades').direction = 'both'
 
             #Add crossfades
             layout.separator()
             layout.prop(scene.vseqf, 'transition', text='')
-            layout.operator('vseqf.quickfades_cross', text='Crossfade Prev Sequence').type = 'previous'
-            layout.operator('vseqf.quickfades_cross', text='Crossfade Next Sequence').type = 'next'
-            layout.operator('vseqf.quickfades_cross', text='Smart Cross to Prev').type = 'previoussmart'
-            layout.operator('vseqf.quickfades_cross', text='Smart Cross to Next').type = 'nextsmart'
+            prop = layout.operator('vseqf.quickfades_cross', text='Crossfade Prev Sequence')
+            prop.type = 'previous'
+            prop.tooltip = 'Add a basic transition from each selected sequence to the previous sequence'
+            prop = layout.operator('vseqf.quickfades_cross', text='Crossfade Next Sequence')
+            prop.type = 'next'
+            prop.tooltip = 'Add a basic transition from each selected sequence to the next sequence'
+            prop = layout.operator('vseqf.quickfades_cross', text='Smart Cross to Prev')
+            prop.type = 'previoussmart'
+            prop.tooltip = 'Add a transition from each selected sequence to the previous sequence, ensure trasitions are '+str(scene.vseqf.fade)+' frames long'
+            prop = layout.operator('vseqf.quickfades_cross', text='Smart Cross to Next')
+            prop.type = 'nextsmart'
+            prop.tooltip = 'Add a transition from each selected sequence to the next sequence, ensure trasitions are '+str(scene.vseqf.fade)+' frames long'
 
         else:
             layout.label(text="No Sequence Selected")
@@ -914,6 +940,11 @@ class VSEQFQuickFadesSet(bpy.types.Operator):
 
     #Should be set to 'in' or 'out'
     type: bpy.props.StringProperty()
+    tooltip: bpy.props.StringProperty("")
+
+    @classmethod
+    def description(cls, context, properties):
+        return properties.tooltip
 
     def execute(self, context):
         bpy.ops.ed.undo_push()
@@ -988,6 +1019,11 @@ class VSEQFQuickFadesCross(bpy.types.Operator):
     bl_description = 'Adds a crossfade between selected sequence and next or previous sequence in timeline'
 
     type: bpy.props.StringProperty()
+    tooltip: bpy.props.StringProperty("")
+
+    @classmethod
+    def description(cls, context, properties):
+        return properties.tooltip
 
     def execute(self, context):
         sequences = timeline.current_sequences(context)

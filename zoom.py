@@ -75,27 +75,49 @@ class VSEQFQuickZoomsMenu(bpy.types.Menu):
         scene = context.scene
         layout = self.layout
 
-        layout.operator('vseqf.quickzooms', text='Zoom All Strips').area = 'all'
-        layout.operator('vseqf.quickzooms', text='Zoom To Timeline').area = 'timeline'
+        prop = layout.operator('vseqf.quickzooms', text='Zoom All Sequences')
+        prop.area = 'all'
+        prop.tooltip = 'Zoom the timeline to all sequences'
+        prop = layout.operator('vseqf.quickzooms', text='Zoom To Timeline')
+        prop.area = 'timeline'
+        prop.tooltip = 'Zoom the timeline to the current playback range'
         selected_sequences = timeline.current_selected(bpy.context)
         if len(selected_sequences) > 0:
             #Only show if a sequence is selected
-            layout.operator('vseqf.quickzooms', text='Zoom Selected').area = 'selected'
+            prop = layout.operator('vseqf.quickzooms', text='Zoom Selected')
+            prop.area = 'selected'
+            prop.tooltip = 'Zoom the timeline to the selected sequences'
 
-        layout.operator('vseqf.quickzooms', text='Zoom Cursor').area = 'cursor'
+        prop = layout.operator('vseqf.quickzooms', text='Zoom Cursor')
+        prop.area = 'cursor'
+        prop.tooltip = 'Zoom the timeline to '+str(context.scene.vseqf.zoom_size)+' frames around the cursor'
         layout.prop(scene.vseqf, 'zoom_size', text="Size")
         layout.operator('vseqf.quickzoom_add', text='Save Current Zoom')
         if len(scene.vseqf.zoom_presets) > 0:
             layout.menu('VSEQF_MT_quickzoom_preset_menu')
 
         layout.separator()
-        layout.operator('vseqf.quickzooms', text='Zoom 2 Seconds').area = '2'
-        layout.operator('vseqf.quickzooms', text='Zoom 10 Seconds').area = '10'
-        layout.operator('vseqf.quickzooms', text='Zoom 30 Seconds').area = '30'
-        layout.operator('vseqf.quickzooms', text='Zoom 1 Minute').area = '60'
-        layout.operator('vseqf.quickzooms', text='Zoom 2 Minutes').area = '120'
-        layout.operator('vseqf.quickzooms', text='Zoom 5 Minutes').area = '300'
-        layout.operator('vseqf.quickzooms', text='Zoom 10 Minutes').area = '600'
+        prop = layout.operator('vseqf.quickzooms', text='Zoom 2 Seconds')
+        prop.area = '2'
+        prop.tooltip = 'Zoom the timeline to 2 seconds around the play cursor'
+        prop = layout.operator('vseqf.quickzooms', text='Zoom 10 Seconds')
+        prop.area = '10'
+        prop.tooltip = 'Zoom the timeline to 10 seconds around the play cursor'
+        prop = layout.operator('vseqf.quickzooms', text='Zoom 30 Seconds')
+        prop.area = '30'
+        prop.tooltip = 'Zoom the timeline to 30 seconds around the play cursor'
+        prop = layout.operator('vseqf.quickzooms', text='Zoom 1 Minute')
+        prop.area = '60'
+        prop.tooltip = 'Zoom the timeline to one minute around the play cursor'
+        prop = layout.operator('vseqf.quickzooms', text='Zoom 2 Minutes')
+        prop.area = '120'
+        prop.tooltip = 'Zoom the timeline to 2 minutes around the play cursor'
+        prop = layout.operator('vseqf.quickzooms', text='Zoom 5 Minutes')
+        prop.area = '300'
+        prop.tooltip = 'Zoom the timeline to 5 minutes around the play cursor'
+        prop = layout.operator('vseqf.quickzooms', text='Zoom 10 Minutes')
+        prop.area = '600'
+        prop.tooltip = 'Zoom the timeline to 10 minutes around the play cursor'
 
 
 class VSEQFQuickZoomPresetMenu(bpy.types.Menu):
@@ -119,9 +141,7 @@ class VSEQFQuickZoomPresetMenu(bpy.types.Menu):
 
 
 class VSEQFQuickZoomPreset(bpy.types.Operator):
-    """Zooms to a specific preset, given by name.
-    Argument:
-        name: String, the zoom preset to activate"""
+    """Zoom to a preset"""
 
     bl_idname = 'vseqf.quickzoom_preset'
     bl_label = "Zoom To QuickZoom Preset"
@@ -152,10 +172,7 @@ class VSEQFClearZooms(bpy.types.Operator):
 
 
 class VSEQFRemoveZoom(bpy.types.Operator):
-    """Removes a zoom from the preset list
-
-    Argument:
-        name: String, the name of the zoom preset to be removed"""
+    """Removes a zoom preset from the preset list"""
 
     bl_idname = 'vseqf.quickzoom_remove'
     bl_label = 'Remove Zoom Preset'
@@ -172,9 +189,7 @@ class VSEQFRemoveZoom(bpy.types.Operator):
 
 
 class VSEQFAddZoom(bpy.types.Operator):
-    """Stores the current vse zoom and position
-    Argument:
-        mode: String, determines where the preset is stored."""
+    """Stores the current vse zoom and position"""
 
     bl_idname = 'vseqf.quickzoom_add'
     bl_label = "Add Zoom Preset"
@@ -214,6 +229,11 @@ class VSEQFQuickZooms(bpy.types.Operator):
 
     #Should be set to 'all', 'selected', cursor', or a positive number of seconds
     area: bpy.props.StringProperty()
+    tooltip: bpy.props.StringProperty("Zoom the timeline")
+
+    @classmethod
+    def description(cls, context, properties):
+        return properties.tooltip
 
     def execute(self, context):
         #return bpy.ops.view2d.smoothview("INVOKE_DEFAULT", xmin=0, xmax=10, ymin=0, ymax=10, wait_for_input=False)

@@ -77,13 +77,11 @@ class VSEQF_UL_QuickMarkerList(bpy.types.UIList):
 
 class VSEQFQuickMarkerDelete(bpy.types.Operator):
     """Operator to delete a marker on a given frame
-    If no marker is on the frame, nothing will be done
-
-    Argument:
-        frame: Integer, the frame to delete a marker from"""
+    If no marker is on the frame, nothing will be done"""
 
     bl_idname = 'vseqf.quickmarkers_delete'
-    bl_label = 'Delete Marker At Frame'
+    bl_label = 'Delete this marker'
+    bl_description = ''
 
     frame: bpy.props.IntProperty()
 
@@ -139,13 +137,12 @@ class VSEQFQuickMarkerRename(bpy.types.Operator):
 
 
 class VSEQFQuickMarkerJump(bpy.types.Operator):
-    """Operator to move the cursor to a given frame
-    Note that a marker doesn't have to be at the frame, that is just the way the script uses this.
+    #Operator to move the cursor to a given frame
+    #Note that a marker doesn't have to be at the frame, that is just the way the script uses this.
 
-    Argument:
-        frame: Integer, the frame number to jump to"""
     bl_idname = 'vseqf.quickmarkers_jump'
-    bl_label = 'Jump To Timeline Marker'
+    bl_label = 'Jump to this marker'
+    bl_description = 'Jump to this marker'
 
     frame: bpy.props.IntProperty()
 
@@ -178,14 +175,12 @@ class VSEQFQuickMarkersMenu(bpy.types.Menu):
 
 
 class VSEQFQuickMarkersPlace(bpy.types.Operator):
-    """Adds a marker with a specific name to the current frame of the timeline
-    If a marker already exists at the current frame, it will be renamed
-
-    Argument:
-        marker: String, the name of the marker to place"""
+    #Adds a marker with a specific name to the current frame of the timeline
+    #If a marker already exists at the current frame, it will be renamed
 
     bl_idname = 'vseqf.quickmarkers_place'
-    bl_label = 'VSEQF Quick Markers Place A Marker'
+    bl_label = "Adds this text as a marker at the current location on the timeline"
+    bl_description = "Adds this text as a marker at the current location on the timeline"
 
     marker: bpy.props.StringProperty()
 
@@ -209,13 +204,11 @@ class VSEQFQuickMarkersPlace(bpy.types.Operator):
 
 
 class VSEQFQuickMarkersRemovePreset(bpy.types.Operator):
-    """Removes a marker name preset from the QuickMarkers preset list
-
-    Argument:
-        marker: String, the name of the marker preset to be removed"""
+    """Removes a marker name preset from the QuickMarkers preset list"""
 
     bl_idname = 'vseqf.quickmarkers_remove_preset'
-    bl_label = 'VSEQF Quick Markers Remove Preset'
+    bl_label = "Delete this marker from the preset list"
+    bl_description = ''
 
     #marker name to be removed
     marker: bpy.props.StringProperty()
@@ -231,13 +224,11 @@ class VSEQFQuickMarkersRemovePreset(bpy.types.Operator):
 
 class VSEQFQuickMarkersAddPreset(bpy.types.Operator):
     """Adds a name preset to QuickMarkers presets
-    If the name already exists in the presets, the operator is canceled
-
-    Argument:
-        preset: String, the name of the marker preset to add"""
+    If the name already exists in the presets, the operator is canceled"""
 
     bl_idname = 'vseqf.quickmarkers_add_preset'
-    bl_label = 'VSEQF Quick Markers Add Preset'
+    bl_label = 'Add this text as a new marker preset'
+    bl_description = ''
 
     preset: bpy.props.StringProperty()
 

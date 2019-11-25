@@ -440,6 +440,11 @@ class VSEQFQuickTimeline(bpy.types.Operator):
     bl_label = 'VSEQF Quick Timeline'
 
     operation: bpy.props.StringProperty()
+    tooltip: bpy.props.StringProperty("")
+
+    @classmethod
+    def description(cls, context, properties):
+        return properties.tooltip
 
     def execute(self, context):
         operation = self.operation
@@ -501,15 +506,29 @@ class VSEQFQuickTimelineMenu(bpy.types.Menu):
     def draw(self, context):
         del context
         layout = self.layout
-        layout.operator('vseqf.quicktimeline', text='Timeline To All').operation = 'sequences'
-        layout.operator('vseqf.quicktimeline', text='Timeline To Selected').operation = 'selected'
+        props = layout.operator('vseqf.quicktimeline', text='Timeline To All')
+        props.operation = 'sequences'
+        props.tooltip = 'Trims the timeline to all sequences'
+        props = layout.operator('vseqf.quicktimeline', text='Timeline To Selected')
+        props.operation = 'selected'
+        props.tooltip = 'Trims the timeline to selected sequence(s)'
         layout.separator()
-        layout.operator('vseqf.quicktimeline', text='Timeline Start To All').operation = 'sequences_start'
-        layout.operator('vseqf.quicktimeline', text='Timeline End To All').operation = 'sequences_end'
-        layout.operator('vseqf.quicktimeline', text='Timeline Start To Selected').operation = 'selected_start'
-        layout.operator('vseqf.quicktimeline', text='Timeline End To Selected').operation = 'selected_end'
+        props = layout.operator('vseqf.quicktimeline', text='Timeline Start To All')
+        props.operation = 'sequences_start'
+        props.tooltip = 'Sets the timeline start to the start of the first sequence'
+        props = layout.operator('vseqf.quicktimeline', text='Timeline End To All')
+        props.operation = 'sequences_end'
+        props.tooltip = 'Sets the timeline end to the end of the last sequence'
+        props = layout.operator('vseqf.quicktimeline', text='Timeline Start To Selected')
+        props.operation = 'selected_start'
+        props.tooltip = 'Sets the timeline start to the start of the first selected sequence'
+        props = layout.operator('vseqf.quicktimeline', text='Timeline End To Selected')
+        props.operation = 'selected_end'
+        props.tooltip = 'Sets the timeline end to the end of the last selected sequence'
         row = layout.row()
-        row.operator('vseqf.quicktimeline', text='Full Timeline Setup').operation = 'full_auto'
+        props = row.operator('vseqf.quicktimeline', text='Full Timeline Setup')
+        props.operation = 'full_auto'
+        props.tooltip = 'Moves sequences back up to frame 1, then sets start and end to encompass all sequences'
         row.enabled = not inside_meta_strip()
 
 
@@ -538,14 +557,28 @@ class VSEQF_PT_QuickTimelinePanel(bpy.types.Panel):
 
         split = row.split(factor=.5, align=True)
         column = split.column(align=True)
-        column.operator('vseqf.quicktimeline', text='Timeline To All').operation = 'sequences'
-        column.operator('vseqf.quicktimeline', text='Start To All').operation = 'sequences_start'
-        column.operator('vseqf.quicktimeline', text='Start To Selected').operation = 'selected_start'
+        props = column.operator('vseqf.quicktimeline', text='Timeline To All')
+        props.operation = 'sequences'
+        props.tooltip = 'Trims the timeline to all sequences'
+        props = column.operator('vseqf.quicktimeline', text='Start To All')
+        props.operation = 'sequences_start'
+        props.tooltip = 'Sets the timeline start to the start of the first sequence'
+        props = column.operator('vseqf.quicktimeline', text='Start To Selected')
+        props.operation = 'selected_start'
+        props.tooltip = 'Sets the timeline start to the start of the first selected sequence'
 
         column = split.column(align=True)
-        column.operator('vseqf.quicktimeline', text='Timeline To Selected').operation = 'selected'
-        column.operator('vseqf.quicktimeline', text='End To All').operation = 'sequences_end'
-        column.operator('vseqf.quicktimeline', text='End To Selected').operation = 'selected_end'
+        props = column.operator('vseqf.quicktimeline', text='Timeline To Selected')
+        props.operation = 'selected'
+        props.tooltip = 'Trims the timeline to selected sequence(s)'
+        props = column.operator('vseqf.quicktimeline', text='End To All')
+        props.operation = 'sequences_end'
+        props.tooltip = 'Sets the timeline end to the end of the last sequence'
+        props = column.operator('vseqf.quicktimeline', text='End To Selected')
+        props.operation = 'selected_end'
+        props.tooltip = 'Sets the timeline end to the end of the last selected sequence'
         row = layout.row()
-        row.operator('vseqf.quicktimeline', text='Full Timeline Setup').operation = 'full_auto'
+        props = row.operator('vseqf.quicktimeline', text='Full Timeline Setup')
+        props.operation = 'full_auto'
+        props.tooltip = 'Moves sequences back up to frame 1, then sets start and end to encompass all sequences'
         row.enabled = not inside_meta_strip()
