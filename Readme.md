@@ -2,10 +2,6 @@
 
 VSEQF is an overhaul for Blender's VSE that can completely change your workflow.  Designed for quick, mouse and keyboard balanced editing with a focus on real-time feedback.
 
-Watch the demo video:  
-[![Demo Video](https://img.youtube.com/vi/rJg8xH8PyGc/0.jpg)](https://www.youtube.com/watch?v=rJg8xH8PyGc)
-
-
 Development for this script is supported by my multimedia and video production business, [Creative Life Productions](http://www.creativelifeproductions.com)  
 But, time spent working on this addon is time I cannot spend earning a living, so if you find this addon useful, consider donating:  
 
