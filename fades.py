@@ -317,10 +317,15 @@ def volume_operator_draw(self, context):
         ypos = self.active_bottom + (point[1] * self.channel_px)
         xpos = self.active_left + ((point[0] - self.active_strip.frame_final_start) * self.frame_px)
         current_coords = (xpos, ypos)
+        if point[0] < self.active_frame_start:
+            last_coords = current_coords
+            continue
         if last_coords is not None:
             coords.append(last_coords)
             coords.append(current_coords)
         last_coords = current_coords
+        if point[0] > self.active_frame_end:
+            break
     bgl.glEnable(bgl.GL_BLEND)
     shader = gpu.shader.from_builtin('2D_UNIFORM_COLOR')
     batch = batch_for_shader(shader, 'LINES', {'pos': coords})
@@ -342,6 +347,8 @@ class VSEQFModalVolumeDraw(bpy.types.Operator):
     active_right = 0
     active_bottom = 0
     active_top = 0
+    active_frame_start = 0
+    active_frame_end = 0
     mode = 'ADD'
     last_press = ''
     last_added = None
@@ -356,6 +363,12 @@ class VSEQFModalVolumeDraw(bpy.types.Operator):
             if area.type in ['GRAPH_EDITOR', 'SEQUENCE_EDITOR']:
                 area.tag_redraw()
 
+    def reset_curve(self):
+        keyframes = self.curve.keyframe_points
+        for keyframe in reversed(keyframes):
+            keyframes.remove(keyframe)
+        self.active_strip.volume = 1
+
     def modal(self, context, event):
         area = context.area
         if event.type in ["V", "MIDDLEMOUSE"] and event.value == 'PRESS':
@@ -369,7 +382,7 @@ class VSEQFModalVolumeDraw(bpy.types.Operator):
         else:
             header_text = "Removing keyframe points from active strip volume"
         area.header_text_set(header_text)
-        status_text = "Click and drag on or above the sound strip to add keyframe points.  Press 'V' or MiddleMouse to toggle add/remove mode.  Confirm with Return."
+        status_text = "Click and drag on or above the sound strip to add keyframe points.  Press 'V' or MiddleMouse to toggle add/remove mode.  Clear the curve with Backspace or Delete.  Confirm with Return."
         context.workspace.status_text_set(status_text)
 
         if event.type in ['LEFTMOUSE', 'MOUSEMOVE']:
@@ -416,7 +429,11 @@ class VSEQFModalVolumeDraw(bpy.types.Operator):
         if event.type == 'LEFTMOUSE':
             self.last_press = 'LEFTMOUSE'
             self.last_added = None
-        elif event.type not in ['MOUSEMOVE', 'INBETWEEN_MOUSEMOVE', 'TIMER']:
+        elif event.type in ['BACK_SPACE', 'DEL']:
+            self.last_press = ''
+            self.last_added = None
+            self.reset_curve()
+        elif event.type not in ['MOUSEMOVE', 'INBETWEEN_MOUSEMOVE', 'TIMER', 'TIMER0']:
             self.last_press = ''
             self.last_added = None
 
@@ -458,6 +475,8 @@ class VSEQFModalVolumeDraw(bpy.types.Operator):
         right, top = view.region_to_view(width, height)
         if math.isnan(left):
             return {'CANCELLED'}
+        self.active_frame_start = active_strip.frame_final_start
+        self.active_frame_end = active_strip.frame_final_end
         shown_width = right - left
         shown_height = top - bottom
         self.channel_px = height / shown_height
