@@ -255,7 +255,8 @@ def set_fade(fade_curve, direction, fade_low_point_frame, fade_high_point_frame,
         #remove fade
         if direction == 'in' and fade_high_point:
             fade_keyframes.remove(fade_high_point)
-        fade_keyframes.remove(fade_low_point)
+        if fade_low_point is not None:
+            fade_keyframes.remove(fade_low_point)
         if direction == 'out' and fade_high_point:
             fade_keyframes.remove(fade_high_point)
         if len(fade_keyframes) == 0:
