@@ -433,7 +433,7 @@ class VSEQFModalVolumeDraw(bpy.types.Operator):
             self.last_press = ''
             self.last_added = None
             self.reset_curve()
-        elif event.type not in ['MOUSEMOVE', 'INBETWEEN_MOUSEMOVE', 'TIMER', 'TIMER0']:
+        elif event.type not in ['MOUSEMOVE', 'INBETWEEN_MOUSEMOVE', 'TIMER', 'TIMER0', 'TIMER1', 'TIMER2', 'TIMER_JOBS', 'TIMERREGION']:
             self.last_press = ''
             self.last_added = None
 
