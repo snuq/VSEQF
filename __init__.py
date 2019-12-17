@@ -981,7 +981,7 @@ class VSEQFSetting(bpy.types.PropertyGroup):
         items=[("CROSS", "Crossfade", "", 1), ("WIPE", "Wipe", "", 2), ("GAMMA_CROSS", "Gamma Cross", "", 3)])
     fade: bpy.props.IntProperty(
         name="Fade Length",
-        default=0,
+        default=10,
         min=0,
         description="Default Fade Length In Frames")
     fadein: bpy.props.IntProperty(
