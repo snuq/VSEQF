@@ -431,6 +431,9 @@ class VSEQFModalVolumeDraw(bpy.types.Operator):
 
         return {'RUNNING_MODAL'}
 
+    def execute(self, context):
+        return {'CANCELLED'}
+
     def invoke(self, context, event):
         bpy.ops.ed.undo_push()
         bpy.ops.ed.undo_push()

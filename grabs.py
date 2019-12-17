@@ -922,6 +922,9 @@ class VSEQFContextSequence(bpy.types.Menu):
             if strip.type == 'META':
                 layout.operator('sequencer.meta_toggle', text='Enter Meta Strip')
                 layout.operator('sequencer.meta_separate')
+            if strip.type == 'SOUND':
+                layout.operator_context = "INVOKE_DEFAULT"
+                layout.operator('vseqf.volume_draw', text='Draw Volume Curve')
         if selected:
             layout.separator()
             layout.label(text='Selected Sequence(s):')
