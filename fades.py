@@ -416,7 +416,7 @@ class VSEQFModalVolumeDraw(bpy.types.Operator):
         if event.type == 'LEFTMOUSE':
             self.last_press = 'LEFTMOUSE'
             self.last_added = None
-        elif event.type not in ['MOUSEMOVE', 'INBETWEEN_MOUSEMOVE']:
+        elif event.type not in ['MOUSEMOVE', 'INBETWEEN_MOUSEMOVE', 'TIMER']:
             self.last_press = ''
             self.last_added = None
 
