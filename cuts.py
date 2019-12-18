@@ -365,36 +365,37 @@ class VSEQFQuickCutsMenu(bpy.types.Menu):
         props = layout.operator('vseqf.cut', text='Cut Insert')
         props.type = 'INSERT'
         props.tooltip = 'Cut '+cut_strips+' sequences under the cursor and insert '+str(context.scene.vseqf.quickcuts_insert)+' frames'
-        props = layout.operator('vseqf.cut', text='UnCut Left', icon='BACK')
-        props.type = 'UNCUT_LEFT'
-        props.tooltip = 'Merge selected sequences to those on left if they match source and position'
-        props = layout.operator('vseqf.cut', text='UnCut Right', icon='FORWARD')
-        props.type = 'UNCUT_RIGHT'
-        props.tooltip = 'Merge selected sequences to those on right if they match source and position'
         props = layout.operator('vseqf.delete', text='Delete', icon='X')
         props.tooltip = 'Delete selected sequences'
         props = layout.operator('vseqf.delete', text='Ripple Delete', icon='X')
         props.ripple = True
         props.tooltip = 'Delete selected sequences, and slide following sequences back to close the gap'
         layout.separator()
-        props = layout.operator('vseqf.cut', text='Trim Left', icon='BACK')
+        props = layout.operator('vseqf.cut', text='Trim Left')
         props.type = 'TRIM_LEFT'
         props.tooltip = 'Cut off the left side of '+cut_strips+' sequences under the cursor'
-        props = layout.operator('vseqf.cut', text='Trim Right', icon='FORWARD')
-        props.type = 'TRIM_RIGHT'
-        props.tooltip = 'Cut off the right side of '+cut_strips+' sequences under the cursor'
         props = layout.operator('vseqf.cut', text='Slide Trim Left', icon='BACK')
         props.type = 'SLIDE_LEFT'
         props.tooltip = 'Cut off the left side of '+cut_strips+' sequences under the cursor, and slide cut sequences back to close the gap'
-        props = layout.operator('vseqf.cut', text='Slide Trim Right', icon='FORWARD')
-        props.type = 'SLIDE_RIGHT'
-        props.tooltip = 'Cut off the right side of '+cut_strips+' sequences under the cursor, and slide cut sequences forward to close the gap'
         props = layout.operator('vseqf.cut', text='Ripple Trim Left', icon='BACK')
         props.type = 'RIPPLE_LEFT'
         props.tooltip = 'Cut off the left side of '+cut_strips+' sequences under the cursor, and slide all sequences back to close the gap'
+        props = layout.operator('vseqf.cut', text='UnCut Left', icon='LOOP_BACK')
+        props.type = 'UNCUT_LEFT'
+        props.tooltip = 'Merge selected sequences to those on left if they match source and position'
+        layout.separator()
+        props = layout.operator('vseqf.cut', text='Trim Right')
+        props.type = 'TRIM_RIGHT'
+        props.tooltip = 'Cut off the right side of '+cut_strips+' sequences under the cursor'
+        props = layout.operator('vseqf.cut', text='Slide Trim Right', icon='FORWARD')
+        props.type = 'SLIDE_RIGHT'
+        props.tooltip = 'Cut off the right side of '+cut_strips+' sequences under the cursor, and slide cut sequences forward to close the gap'
         props = layout.operator('vseqf.cut', text='Ripple Trim Right', icon='FORWARD')
         props.type = 'RIPPLE_RIGHT'
         props.tooltip = 'Cut off the right side of '+cut_strips+' sequences under the cursor, and slide all sequences back to close the gap'
+        props = layout.operator('vseqf.cut', text='UnCut Right', icon='LOOP_FORWARDS')
+        props.type = 'UNCUT_RIGHT'
+        props.tooltip = 'Merge selected sequences to those on right if they match source and position'
         layout.separator()
         layout.prop(context.scene.vseqf, 'quickcuts_all', toggle=True)
         layout.prop(context.scene.vseqf, 'quickcuts_insert')
@@ -439,13 +440,6 @@ class VSEQF_PT_QuickCutsPanel(bpy.types.Panel):
         props.type = 'INSERT'
         props.tooltip = 'Cut '+cut_strips+' sequences under the cursor and insert '+str(context.scene.vseqf.quickcuts_insert)+' frames'
 
-        row = box.row(align=True)
-        props = row.operator('vseqf.cut', text='UnCut Left', icon='BACK')
-        props.type = 'UNCUT_LEFT'
-        props.tooltip = 'Merge selected sequences to those on left if they match source and position'
-        props = row.operator('vseqf.cut', text='UnCut Right', icon='FORWARD')
-        props.type = 'UNCUT_RIGHT'
-        props.tooltip = 'Merge selected sequences to those on right if they match source and position'
         row = box.row()
         props = row.operator('vseqf.delete', text='Delete', icon='X')
         props.tooltip = 'Delete selected sequences'
@@ -466,6 +460,9 @@ class VSEQF_PT_QuickCutsPanel(bpy.types.Panel):
         props = column.operator('vseqf.cut', text='Ripple Trim Left', icon='BACK')
         props.type = 'RIPPLE_LEFT'
         props.tooltip = 'Cut off the left side of '+cut_strips+' sequences under the cursor, and slide all sequences back to close the gap'
+        props = column.operator('vseqf.cut', text='UnCut Left', icon='LOOP_BACK')
+        props.type = 'UNCUT_LEFT'
+        props.tooltip = 'Merge selected sequences to those on left if they match source and position'
 
         column = split.column(align=True)
         props = column.operator('vseqf.cut', text='Trim Right', icon='FORWARD')
@@ -477,6 +474,9 @@ class VSEQF_PT_QuickCutsPanel(bpy.types.Panel):
         props = column.operator('vseqf.cut', text='Ripple Trim Right', icon='FORWARD')
         props.type = 'RIPPLE_RIGHT'
         props.tooltip = 'Cut off the right side of '+cut_strips+' sequences under the cursor, and slide all sequences back to close the gap'
+        props = column.operator('vseqf.cut', text='UnCut Right', icon='LOOP_FORWARDS')
+        props.type = 'UNCUT_RIGHT'
+        props.tooltip = 'Merge selected sequences to those on right if they match source and position'
 
 
 class VSEQFDelete(bpy.types.Operator):

@@ -166,7 +166,7 @@ classes = classes + [threepoint.VSEQF_PT_ThreePointBrowserPanel, threepoint.VSEQ
                      threepoint.VSEQF_PT_ThreePointPanel, threepoint.VSEQFThreePointImport,
                      threepoint.VSEQFThreePointOperator, threepoint.VSEQFQuick3PointValues]
 classes = classes + [timeline.VSEQFMeta, timeline.VSEQFMetaExit, timeline.VSEQFQuickTimeline,
-                     timeline.VSEQFQuickTimelineMenu, timeline.VSEQF_PT_QuickTimelinePanel]
+                     timeline.VSEQFQuickTimelineMenu]
 classes = classes + [zoom.VSEQFQuickZoomsMenu, zoom.VSEQFQuickZoomPresetMenu, zoom.VSEQFQuickZoomPreset,
                      zoom.VSEQFClearZooms, zoom.VSEQFRemoveZoom, zoom.VSEQFAddZoom, zoom.VSEQFQuickZooms,
                      zoom.VSEQFZoomPreset]
@@ -200,6 +200,12 @@ def draw_follow_header(self, context):
     scene = context.scene
     if context.space_data.view_type != 'PREVIEW':
         layout.prop(scene.vseqf, 'follow', text='Follow Cursor', toggle=True)
+
+
+def draw_timeline_menu(self, context):
+    layout = self.layout
+    if context.sequences and context.scene.sequence_editor and len(context.sequences) > 0:
+        layout.menu('VSEQF_MT_quicktimeline_menu', text='Timeline')
 
 
 def start_follow(_, context):
@@ -1462,7 +1468,8 @@ def register():
     vseqf_draw_handler = bpy.types.SpaceSequenceEditor.draw_handler_add(vseqf_draw, (), 'WINDOW', 'POST_PIXEL')
 
     #Add menus
-    bpy.types.SEQUENCER_HT_header.append(draw_quickspeed_header)
+    bpy.types.SEQUENCER_HT_header.append(draw_timeline_menu)
+    bpy.types.TIME_HT_editor_buttons.append(draw_quickspeed_header)
     bpy.types.SEQUENCER_HT_header.append(draw_follow_header)
     bpy.types.SEQUENCER_MT_view.append(draw_quickzoom_menu)
     bpy.types.SEQUENCER_MT_view.prepend(draw_quicksettings_menu)
@@ -1498,7 +1505,8 @@ def unregister():
     bpy.types.SpaceSequenceEditor.draw_handler_remove(vseqf_draw_handler, 'WINDOW')
 
     #Unregister menus
-    bpy.types.SEQUENCER_HT_header.remove(draw_quickspeed_header)
+    bpy.types.SEQUENCER_HT_header.remove(draw_timeline_menu)
+    bpy.types.TIME_HT_editor_buttons.remove(draw_quickspeed_header)
     bpy.types.SEQUENCER_MT_view.remove(draw_quickzoom_menu)
     bpy.types.SEQUENCER_MT_view.remove(draw_quicksettings_menu)
     bpy.types.SEQUENCER_HT_header.remove(draw_follow_header)

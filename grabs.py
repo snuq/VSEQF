@@ -857,6 +857,7 @@ class VSEQFContextNone(bpy.types.Menu):
             layout.separator()
         layout.menu('SEQUENCER_MT_add')
         layout.menu('VSEQF_MT_quickzooms_menu')
+        layout.menu('VSEQF_MT_quicktimeline_menu')
 
 
 class VSEQFContextSequenceLeft(bpy.types.Menu):
