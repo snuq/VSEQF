@@ -276,27 +276,6 @@ def on_sequence(frame, channel, sequence):
         return False
 
 
-def vseqf_grab_draw(self, context):
-    #Callback function to draw overlays in sequencer when grab is activated
-    colors = context.preferences.themes[0].user_interface
-    text_color = list(colors.wcol_text.text_sel)+[1]
-    if self.mode == 'SLIP':
-        mode = 'Slip'
-    else:
-        if self.ripple:
-            mode = 'Ripple'
-            if self.ripple_pop:
-                mode = 'Ripple-Pop'
-        else:
-            mode = 'Grab'
-
-    view = context.region.view2d
-    for seq in self.grabbed_sequences:
-        sequence = seq
-        window_x, window_y = view.view_to_region(sequence.frame_final_start, sequence.channel)
-        vseqf.draw_text(window_x, window_y - 6, 12, mode, text_color)
-
-
 class VSEQFSelectGrab(bpy.types.Operator):
     """Replacement for the right and left-click select operator and context menu"""
     bl_idname = "vseqf.select_grab"
@@ -427,6 +406,26 @@ class VSEQFGrabAdd(bpy.types.Operator):
     ripple_start = 0
     ripple_left = 0
 
+    def vseqf_grab_draw(self, context):
+        #Callback function to draw overlays in sequencer when grab is activated
+        colors = context.preferences.themes[0].user_interface
+        text_color = list(colors.wcol_text.text_sel)+[1]
+        if self.mode == 'SLIP':
+            mode = 'Slip'
+        else:
+            if self.ripple:
+                mode = 'Ripple'
+                if self.ripple_pop:
+                    mode = 'Ripple-Pop'
+            else:
+                mode = 'Grab'
+
+        view = context.region.view2d
+        for seq in self.grabbed_sequences:
+            sequence = seq
+            window_x, window_y = view.view_to_region(sequence.frame_final_start, sequence.channel)
+            vseqf.draw_text(window_x, window_y - 6, 12, mode, text_color)
+
     def reset_sequences(self):
         #used when cancelling, puts everything back to where it was at the beginning by first moving it somewhere safe, then to the true location
 
@@ -451,6 +450,8 @@ class VSEQFGrabAdd(bpy.types.Operator):
         return
 
     def modal(self, context, event):
+        release_confirm = bpy.context.preferences.inputs.use_drag_immediately
+
         reset_sequences = False
         if event.type == 'TIMER':
             pass
@@ -519,7 +520,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
         ripple_offset = move_sequences(context, self.starting_data, offset_x, offset_y, self.grabbed_sequences, ripple_pop=self.ripple_pop, fix_fades=False, ripple=self.ripple, move_root=False)
         grab_ripple_sequences(self.starting_data, self.ripple_sequences, self.ripple, ripple_offset)
 
-        if event.type in {'LEFTMOUSE', 'RET'}:
+        if event.type in {'LEFTMOUSE', 'RET'} or (release_confirm and event.value == 'RELEASE'):
             self.remove_draw_handler()
             if self.prefs.fades:
                 fix_fades = True
@@ -700,7 +701,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
         #bpy.ops.ed.undo_push()
         context.window_manager.modal_handler_add(self)
         args = (self, context)
-        self._handle = bpy.types.SpaceSequenceEditor.draw_handler_add(vseqf_grab_draw, args, 'WINDOW', 'POST_PIXEL')
+        self._handle = bpy.types.SpaceSequenceEditor.draw_handler_add(self.vseqf_grab_draw, args, 'WINDOW', 'POST_PIXEL')
         return {'RUNNING_MODAL'}
 
 

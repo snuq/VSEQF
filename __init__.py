@@ -32,6 +32,7 @@ Future Possibilities:
 
 Todo:
     Once the tools panel is implemented in sequencer, rework all panels and menus to make better use of it.
+    Integrate VU meter into script once it has been fully tested
 
 Features:
     Strip parenting
