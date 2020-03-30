@@ -506,6 +506,8 @@ class VSEQFQuickTimelineMenu(bpy.types.Menu):
     def draw(self, context):
         del context
         layout = self.layout
+        layout.operator('vseqf.check_clipping')
+        layout.separator()
         props = layout.operator('vseqf.quicktimeline', text='Timeline To All')
         props.operation = 'sequences'
         props.tooltip = 'Trims the timeline to all sequences'

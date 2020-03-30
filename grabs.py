@@ -4,6 +4,7 @@ from . import vseqf
 from . import timeline
 from . import parenting
 from . import fades
+from . import vu_meter
 
 
 marker_area_height = 40
@@ -521,7 +522,9 @@ class VSEQFGrabAdd(bpy.types.Operator):
         grab_ripple_sequences(self.starting_data, self.ripple_sequences, self.ripple, ripple_offset)
 
         if event.type in {'LEFTMOUSE', 'RET'} or (release_confirm and event.value == 'RELEASE'):
+            vu_meter.vu_meter_calculate(context.scene)
             self.remove_draw_handler()
+            vseqf.redraw_sequencers()
             if self.prefs.fades:
                 fix_fades = True
             else:
@@ -700,7 +703,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
             self.can_pop = False
         #bpy.ops.ed.undo_push()
         context.window_manager.modal_handler_add(self)
-        args = (self, context)
+        args = (context, )
         self._handle = bpy.types.SpaceSequenceEditor.draw_handler_add(self.vseqf_grab_draw, args, 'WINDOW', 'POST_PIXEL')
         return {'RUNNING_MODAL'}
 

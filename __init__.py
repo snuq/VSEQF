@@ -32,7 +32,6 @@ Future Possibilities:
 
 Todo:
     Once the tools panel is implemented in sequencer, rework all panels and menus to make better use of it.
-    Integrate VU meter into script once it has been fully tested
 
 Features:
     Strip parenting
@@ -123,6 +122,7 @@ from . import threepoint
 from . import timeline
 from . import zoom
 from . import vseqf
+from . import vu_meter
 
 
 bl_info = {
@@ -137,6 +137,9 @@ bl_info = {
     "category": "Sequencer"
 }
 vseqf_draw_handler = None
+vu_meter_draw_handler = None
+frame_step_handler = None
+continuous_handler = None
 
 classes = []
 
@@ -171,6 +174,7 @@ classes = classes + [timeline.VSEQFMeta, timeline.VSEQFMetaExit, timeline.VSEQFQ
 classes = classes + [zoom.VSEQFQuickZoomsMenu, zoom.VSEQFQuickZoomPresetMenu, zoom.VSEQFQuickZoomPreset,
                      zoom.VSEQFClearZooms, zoom.VSEQFRemoveZoom, zoom.VSEQFAddZoom, zoom.VSEQFQuickZooms,
                      zoom.VSEQFZoomPreset]
+classes = classes + [vu_meter.VUMeterCheckClipping]
 
 
 #Menu draw functions
@@ -884,10 +888,11 @@ def draw_strip_info(context, active_strip, fps, frame_px, channel_px, min_x, max
 #Functions related to QuickSpeed
 @persistent
 def frame_step(scene):
-    """Handler that skips frames when the speed step value is used
+    """Handler that skips frames when the speed step value is used, and updates the vu meter
     Argument:
         scene: the current Scene"""
 
+    vu_meter.vu_meter_calculate(scene)
     if bpy.context.scene != scene:
         return
     if scene.vseqf.step in [-1, 0, 1]:
@@ -918,6 +923,7 @@ class VSEQFSettingsMenu(bpy.types.Menu):
 
         layout = self.layout
         scene = context.scene
+        layout.prop(scene.vseqf, 'vu_show', text='Show VU Meter')
         layout.prop(scene.vseqf, 'snap_cursor_to_edge')
         layout.prop(scene.vseqf, 'snap_new_end')
         layout.prop(scene.vseqf, 'shortcut_skip')
@@ -945,6 +951,17 @@ class VSEQFSettingsMenu(bpy.types.Menu):
 
 class VSEQFSetting(bpy.types.PropertyGroup):
     """Property group to store most VSEQF settings.  This will be assigned to scene.vseqf"""
+
+    vu: bpy.props.FloatProperty(
+        name="VU Meter Level",
+        default=-60)
+    vu_show: bpy.props.BoolProperty(
+        name="Enable VU Meter",
+        default=True)
+    vu_max: bpy.props.FloatProperty(
+        name="VU Meter Max Level",
+        default=-60)
+
     zoom_presets: bpy.props.CollectionProperty(type=zoom.VSEQFZoomPreset)
     last_frame: bpy.props.IntProperty(
         name="Last Scene Frame",
@@ -1314,6 +1331,44 @@ class SEQUENCER_MT_add(bpy.types.Menu):
         col.enabled = selected_sequences_len(context) >= 1
 
 
+def remove_vu_draw_handler(add=False):
+    global vu_meter_draw_handler
+    if vu_meter_draw_handler:
+        try:
+            bpy.types.SpaceSequenceEditor.draw_handler_remove(vu_meter_draw_handler, 'WINDOW')
+            vu_meter_draw_handler = None
+        except:
+            pass
+    if add:
+        vu_meter_draw_handler = bpy.types.SpaceSequenceEditor.draw_handler_add(vu_meter.vu_meter_draw, (), 'WINDOW', 'POST_PIXEL')
+
+
+def remove_frame_step_handler(add=False):
+    global frame_step_handler
+    handlers = bpy.app.handlers.frame_change_post
+    if frame_step_handler:
+        try:
+            handlers.remove(frame_step_handler)
+            frame_step_handler = None
+        except:
+            pass
+    if add:
+        frame_step_handler = handlers.append(frame_step)
+
+
+def remove_continuous_handler(add=False):
+    global continuous_handler
+    handlers = bpy.app.handlers.depsgraph_update_post
+    if continuous_handler:
+        try:
+            handlers.remove(continuous_handler)
+            continuous_handler = None
+        except:
+            pass
+    if add:
+        continuous_handler = handlers.append(vseqf_continuous)
+
+
 #Register properties, operators, menus and shortcuts
 classes = classes + [VSEQFSettingsMenu, VSEQFSetting, VSEQFFollow, VSEQFImport, VSEQF_PT_CompactEdit,
                      SEQUENCER_MT_strip, SEQUENCER_MT_strip_transform, SEQUENCER_MT_add]
@@ -1488,20 +1543,14 @@ def register():
     #Register shortcuts
     register_keymaps()
 
-    #Register handler
-    handlers = bpy.app.handlers.frame_change_post
-    for handler in handlers:
-        if " frame_step " in str(handler):
-            handlers.remove(handler)
-    handlers.append(frame_step)
-    handlers = bpy.app.handlers.depsgraph_update_post
-    for handler in handlers:
-        if " vseqf_continuous " in str(handler):
-            handlers.remove(handler)
-    handlers.append(vseqf_continuous)
+    #Register handlers
+    remove_frame_step_handler(add=True)
+    remove_continuous_handler(add=True)
+    remove_vu_draw_handler(add=True)
 
 
 def unregister():
+
     global vseqf_draw_handler
     bpy.types.SpaceSequenceEditor.draw_handler_remove(vseqf_draw_handler, 'WINDOW')
 
@@ -1518,15 +1567,11 @@ def unregister():
         if (keymapitem.type == 'Z') | (keymapitem.type == 'F') | (keymapitem.type == 'S') | (keymapitem.type == 'G') | (keymapitem.type == 'RIGHTMOUSE') | (keymapitem.type == 'K') | (keymapitem.type == 'E') | (keymapitem.type == 'X') | (keymapitem.type == 'DEL') | (keymapitem.type == 'M') | (keymapitem.type == 'NUMPAD_0') | (keymapitem.type == 'NUMPAD_1') | (keymapitem.type == 'NUMPAD_2') | (keymapitem.type == 'NUMPAD_3') | (keymapitem.type == 'NUMPAD_4') | (keymapitem.type == 'NUMPAD_5') | (keymapitem.type == 'NUMPAD_6') | (keymapitem.type == 'NUMPAD_7') | (keymapitem.type == 'NUMPAD_8') | (keymapitem.type == 'NUMPAD_9'):
             keymapitems.remove(keymapitem)
 
-    #Remove handlers for modal operators
-    handlers = bpy.app.handlers.frame_change_post
-    for handler in handlers:
-        if " frame_step " in str(handler):
-            handlers.remove(handler)
-    handlers = bpy.app.handlers.depsgraph_update_post
-    for handler in handlers:
-        if " vseqf_continuous " in str(handler):
-            handlers.remove(handler)
+    #Remove handlers
+    remove_vu_draw_handler()
+    remove_frame_step_handler()
+    remove_continuous_handler()
+
     try:
         bpy.utils.unregister_class(VSEQuickFunctionSettings)
     except RuntimeError:
