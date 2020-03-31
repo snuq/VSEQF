@@ -16,7 +16,10 @@ def vseqf_cut(sequence, frame=0, cut_type="SOFT"):
     right_sequence = False
     if frame > sequence.frame_final_start and frame < sequence.frame_final_end:
         sequence.select = True
-        bpy.ops.sequencer.cut(frame=frame, type=cut_type, side="BOTH")
+        try:
+            bpy.ops.sequencer.split(frame=frame, type=cut_type, side="BOTH")  #Changed in 2.83
+        except AttributeError:
+            bpy.ops.sequencer.cut(frame=frame, type=cut_type, side="BOTH")
         sequences = timeline.current_selected(bpy.context)
         for seq in sequences:
             seq.select = False

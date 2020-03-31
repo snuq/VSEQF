@@ -76,33 +76,6 @@ Features:
         Cutting strips with a crossfade could cause the crossfade to be applied to the wrong cut strip, it is now applied to the correct strip.  https://developer.blender.org/T50877
     And much more
 
-
-Changelog:
-0.96
-    Fixed bug where box select wouldn't work.
-    Removed right-click hold menus - too buggy and blocked box select.  New context menu shortcut: '`' and 'w'
-    Improved frame skipping
-    Fixed bug where cut strips with deleted parents could have their old parent 'replaced' by a new cut
-    Fixed bug in fade operator where waveforms for strips with no animation data would vanish
-    Removed QuickList
-    Fixed a bug where clearing fades could cause an error - thanks jaggz
-    Improved fades - should be better about maintaining the original curve, and not leave extra points when fades are cleared
-    Refactored code to make it easier to maintain
-    Added option to disable/enable child edges following parents
-    Rewrote grab and snapping functions, should be more reliable and correct now
-    Fixed some bugs in 3point
-    Added variable to change skipped frames in Numpad 7 and 8 shortcuts
-    Implemented an operator to draw keyframes for active sound strip directly in the vse (press 'V')
-    Fixed bug where filled sequencer areas were not detected properly
-    Greatly improved strip tags interface, added ability for tags to become strip markers
-    Moved some panels to the new 'Sequencer' tab
-    Fixed some api bugs introduced from Blender 2.81
-    Added proper tooltips to all operators
-
-2.82.1
-    Changed versioning system to make it obvious which versions work with which versions of Blender
-    Added VU meters
-
 """
 
 import os
@@ -140,6 +113,10 @@ bl_info = {
     "tracker_url": "https://github.com/snuq/VSEQF/issues",
     "category": "Sequencer"
 }
+from .addon_updater import Updater as updater
+updater.addon = "vseqf"
+from . import addon_updater_ops
+
 vseqf_draw_handler = None
 vu_meter_draw_handler = None
 frame_step_handler = None
@@ -1112,6 +1089,7 @@ class VSEQFSetting(bpy.types.PropertyGroup):
 class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
     """Addon preferences for QuickFunctions, used to enable and disable features"""
     bl_idname = __name__
+
     parenting: bpy.props.BoolProperty(
         name="Enable Quick Parenting",
         default=True)
@@ -1137,8 +1115,35 @@ class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
         name="Enable Quick Three Point",
         default=True)
 
+    auto_check_update: bpy.props.BoolProperty(
+        name="Auto-check for Update",
+        description="If enabled, auto-check for updates using an interval",
+        default=False)
+    updater_intrval_months: bpy.props.IntProperty(
+        name='Months',
+        description="Number of months between checking for updates",
+        default=0,
+        min=0)
+    updater_intrval_days: bpy.props.IntProperty(
+        name='Days',
+        description="Number of days between checking for updates",
+        default=7,
+        min=0,
+        max=31)
+    updater_intrval_hours: bpy.props.IntProperty(
+        name='Hours',
+        description="Number of hours between checking for updates",
+        default=0,
+        min=0,
+        max=23)
+    updater_intrval_minutes: bpy.props.IntProperty(
+        name='Minutes',
+        description="Number of minutes between checking for updates",
+        default=0,
+        min=0,
+        max=59)
+
     def draw(self, context):
-        del context
         layout = self.layout
         layout.prop(self, "parenting")
         layout.prop(self, "fades")
@@ -1148,6 +1153,10 @@ class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
         layout.prop(self, "cuts")
         layout.prop(self, "edit")
         layout.prop(self, "threepoint")
+
+        mainrow = layout.row()
+        col = mainrow.column()
+        addon_updater_ops.update_settings_ui(self, context)
 
 
 #Replaced Blender Menus
@@ -1160,7 +1169,7 @@ class SEQUENCER_MT_strip_transform(bpy.types.Menu):
         #layout.operator("transform.seq_slide", text="Move")
         layout.operator("vseqf.grab", text="Grab/Move")
         #layout.operator("transform.transform", text="Move/Extend from Playhead").mode = 'TIME_EXTEND'
-        layout.operator("vseqf.grab", text="Move/Extend from frame").mode = 'TIME_EXTEND'
+        layout.operator("vseqf.grab", text="Move/Extend from playhead").mode = 'TIME_EXTEND'
         #layout.operator("sequencer.slip", text="Slip Strip Contents")
         layout.operator("vseqf.grab", text="Slip Strip Contents").mode = 'SLIP'
 
@@ -1196,8 +1205,8 @@ class SEQUENCER_MT_strip(bpy.types.Menu):
         layout.separator()
         #layout.operator("sequencer.cut", text="Cut").type = 'SOFT'
         #layout.operator("sequencer.cut", text="Hold Cut").type = 'HARD'
-        layout.operator("vseqf.cut", text="Cut").type = 'SOFT'
-        layout.operator("vseqf.cut", text="Hold Cut").type = 'HARD'
+        layout.operator("vseqf.cut", text="Cut/Split").type = 'SOFT'
+        layout.operator("vseqf.cut", text="Hold Cut/Split").type = 'HARD'
 
         layout.separator()
         layout.operator("sequencer.copy", text="Copy")
@@ -1248,9 +1257,6 @@ class SEQUENCER_MT_strip(bpy.types.Menu):
                 #layout.operator("sequencer.meta_make")
                 layout.operator("vseqf.meta_make")
                 layout.operator("sequencer.meta_toggle", text="Toggle Meta")
-
-        layout.separator()
-        layout.menu("SEQUENCER_MT_strip_lock_mute")
 
         layout.separator()
         layout.menu("SEQUENCER_MT_strip_input")
@@ -1513,6 +1519,12 @@ def register_keymaps():
 
 
 def register():
+    addon_updater_ops.register(bl_info)
+    updater.user = "snuq"
+    updater.repo = "VSEQF"
+    updater.website = "https://github.com/snuq/VSEQF"
+    updater.verbose = False
+
     bpy.utils.register_class(VSEQuickFunctionSettings)
 
     #Register classes
@@ -1554,7 +1566,6 @@ def register():
 
 
 def unregister():
-
     global vseqf_draw_handler
     bpy.types.SpaceSequenceEditor.draw_handler_remove(vseqf_draw_handler, 'WINDOW')
 
@@ -1584,6 +1595,8 @@ def unregister():
     #Unregister classes
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
+
+    addon_updater_ops.unregister()
 
 
 if __name__ == "__main__":
