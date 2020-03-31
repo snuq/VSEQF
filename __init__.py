@@ -99,6 +99,10 @@ Changelog:
     Fixed some api bugs introduced from Blender 2.81
     Added proper tooltips to all operators
 
+2.82.1
+    Changed versioning system to make it obvious which versions work with which versions of Blender
+    Added VU meters
+
 """
 
 import os
@@ -129,8 +133,8 @@ bl_info = {
     "name": "VSE Quick Functions",
     "description": "Improves functionality of the sequencer by adding new menus and functions for snapping, adding fades, zooming, sequence parenting, ripple editing, playback speed, and more.",
     "author": "Hudson Barkley (Snu/snuq/Aritodo)",
-    "version": (0, 9, 6),
-    "blender": (2, 81, 0),
+    "version": (2, 82, 1),
+    "blender": (2, 82, 0),
     "location": "Sequencer Panels; Sequencer Menus; Sequencer S, F, Shift-F, Z, Ctrl-P, Shift-P, Alt-M, Alt-K Shortcuts",
     "wiki_url": "https://github.com/snuq/VSEQF",
     "tracker_url": "https://github.com/snuq/VSEQF/issues",
