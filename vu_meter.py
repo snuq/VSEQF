@@ -23,6 +23,8 @@ def display_report(report):
 
 def get_volume_unit(frame=None):
     total = 0
+    if bpy.context.scene.sequence_editor is None:
+        return 0
     sequences = bpy.context.scene.sequence_editor.sequences_all
     depsgraph = bpy.context.evaluated_depsgraph_get()
     if frame is None:
