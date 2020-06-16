@@ -206,7 +206,8 @@ def move_sequences(context, starting_data, offset_x, offset_y, grabbed_sequences
                                 select_right = False
                             if select_left or select_right:
                                 move_sequence(context, child, offset_x, offset_y, select_left, select_right, child_data.channel, child_data.frame_start, child_data.frame_final_start, child_data.frame_final_end, ripple=ripple, fix_fades=fix_fades)
-                        child.frame_start = child_data.frame_start + ripple_offset
+                        if not data.select_right_handle:
+                            child.frame_start = child_data.frame_start + ripple_offset
                     else:
                         move_sequence(context, child, root_offset_x, root_offset_y, False, False, child_data.channel, child_data.frame_start, child_data.frame_final_start, child_data.frame_final_end)
                 else:
@@ -588,9 +589,13 @@ class VSEQFGrabAdd(bpy.types.Operator):
         to_move = []
         selected_sequences = timeline.current_selected(context)
         for sequence in selected_sequences:
-            if sequence.frame_final_start < self.ripple_start and not hasattr(sequence, 'input_1') and not sequence.lock:
-                self.ripple_start = sequence.frame_final_start
-                self.ripple_left = sequence.frame_final_start
+            if sequence.select_right_handle:
+                ripple_point = sequence.frame_final_end
+            else:
+                ripple_point = sequence.frame_final_start
+            if ripple_point < self.ripple_start and not hasattr(sequence, 'input_1') and not sequence.lock:
+                self.ripple_start = ripple_point
+                self.ripple_left = ripple_point
             if is_parenting:
                 to_move = parenting.get_recursive(sequence, to_move)
             else:
