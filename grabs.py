@@ -156,7 +156,7 @@ def grab_starting_data(sequences):
     return data
 
 
-def move_sequences(context, starting_data, offset_x, offset_y, grabbed_sequences, fix_fades=False, ripple=False, ripple_pop=False, move_root=True):
+def move_sequences(context, starting_data, offset_x, offset_y, grabbed_sequences, fix_fades=False, ripple=False, ripple_pop=False, move_root=True, child_edges=False):
     ripple_offset = 0
     right_edges = []
 
@@ -213,6 +213,12 @@ def move_sequences(context, starting_data, offset_x, offset_y, grabbed_sequences
                 else:
                     #Children of children, only move them if the root sequence has moved
                     move_sequence(context, child, root_offset_x, root_offset_y, False, False, child_data.channel, child_data.frame_start, child_data.frame_final_start, child_data.frame_final_end)
+                if child_edges:
+                    #Snap edges of children to edge of parent
+                    if sequence.select_left_handle:
+                        child.frame_final_start = sequence.frame_final_start
+                    if sequence.select_right_handle:
+                        child.frame_final_end = sequence.frame_final_end
 
     return ripple_offset
 

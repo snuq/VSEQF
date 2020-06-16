@@ -184,7 +184,7 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                     else:
                         snap_start = sequence.frame_final_start
                     offset_x = (snap_target - snap_start)
-                    grabs.move_sequences(context, starting_data, offset_x, 0, [sequence], fix_fades=True)
+                    grabs.move_sequences(context, starting_data, offset_x, 0, [sequence], fix_fades=True, child_edges=True)
                     check_snap.append([sequence, offset_x])
                 for data in check_snap:
                     #Check positions again because the strip collisions thing can mess them up
