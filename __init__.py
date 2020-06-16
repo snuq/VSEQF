@@ -31,7 +31,7 @@ Future Possibilities:
     Showing a visual offset on the active audio sequence, showing how far out of sync it is from it's video parent
 
 Todo:
-    Bug: grab operator sometimes doesnt activate on right-click drag in blender 2.83??
+    Bug: grab operator sometimes doesnt activate on click-drag in blender 2.83??
     Bug: vu meter can be REALLY slow sometimes...
     Bug: snapping a strip can try to snap to its own child, which causes weirdness when both are a bit offset
     Feature: add maximize volume option for strip, maybe add a compressor via animations?

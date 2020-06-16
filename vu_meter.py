@@ -66,6 +66,8 @@ def get_volume_unit(frame=None):
 
 
 def vu_meter_calculate(scene):
+    if scene != bpy.context.scene:
+        return
     vseqf_settings = scene.vseqf
     if vseqf_settings.vu_show:
         percent_vu = get_volume_unit()
