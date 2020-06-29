@@ -284,6 +284,33 @@ def on_sequence(frame, channel, sequence):
         return False
 
 
+class VSEQFSelectGrabTool(bpy.types.WorkSpaceTool):
+    bl_space_type = 'SEQUENCE_EDITOR'
+    bl_context_mode = 'SEQUENCER'  #Also could be PREVIEW or SEQUENCER_PREVIEW
+
+    bl_idname = "vseqf.select_grab_tool"
+    bl_label = "Move Plus"
+    bl_description = (
+        "Select and move a strip, with parenting and extra features."
+    )
+    bl_icon = "ops.generic.select"
+    bl_widget = None
+    bl_keymap = (
+        ("vseqf.select_grab", {"type": 'RIGHTMOUSE', "value": 'PRESS'}, None),
+        ("vseqf.select_grab", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+        ("vseqf.select_grab", {"type": 'RIGHTMOUSE', "value": 'PRESS', "ctrl": True}, None),
+        ("vseqf.select_grab", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
+        ("vseqf.select_grab", {"type": 'RIGHTMOUSE', "value": 'PRESS', "alt": True}, None),
+        ("vseqf.select_grab", {"type": 'LEFTMOUSE', "value": 'PRESS', "alt": True}, None),
+        ("vseqf.select_grab", {"type": 'RIGHTMOUSE', "value": 'PRESS', "ctrl": True, "alt": True}, None),
+        ("vseqf.select_grab", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True, "alt": True}, None),
+    )
+
+    def draw_settings(self, layout, tool):
+        props = tool.operator_properties("vseqf.select_grab")
+        layout.prop(props, "mode")
+
+
 class VSEQFSelectGrab(bpy.types.Operator):
     """Replacement for the right and left-click select operator and context menu"""
     bl_idname = "vseqf.select_grab"
@@ -327,6 +354,20 @@ class VSEQFSelectGrab(bpy.types.Operator):
 
     def invoke(self, context, event):
         self.click_mode = context.window_manager.keyconfigs.active.preferences.select_mouse
+        if self.click_mode == 'RIGHT' and event.type == 'LEFTMOUSE':
+            #in RCS, left click on squencer, move cursor if nothing is clickd on
+            region = context.region
+            view = region.view2d
+            location = view.region_to_view(event.mouse_region_x, event.mouse_region_y)
+            click_frame, click_channel = location
+            clicked_sequence = None
+            for sequence in context.scene.sequence_editor.sequences:
+                if on_sequence(click_frame, click_channel, sequence):
+                    clicked_sequence = sequence
+                    break
+            if not clicked_sequence:
+                bpy.ops.anim.change_frame('INVOKE_DEFAULT')
+                return {'FINISHED'}
         if event.type == 'RIGHTMOUSE':
             #right click, maybe do context menus
             bpy.ops.vseqf.context_menu('INVOKE_DEFAULT')
@@ -334,11 +375,19 @@ class VSEQFSelectGrab(bpy.types.Operator):
                 return {'FINISHED'}
         bpy.ops.ed.undo_push()
         self.selected = []
-        selected_sequences = timeline.current_selected(context)
-        for sequence in selected_sequences:
+        original_selected_sequences = timeline.current_selected(context)
+        for sequence in original_selected_sequences:
             self.selected.append([sequence, sequence.select_left_handle, sequence.select_right_handle])
         if event.mouse_region_y > marker_area_height:
-            bpy.ops.sequencer.select('INVOKE_DEFAULT', deselect_all=True)
+            if event.ctrl and event.alt:
+                return {'FINISHED'}
+            elif event.ctrl:
+                bpy.ops.sequencer.select('INVOKE_DEFAULT', deselect_all=False, linked_time=True)
+                return {'FINISHED'}
+            elif event.alt:
+                bpy.ops.sequencer.select('INVOKE_DEFAULT', deselect_all=True, linked_handle=True)
+            else:
+                bpy.ops.sequencer.select('INVOKE_DEFAULT', deselect_all=True)
         selected_sequences = timeline.current_selected(context)
         if not selected_sequences:
             return {'FINISHED'}

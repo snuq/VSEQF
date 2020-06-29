@@ -110,8 +110,8 @@ bl_info = {
     "name": "VSE Quick Functions",
     "description": "Improves functionality of the sequencer by adding new menus and functions for snapping, adding fades, zooming, sequence parenting, ripple editing, playback speed, and more.",
     "author": "Hudson Barkley (Snu/snuq/Aritodo)",
-    "version": (2, 82, 2),
-    "blender": (2, 82, 0),
+    "version": (2, 83, 0),
+    "blender": (2, 83, 0),
     "location": "Sequencer Panels; Sequencer Menus; Sequencer S, F, Shift-F, Z, Ctrl-P, Shift-P, Alt-M, Alt-K Shortcuts",
     "wiki_url": "https://github.com/snuq/VSEQF",
     "tracker_url": "https://github.com/snuq/VSEQF/issues",
@@ -669,6 +669,7 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
 def vseqf_continuous(scene):
     if not bpy.context.scene or bpy.context.scene != scene:
         return
+    replace_default_keymap()
     if scene.vseqf.last_frame != scene.frame_current:
         #scene frame was changed, assume nothing else happened
         pass
@@ -1388,7 +1389,19 @@ classes = classes + [VSEQFSettingsMenu, VSEQFSetting, VSEQFFollow, VSEQFImport, 
                      SEQUENCER_MT_strip, SEQUENCER_MT_strip_transform, SEQUENCER_MT_add]
 
 
+def replace_default_keymap():
+    #replace sequencer select tool keymaps
+    default_keymaps = bpy.context.window_manager.keyconfigs.default.keymaps
+    if 'Sequencer Tool: Select' not in default_keymaps:
+        return
+    select_tool_keymap = default_keymaps['Sequencer Tool: Select']
+    if 'sequencer.select' in select_tool_keymap.keymap_items:
+        current_select = select_tool_keymap.keymap_items['sequencer.select']
+        select_tool_keymap.keymap_items.remove(current_select)
+
+
 def register_keymaps():
+    #register standard keymaps
     if bpy.context.window_manager.keyconfigs.addon:
         keymap = bpy.context.window_manager.keyconfigs.addon.keymaps.new(name='Sequencer', space_type='SEQUENCE_EDITOR', region_type='WINDOW')
         keymapitems = keymap.keymap_items
@@ -1534,6 +1547,9 @@ def register():
     #Register classes
     for cls in classes:
         bpy.utils.register_class(cls)
+
+    #Register toolbar buttons
+    #bpy.utils.register_tool(grabs.VSEQFSelectGrabTool, separator=True)
 
     global vseqf_draw_handler
     if vseqf_draw_handler:
