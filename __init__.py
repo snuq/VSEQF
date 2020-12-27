@@ -1561,7 +1561,11 @@ def register():
 
     #Add menus
     bpy.types.SEQUENCER_HT_header.append(draw_timeline_menu)
-    bpy.types.TIME_HT_editor_buttons.append(draw_quickspeed_header)
+    try:
+        bpy.types.TIME_HT_editor_buttons.append(draw_quickspeed_header)
+    except:
+        #Fix for bug in blender 2.91, move the quickspeed header to the sequencer...
+        bpy.types.TIME_MT_editor_menus.append(draw_quickspeed_header)
     bpy.types.SEQUENCER_HT_header.append(draw_follow_header)
     bpy.types.SEQUENCER_MT_view.append(draw_quickzoom_menu)
     bpy.types.SEQUENCER_MT_view.prepend(draw_quicksettings_menu)
@@ -1569,12 +1573,12 @@ def register():
 
     #New variables
     bpy.types.Scene.vseqf_skip_interval = bpy.props.IntProperty(default=0, min=0)
+    bpy.types.Scene.vseqf = bpy.props.PointerProperty(type=VSEQFSetting)
     bpy.types.Sequence.parent = bpy.props.StringProperty()
     bpy.types.Sequence.tags = bpy.props.CollectionProperty(type=tags.VSEQFTags)
-    bpy.types.Scene.vseqf = bpy.props.PointerProperty(type=VSEQFSetting)
-    bpy.types.MovieClip.import_settings = bpy.props.PointerProperty(type=threepoint.VSEQFQuick3PointValues)
     bpy.types.Sequence.new = bpy.props.BoolProperty(default=True)
     bpy.types.Sequence.last_name = bpy.props.StringProperty()
+    bpy.types.MovieClip.import_settings = bpy.props.PointerProperty(type=threepoint.VSEQFQuick3PointValues)
 
     #Register shortcuts
     register_keymaps()
@@ -1591,7 +1595,10 @@ def unregister():
 
     #Unregister menus
     bpy.types.SEQUENCER_HT_header.remove(draw_timeline_menu)
-    bpy.types.TIME_HT_editor_buttons.remove(draw_quickspeed_header)
+    try:
+        bpy.types.TIME_HT_editor_buttons.remove(draw_quickspeed_header)
+    except:
+        bpy.types.TIME_MT_editor_menus.remove(draw_quickspeed_header)
     bpy.types.SEQUENCER_MT_view.remove(draw_quickzoom_menu)
     bpy.types.SEQUENCER_MT_view.remove(draw_quicksettings_menu)
     bpy.types.SEQUENCER_HT_header.remove(draw_follow_header)
