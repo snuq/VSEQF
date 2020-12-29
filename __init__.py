@@ -1564,8 +1564,8 @@ def register():
     try:
         bpy.types.TIME_HT_editor_buttons.append(draw_quickspeed_header)
     except:
-        #Fix for bug in blender 2.91, move the quickspeed header to the sequencer...
-        bpy.types.TIME_MT_editor_menus.append(draw_quickspeed_header)
+        #Fix for blender 2.91, move the quickspeed header...
+        bpy.types.DOPESHEET_HT_header.append(draw_quickspeed_header)
     bpy.types.SEQUENCER_HT_header.append(draw_follow_header)
     bpy.types.SEQUENCER_MT_view.append(draw_quickzoom_menu)
     bpy.types.SEQUENCER_MT_view.prepend(draw_quicksettings_menu)
@@ -1598,7 +1598,7 @@ def unregister():
     try:
         bpy.types.TIME_HT_editor_buttons.remove(draw_quickspeed_header)
     except:
-        bpy.types.TIME_MT_editor_menus.remove(draw_quickspeed_header)
+        bpy.types.DOPESHEET_HT_header.remove(draw_quickspeed_header)
     bpy.types.SEQUENCER_MT_view.remove(draw_quickzoom_menu)
     bpy.types.SEQUENCER_MT_view.remove(draw_quicksettings_menu)
     bpy.types.SEQUENCER_HT_header.remove(draw_follow_header)
