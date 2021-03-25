@@ -105,7 +105,7 @@ def select_parent(child_sequence):
 
 class VSEQF_PT_Parenting(bpy.types.Panel):
     bl_label = 'Parenting'
-    bl_parent_id = "SEQUENCER_PT_adjust"
+    #bl_parent_id = "SEQUENCER_PT_adjust"
     bl_space_type = 'SEQUENCE_EDITOR'
     bl_region_type = 'UI'
     bl_category = "Strip"
