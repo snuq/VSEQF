@@ -110,8 +110,8 @@ bl_info = {
     "name": "VSE Quick Functions",
     "description": "Improves functionality of the sequencer by adding new menus and functions for snapping, adding fades, zooming, sequence parenting, ripple editing, playback speed, and more.",
     "author": "Hudson Barkley (Snu/snuq/Aritodo)",
-    "version": (2, 92, 0),
-    "blender": (2, 92, 0),
+    "version": (2, 93, 0),
+    "blender": (2, 93, 0),
     "location": "Sequencer Panels; Sequencer Menus; Sequencer S, F, Shift-F, Z, Ctrl-P, Shift-P, Alt-M, Alt-K Shortcuts",
     "wiki_url": "https://github.com/snuq/VSEQF",
     "tracker_url": "https://github.com/snuq/VSEQF/issues",
@@ -592,6 +592,7 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
                 length = len(self.files)
             else:
                 length = self.length
+            dirname = dirname + os.path.sep
             bpy.ops.sequencer.image_strip_add(directory=dirname, files=files, relative_path=self.relative_path, frame_start=self.frame, frame_end=self.frame+length-1, channel=self.channel, replace_sel=True, use_placeholders=self.use_placeholders)
             imported = timeline.current_selected(context)
             self.all_imported.extend(imported)
