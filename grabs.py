@@ -26,6 +26,15 @@ class SequencePlaceHolder(object):
     parent_data = None
 
 
+def get_click_mode(context):
+    #Had to implement this because blender does not HAVE this setting when using a custom keymap. argh.
+    try:
+        click_mode = context.window_manager.keyconfigs.active.preferences.select_mouse
+    except:
+        click_mode = 'LEFT'
+    return click_mode
+
+
 def move_sequence_position(context, sequence, offset_x, offset_y, start_channel, start_frame_start, start_frame_final_start, start_frame_final_end):
     #Move a sequence by a given offset
 
@@ -353,7 +362,7 @@ class VSEQFSelectGrab(bpy.types.Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
-        self.click_mode = context.window_manager.keyconfigs.active.preferences.select_mouse
+        self.click_mode = get_click_mode(context)
         if self.click_mode == 'RIGHT' and event.type == 'LEFTMOUSE':
             #in RCS, left click on squencer, move cursor if nothing is clickd on
             region = context.region
@@ -795,7 +804,7 @@ class VSEQFContextMenu(bpy.types.Operator):
     click_mode = None
 
     def invoke(self, context, event):
-        self.click_mode = context.window_manager.keyconfigs.active.preferences.select_mouse
+        self.click_mode = get_click_mode(context)
         if event.type == 'RIGHTMOUSE':
             if self.click_mode == 'RIGHT':
                 return {'CANCELLED'}

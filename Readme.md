@@ -1,4 +1,4 @@
-# VSE Quick Functions Addon For Blender 2.92
+# VSE Quick Functions Addon For Blender 2.93
 
 VSEQF is an overhaul for Blender's VSE that can completely change your workflow.  Designed for quick, mouse and keyboard balanced editing with a focus on real-time feedback.
 
