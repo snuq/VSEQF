@@ -68,6 +68,12 @@ def get_volume_unit(frame=None):
 def vu_meter_calculate(scene):
     if scene != bpy.context.scene:
         return
+
+    # make sure sequence editor is refreshed on blender 3.x
+    for area in bpy.context.screen.areas:
+        if area.type == 'SEQUENCE_EDITOR':
+            area.tag_redraw()
+
     vseqf_settings = scene.vseqf
     if vseqf_settings.vu_show:
         percent_vu = get_volume_unit()
