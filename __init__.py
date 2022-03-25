@@ -110,8 +110,8 @@ bl_info = {
     "name": "VSE Quick Functions",
     "description": "Improves functionality of the sequencer by adding new menus and functions for snapping, adding fades, zooming, sequence parenting, ripple editing, playback speed, and more.",
     "author": "Hudson Barkley (Snu/snuq/Aritodo)",
-    "version": (2, 93, 1),
-    "blender": (2, 93, 0),
+    "version": (3, 1, 1),
+    "blender": (3, 1, 0),
     "location": "Sequencer Panels; Sequencer Menus; Sequencer S, F, Shift-F, Z, Ctrl-P, Shift-P, Alt-M, Alt-K Shortcuts",
     "wiki_url": "https://github.com/snuq/VSEQF",
     "tracker_url": "https://github.com/snuq/VSEQF/issues",
@@ -266,7 +266,7 @@ class VSEQFFollow(bpy.types.Operator):
     def recalculate_target(self, context):
         cursor_location = self.view.view_to_region(context.scene.frame_current, 0, clip=True)[0]
         if cursor_location == 12000:
-            self.cursor_target = round(self.region.width / 4)
+            self.cursor_target = int(round(self.region.width / 4))
         else:
             self.cursor_target = cursor_location
 
@@ -531,7 +531,7 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
         scene = context.scene
         prefs = vseqf.get_prefs()
         fps = vseqf.get_fps(context.scene)
-        self.length = fps * 4
+        self.length = int(fps * 4)
         self.start_frame = context.scene.frame_current
         if len(context.scene.sequence_editor.sequences_all) == 0:
             self.use_movie_framerate = True
@@ -886,7 +886,7 @@ def frame_step(scene):
         return
     difference = scene.frame_current - scene.vseqf.last_frame
     if difference == -1 or difference == 1:
-        frame_skip = difference * (abs(scene.vseqf.step) - 1)
+        frame_skip = int(difference * (abs(scene.vseqf.step) - 1))
         bpy.ops.screen.frame_offset(delta=frame_skip)
     scene.vseqf.last_frame = scene.frame_current
 

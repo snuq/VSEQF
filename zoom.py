@@ -38,12 +38,12 @@ def zoom_custom(begin, end, bottom=None, top=None, preroll=True):
     #Determine preroll for the zoom
     zoomlength = end - begin
     if zoomlength > 60 and preroll:
-        preroll = (zoomlength-60) / 10
+        preroll = int(round((zoomlength-60) / 10))
     else:
         preroll = 0
 
     #Create a temporary sequence, zoom in on it, then delete it
-    zoom_clip = scene.sequence_editor.sequences.new_effect(name='----vseqf-temp-zoom----', type='ADJUSTMENT', channel=1, frame_start=begin-preroll, frame_end=end)
+    zoom_clip = scene.sequence_editor.sequences.new_effect(name='----vseqf-temp-zoom----', type='ADJUSTMENT', channel=1, frame_start=begin - preroll, frame_end=end)
     scene.sequence_editor.active_strip = zoom_clip
     for region in bpy.context.area.regions:
         if region.type == 'WINDOW':

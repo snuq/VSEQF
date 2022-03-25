@@ -1105,8 +1105,8 @@ class VSEQFQuickFadesCross(bpy.types.Operator):
                                 current_offset = first_sequence.frame_offset_end + second_sequence.frame_offset_start
                                 first_sequence_offset_percent = first_sequence.frame_offset_end / current_offset
                                 second_sequence_offset_percent = second_sequence.frame_offset_start / current_offset
-                                first_sequence.frame_final_end = first_sequence.frame_final_end + (round(first_sequence_offset_percent * fade_offset))
-                                second_sequence.frame_final_start = second_sequence.frame_final_start - (round(second_sequence_offset_percent * fade_offset))
+                                first_sequence.frame_final_end = int(first_sequence.frame_final_end + (round(first_sequence_offset_percent * fade_offset)))
+                                second_sequence.frame_final_start = int(second_sequence.frame_final_start - (round(second_sequence_offset_percent * fade_offset)))
 
                         elif abs(current_fade) > target_fade:
                             #detected overlap is larger than target fade, subtract equal amounts from each sequence

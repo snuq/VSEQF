@@ -6,11 +6,11 @@ from . import vseqf
 
 
 def update_import_frame_in(self, fps):
-    self.import_frame_in = (self.import_minutes_in * 60 * fps) + (self.import_seconds_in * fps) + self.import_frames_in
+    self.import_frame_in = int(round((self.import_minutes_in * 60 * fps) + (self.import_seconds_in * fps) + self.import_frames_in))
 
 
 def update_import_frame_length(self, fps):
-    self.import_frame_length = (self.import_minutes_length * 60 * fps) + (self.import_seconds_length * fps) + self.import_frames_length
+    self.import_frame_length = int(round((self.import_minutes_length * 60 * fps) + (self.import_seconds_length * fps) + self.import_frames_length))
 
 
 def update_import_minutes_in(self, context):
@@ -69,11 +69,11 @@ def update_import_seconds_length(self, context):
     max_minutes = max_minutes + (max_hours * 60)
     if self.import_minutes_in + self.import_minutes_length >= max_minutes:
         if self.import_seconds_length + self.import_seconds_in > max_seconds:
-            self.import_seconds_length = max_seconds - self.import_seconds_in
+            self.import_seconds_length = int(round(max_seconds - self.import_seconds_in))
     else:
         if self.import_seconds_length >= 60:
             self.import_seconds_length = 0
-            self.import_minutes_length = self.import_minutes_length + 1
+            self.import_minutes_length = int(round(self.import_minutes_length + 1))
     update_import_frame_length(self, fps)
 
 
@@ -95,7 +95,7 @@ def update_import_frames_in(self, context):
             if self.import_seconds_length > 0 or self.import_minutes_length > 0:
                 #reduce seconds length, roll frames up to next
                 self.import_seconds_length = self.import_seconds_length - 1
-                self.import_frames_length = round(fps) - 1
+                self.import_frames_length = int(round(fps) - 1)
             elif self.import_frames_length > 1:
                 #reduce frame length
                 self.import_frames_length = self.import_frames_length - 1

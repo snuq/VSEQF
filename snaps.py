@@ -92,7 +92,7 @@ class VSEQFQuickSnaps(bpy.types.Operator):
         #Cursor snaps
         if self.type == 'cursor_to_seconds':
             fps = vseqf.get_fps(scene)
-            scene.frame_current = round(round(scene.frame_current / fps) * fps)
+            scene.frame_current = int(round(round(scene.frame_current / fps) * fps))
         elif self.type == 'cursor_to_beginning':
             if active:
                 scene.frame_current = active.frame_final_start
