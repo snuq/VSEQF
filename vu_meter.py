@@ -69,11 +69,6 @@ def vu_meter_calculate(scene):
     if scene != bpy.context.scene:
         return
 
-    # make sure sequence editor is refreshed on blender 3.x
-    for area in bpy.context.screen.areas:
-        if area.type == 'SEQUENCE_EDITOR':
-            area.tag_redraw()
-
     vseqf_settings = scene.vseqf
     if vseqf_settings.vu_show:
         percent_vu = get_volume_unit()
@@ -83,6 +78,11 @@ def vu_meter_calculate(scene):
         if vseqf_settings.vu_max < vseqf_settings.vu or vu_max_delay > 30:
             vseqf_settings.vu_max = vseqf_settings.vu
             vu_max_delay = 0
+
+        # make sure sequence editor is refreshed on blender 3.x
+        for area in bpy.context.screen.areas:
+            if area.type == 'SEQUENCE_EDITOR':
+                area.tag_redraw()
 
 
 def percent_to_db(percent):
