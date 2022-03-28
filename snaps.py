@@ -3,6 +3,7 @@ from . import timeline
 from . import parenting
 from . import vseqf
 from . import grabs
+from . import shortcuts
 
 
 class VSEQFQuickSnapsMenu(bpy.types.Menu):
@@ -53,6 +54,21 @@ class VSEQFQuickSnapsMenu(bpy.types.Menu):
                 props.tooltip = 'Snaps all sequences to the cursor as if they were one sequence'
         except:
             pass
+        markers = context.scene.timeline_markers
+        if len(markers) > 0:
+            layout.separator()
+            props = layout.operator('vseqf.skip_timeline', text='Jump to Closest Marker')
+            props.type = 'CLOSEMARKER'
+            props.tooltip = 'Snaps the cursor to the nearest timeline marker'
+            props = layout.operator('vseqf.skip_timeline', text='Jump to Previous Marker')
+            props.type = 'LASTMARKER'
+            props.tooltip = 'Snaps the cursor to the previous timeline marker'
+            props = layout.operator('vseqf.skip_timeline', text='Jump to Next Marker')
+            props.type = 'NEXTMARKER'
+            props.tooltip = 'Snaps the cursor to the next timehline marker'
+            props = layout.operator('vseqf.quicksnaps', text='Closest Marker to Cursor')
+            props.type = 'marker_to_cursor'
+            props.tooltip = 'Snaps the closest marker to the cursor position'
 
 
 class VSEQFQuickSnaps(bpy.types.Operator):
@@ -99,6 +115,12 @@ class VSEQFQuickSnaps(bpy.types.Operator):
         elif self.type == 'cursor_to_end':
             if active:
                 scene.frame_current = active.frame_final_end
+
+        #Marker snaps
+        elif self.type == 'marker_to_cursor':
+            closest_marker = shortcuts.find_marker(scene.frame_current, 'closest')
+            if closest_marker is not None:
+                closest_marker.frame = scene.frame_current
 
         #Sequence snaps
         else:
@@ -204,5 +226,6 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                 snap_target = context.scene.frame_current
                 offset_x = (snap_target - start.frame_final_start)
                 grabs.move_sequences(context, starting_data, offset_x, 0, to_snap)
+
 
         return{'FINISHED'}

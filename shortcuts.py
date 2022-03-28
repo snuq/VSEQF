@@ -50,12 +50,17 @@ def find_marker(frame, direction):
                 if best_delta is None or delta < best_delta:
                     best_delta = delta
                     return_marker = marker
-        else:
+        elif direction == 'previous':
             if marker.frame < frame:
                 delta = frame - marker.frame
                 if best_delta is None or delta < best_delta:
                     best_delta = delta
                     return_marker = marker
+        else:
+            delta = abs(frame - marker.frame)
+            if best_delta is None or delta < best_delta:
+                best_delta = delta
+                return_marker = marker
     return return_marker
 
 
@@ -150,7 +155,8 @@ class VSEQFQuickShortcutsSkip(bpy.types.Operator):
     bl_idname = 'vseqf.skip_timeline'
     bl_label = 'Skip timeline location'
 
-    type: bpy.props.EnumProperty(name='Type', items=[("NEXTSECOND", "One Second Forward", "", 1), ("LASTSECOND", "One Second Backward", "", 2), ("NEXTEDGE", "Next Clip Edge", "", 3), ("LASTEDGE", "Last Clip Edge", "", 4), ("LASTMARKER", "Last Marker", "", 5), ("NEXTMARKER", "Next Marker", "", 6)])
+    type: bpy.props.EnumProperty(name='Type', items=[("NEXTSECOND", "One Second Forward", "", 1), ("LASTSECOND", "One Second Backward", "", 2), ("NEXTEDGE", "Next Clip Edge", "", 3), ("LASTEDGE", "Last Clip Edge", "", 4), ("LASTMARKER", "Last Marker", "", 5), ("NEXTMARKER", "Next Marker", "", 6), ("CLOSEMARKER", "Closest Marker", "", 7)])
+    tooltip: bpy.props.StringProperty("")
 
     def execute(self, context):
         bpy.ops.ed.undo_push()
@@ -178,6 +184,10 @@ class VSEQFQuickShortcutsSkip(bpy.types.Operator):
                 context.scene.frame_current = marker.frame
         elif self.type == "NEXTMARKER":
             marker = find_marker(context.scene.frame_current, direction='next')
+            if marker:
+                context.scene.frame_current = marker.frame
+        elif self.type == "CLOSEMARKER":
+            marker = find_marker(context.scene.frame_current, direction='close')
             if marker:
                 context.scene.frame_current = marker.frame
         return{'FINISHED'}
