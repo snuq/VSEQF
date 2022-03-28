@@ -885,6 +885,9 @@ class VSEQFContextMarker(bpy.types.Menu):
             row.operator('vseqf.quickmarkers_rename')
             layout.operator('vseqf.quickmarkers_jump', text='Jump Cursor To This Marker').frame = frame
             layout.operator('vseqf.quickmarkers_move').frame = frame
+            props = layout.operator('vseqf.quickmarkers_move', text='Move Marker To Cursor')
+            props.frame = frame
+            props.to_cursor = True
 
 
 class VSEQFContextCursor(bpy.types.Menu):
@@ -909,11 +912,18 @@ class VSEQFContextCursor(bpy.types.Menu):
         layout.operator('vseqf.quicksnaps', text='Cursor To Nearest Second').type = 'cursor_to_seconds'
         sequence = timeline.current_active(context)
         if sequence:
+            layout.separator()
             layout.operator('vseqf.quicksnaps', text='Cursor To Beginning Of Sequence').type = 'cursor_to_beginning'
             layout.operator('vseqf.quicksnaps', text='Cursor To End Of Sequence').type = 'cursor_to_end'
             layout.operator('vseqf.quicksnaps', text='Selected To Cursor').type = 'selection_to_cursor'
             layout.operator('vseqf.quicksnaps', text='Sequence Beginning To Cursor').type = 'begin_to_cursor'
             layout.operator('vseqf.quicksnaps', text='Sequence End To Cursor').type = 'end_to_cursor'
+        markers = context.scene.timeline_markers
+        if len(markers) > 0:
+            layout.separator()
+            layout.operator('vseqf.skip_timeline', text='Jump to Closest Marker').type = 'CLOSEMARKER'
+            layout.operator('vseqf.skip_timeline', text='Jump to Previous Marker').type = 'LASTMARKER'
+            layout.operator('vseqf.skip_timeline', text='Jump to Next Marker').type = 'NEXTMARKER'
 
 
 class VSEQFContextNone(bpy.types.Menu):

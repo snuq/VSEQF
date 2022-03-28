@@ -1046,6 +1046,10 @@ class VSEQFSetting(bpy.types.PropertyGroup):
         name="Deselect New Markers",
         default=True,
         description="Markers added with this interface will not be selected when added")
+    ripple_markers: bpy.props.BoolProperty(
+        name="Ripple Edit Markers",
+        default=False,
+        description="When performing ripple edits, markers will be moved along with strips")
 
     zoom_size: bpy.props.IntProperty(
         name='Zoom Amount',

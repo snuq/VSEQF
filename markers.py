@@ -101,6 +101,7 @@ class VSEQFQuickMarkerMove(bpy.types.Operator):
     bl_label = 'Move This Marker'
 
     frame: bpy.props.IntProperty()
+    to_cursor: bpy.props.BoolProperty(default=False)
 
     def execute(self, context):
         marker = None
@@ -111,7 +112,10 @@ class VSEQFQuickMarkerMove(bpy.types.Operator):
             else:
                 timeline_marker.select = False
         if marker:
-            bpy.ops.marker.move('INVOKE_DEFAULT')
+            if self.to_cursor:
+                marker.frame = context.scene.frame_current
+            else:
+                bpy.ops.marker.move('INVOKE_DEFAULT')
         return {'FINISHED'}
 
 

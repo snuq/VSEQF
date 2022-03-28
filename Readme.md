@@ -382,6 +382,10 @@ If context menu is enabled, some snaps will be found on right clicking the curso
 
    Detects the previous or next sequence in the timeline from the active sequence, and moves the active sequence so it's beginning or end matches the other sequence's end or beginning.
 
+* __Jump To Closest/Previous/Next Marker__
+
+    Detects nearby markers and moves the cursor to them.
+
 
 
 ## QuickZooms
