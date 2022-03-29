@@ -232,6 +232,15 @@ def move_sequences(context, starting_data, offset_x, offset_y, grabbed_sequences
     return ripple_offset
 
 
+def grab_ripple_markers(ripple_markers, ripple, ripple_offset):
+    for marker_data in ripple_markers:
+        marker, original_frame = marker_data
+        if ripple:
+            marker.frame = original_frame + ripple_offset
+        else:
+            marker.frame = original_frame
+
+
 def grab_ripple_sequences(starting_data, ripple_sequences, ripple, ripple_offset):
     for sequence in ripple_sequences:
         data = starting_data[sequence.name]
@@ -257,7 +266,7 @@ def grab_ripple_sequences(starting_data, ripple_sequences, ripple, ripple_offset
                 data.rippled = False
 
 
-def ripple_timeline(sequences, start_frame, ripple_amount, select_ripple=True):
+def ripple_timeline(sequences, start_frame, ripple_amount, select_ripple=True, markers=[]):
     """Moves all given sequences starting after the frame given as 'start_frame', by moving them forward by 'ripple_amount' frames.
     'select_ripple' will select all sequences that were moved."""
 
@@ -275,6 +284,10 @@ def ripple_timeline(sequences, start_frame, ripple_amount, select_ripple=True):
         if (sequence.frame_start != seq[2] or sequence.channel != seq[1]) and seq[3]:
             seq[3] = False
             to_change.append(seq)
+    if markers:
+        for marker in markers:
+            if marker.frame >= (start_frame - ripple_amount):
+                marker.frame = marker.frame + ripple_amount
 
 
 def near_marker(context, frame):
@@ -447,6 +460,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
     target_grab_channel = 1
     sequences = []
     starting_data = {}
+    ripple_markers = []
     pos_x_start = 0
     pos_y_start = 0
     pos_x = 0
@@ -492,9 +506,15 @@ class VSEQFGrabAdd(bpy.types.Operator):
             window_x, window_y = view.view_to_region(sequence.frame_final_start, sequence.channel)
             vseqf.draw_text(window_x, window_y - 6, 12, mode, text_color)
 
+    def reset_markers(self):
+        for marker_data in self.ripple_markers:
+            marker, original_frame = marker_data
+            marker.frame = original_frame
+
     def reset_sequences(self):
         #used when cancelling, puts everything back to where it was at the beginning by first moving it somewhere safe, then to the true location
 
+        self.reset_markers()
         timeline_length = self.timeline_end - self.timeline_start
 
         for sequence in self.sequences:
@@ -585,6 +605,8 @@ class VSEQFGrabAdd(bpy.types.Operator):
             self.reset_sequences()
         ripple_offset = move_sequences(context, self.starting_data, offset_x, offset_y, self.grabbed_sequences, ripple_pop=self.ripple_pop, fix_fades=False, ripple=self.ripple, move_root=False)
         grab_ripple_sequences(self.starting_data, self.ripple_sequences, self.ripple, ripple_offset)
+        if context.scene.vseqf.ripple_markers:
+            grab_ripple_markers(self.ripple_markers, self.ripple, ripple_offset)
 
         if event.type in {'LEFTMOUSE', 'RET'} or (release_confirm and event.value == 'RELEASE'):
             vu_meter.vu_meter_calculate(context.scene)
@@ -596,6 +618,8 @@ class VSEQFGrabAdd(bpy.types.Operator):
                 fix_fades = False
             ripple_offset = move_sequences(context, self.starting_data, offset_x, offset_y, self.grabbed_sequences, ripple_pop=self.ripple_pop, fix_fades=fix_fades, ripple=self.ripple, move_root=False)
             grab_ripple_sequences(self.starting_data, self.ripple_sequences, self.ripple, ripple_offset)
+            if context.scene.vseqf.ripple_markers:
+                grab_ripple_markers(self.ripple_markers, self.ripple, ripple_offset)
 
             if not context.screen.is_animation_playing:
                 if self.snap_edge:
@@ -664,6 +688,12 @@ class VSEQFGrabAdd(bpy.types.Operator):
                 to_move = parenting.get_recursive(sequence, to_move)
             else:
                 to_move.append(sequence)
+
+        #store markers to ripple
+        self.ripple_markers = []
+        for marker in context.scene.timeline_markers:
+            if marker.frame >= self.ripple_start:
+                self.ripple_markers.append([marker, marker.frame])
 
         self.starting_data = grab_starting_data(sequences)
         #generate grabbed sequences and ripple sequences lists

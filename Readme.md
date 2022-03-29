@@ -106,6 +106,7 @@ The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' o
    While in grab mode, press the alt key to toggle between ripple, ripple-pop, and normal mode.  
    Ripple mode will move all sequences after the grabbed sequence the same amount.
    Ripple-Pop will allow you to move a sequence above and out of a line, automatically closing the gap left behind.  This will only operate when one sequence is grabbed.
+   Enable the 'Ripple Edit Markers' option to cause markers to behave by ripple rules as well.
 
 * __Grab Multiple With Right-Click Drag__
 

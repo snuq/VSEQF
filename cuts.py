@@ -321,7 +321,11 @@ class VSEQFCut(bpy.types.Operator):
                 else:
                     insert = context.scene.vseqf.quickcuts_insert
             sequences = timeline.current_sequences(context)
-            grabs.ripple_timeline(sequences, ripple_frame - 1, insert)
+            if context.scene.vseqf.ripple_markers:
+                markers = context.scene.timeline_markers
+            else:
+                markers = []
+            grabs.ripple_timeline(sequences, ripple_frame - 1, insert, markers=markers)
         else:
             for sequence in to_select:
                 if sequence:
@@ -533,7 +537,11 @@ class VSEQFDelete(bpy.types.Operator):
                 if frame - end_frame > 1:
                     #Ripple section, start next section
                     ripple_length = end_frame - start_frame
-                    grabs.ripple_timeline(sequences, start_frame, -ripple_length)
+                    if context.scene.vseqf.ripple_markers:
+                        markers = context.scene.timeline_markers
+                    else:
+                        markers = []
+                    grabs.ripple_timeline(sequences, start_frame, -ripple_length, markers=markers)
                     start_frame = frame
                 end_frame = frame
             context.scene.frame_current = ripple_frames[0]

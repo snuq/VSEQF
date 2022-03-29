@@ -915,6 +915,7 @@ class VSEQFSettingsMenu(bpy.types.Menu):
         layout.prop(scene.vseqf, 'snap_cursor_to_edge')
         layout.prop(scene.vseqf, 'snap_new_end')
         layout.prop(scene.vseqf, 'shortcut_skip')
+        layout.prop(scene.vseqf, 'ripple_markers')
         if prefs.parenting:
             layout.separator()
             layout.label(text='QuickParenting Settings')
