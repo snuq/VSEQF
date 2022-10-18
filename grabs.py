@@ -412,6 +412,7 @@ class VSEQFSelectGrab(bpy.types.Operator):
                 bpy.ops.sequencer.select('INVOKE_DEFAULT', deselect_all=True)
         selected_sequences = timeline.current_selected(context)
         if not selected_sequences:
+            bpy.ops.sequencer.select_box('INVOKE_DEFAULT')
             return {'FINISHED'}
         prefs = vseqf.get_prefs()
         if prefs.threepoint:
