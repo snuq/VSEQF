@@ -66,20 +66,20 @@ def move_sequence_left_handle(context, sequence, offset_x, start_channel, start_
         if sequence.frame_final_start != new_start:
             sequence.frame_start = new_start
         if sequence.frame_final_end != frame_final_end:
-            sequence.frame_final_end = frame_final_end
+            sequence.frame_final_end = int(frame_final_end)
     else:  #Normal strip
-        if new_start >= frame_final_end - sequence.frame_still_end:
+        if new_start >= frame_final_end + sequence.frame_offset_end:
             #Prevent left handle from being moved beyond ending point of strip
-            new_start = frame_final_end - 1 - sequence.frame_still_end
+            new_start = frame_final_end - 1 + sequence.frame_offset_end
         if sequence.type == 'SOUND':
             #Prevent sound strip beginning from being dragged beyond start point
             if new_start < sequence.frame_start:
                 new_start = sequence.frame_start
         new_position = start_frame_start
         if sequence.frame_final_start != new_start:
-            sequence.frame_final_start = new_start
+            sequence.frame_final_start = int(new_start)
         if sequence.frame_start != new_position:
-            sequence.frame_start = new_position
+            sequence.frame_start = int(new_position)
         if fix_fades:
             fades.fix_fade_in(context, sequence, start_frame_final_start)
 
@@ -91,13 +91,13 @@ def move_sequence_right_handle(context, sequence, offset_x, start_channel, start
     sequence.channel = start_channel
     sequence.frame_start = frame_start_backup
     new_end = start_frame_final_end + offset_x
-    if new_end <= sequence.frame_final_start + 1 + sequence.frame_still_start:
+    if new_end <= sequence.frame_final_start + 1 - sequence.frame_offset_start:
         #Prevent right handle from being moved beyond start point of strip
-        new_end = sequence.frame_final_start + 1 + sequence.frame_still_start
+        new_end = sequence.frame_final_start + 1 - sequence.frame_offset_start
     if sequence.type == 'SOUND':
         if new_end > sequence.frame_start + sequence.frame_duration:
             new_end = sequence.frame_start + sequence.frame_duration
-    sequence.frame_final_end = new_end
+    sequence.frame_final_end = int(new_end)
     if fix_fades:
         fades.fix_fade_out(context, sequence, start_frame_final_end)
 
