@@ -861,8 +861,8 @@ def draw_strip_info(context, active_strip, fps, frame_px, channel_px, min_x, max
         bgl.glEnable(bgl.GL_BLEND)
         for tag in active_strip.tags:
             if tag.use_offset:
-                if active_strip.frame_offset_start < tag.offset <= active_strip.frame_final_duration + active_strip.frame_offset_start - active_strip.frame_still_start:
-                    adjusted_offset = tag.offset - 1 - active_strip.frame_offset_start + active_strip.frame_still_start
+                if active_strip.frame_offset_start < tag.offset <= active_strip.frame_final_duration + active_strip.frame_offset_start:
+                    adjusted_offset = tag.offset - 1 - active_strip.frame_offset_start
                     left = active_left + (adjusted_offset * frame_px)
                     width = tag.length * frame_px
                     if left + width > active_right:
