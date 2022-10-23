@@ -9,7 +9,6 @@ class VSEQFTempSettings(object):
     """Substitute for the addon preferences when this script isn't loaded as an addon"""
     parenting = True
     fades = True
-    proxy = True
     markers = True
     tags = True
     cuts = True
@@ -111,32 +110,10 @@ def parenting():
         return False
 
 
-def proxy():
-    prefs = get_prefs()
-    if prefs.proxy and bpy.context.scene.vseqf.enable_proxy:
-        return True
-    else:
-        return False
-
-
 def redraw_sequencers():
     for area in bpy.context.screen.areas:
         if area.type == 'SEQUENCE_EDITOR':
             area.tag_redraw()
-
-
-def apply_proxy_settings(seq):
-    vseqf = bpy.context.scene.vseqf
-    seq_type = seq.rna_type.name
-    if seq_type in ['Movie Sequence', 'Image Sequence', 'MovieClip']:
-        seq.use_proxy = True
-        seq.proxy.build_25 = vseqf.proxy_25
-        seq.proxy.build_50 = vseqf.proxy_50
-        seq.proxy.build_75 = vseqf.proxy_75
-        seq.proxy.build_100 = vseqf.proxy_100
-        seq.proxy.quality = vseqf.proxy_quality
-        return True
-    return False
 
 
 def get_fps(scene=None):

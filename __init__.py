@@ -61,8 +61,6 @@ Features:
     Numpad shortcuts
         Have full control over the timeline and selected strips with the numpad only.
         Control playback speed, move strips around, or move the cursor, even cut strips, all without moving from the numpad.
-    Proxy improvements
-        Automatically set, or even generate proxies for newly imported strips.
     Working with markers
         Create markers based on named presets, easily add several 'Fix This Later' markers for instance.
         See all marker time indexes in a list, and quickly jump to whichever you wish.
@@ -454,14 +452,6 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
         name="Auto-Parent A/V",
         description="Automatically parent audio strips to their movie strips",
         default=True)
-    autoproxy: bpy.props.BoolProperty(
-        name="Auto-Set Proxy",
-        description="Automatically enable proxy settings",
-        default=False)
-    autogenerateproxy: bpy.props.BoolProperty(
-        name="Auto-Generate Proxy",
-        description="Automatically generate proxies for imported strips",
-        default=False)
     use_placeholders: bpy.props.BoolProperty(
         name="Use Placeholders",
         description="Use placeholders for missing frames of the strip",
@@ -494,9 +484,6 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
             layout.prop(self, 'use_movie_framerate')
             if vseqf.parenting():
                 layout.prop(self, 'autoparent')
-            if prefs.proxy:
-                layout.prop(self, 'autoproxy')
-                layout.prop(self, 'autogenerateproxy')
         elif self.type == 'IMAGE':
             context.space_data.params.use_filter_image = True
             layout = self.layout
@@ -516,9 +503,6 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
             row.prop(self, 'import_location')
             row = layout.row()
             row.prop(self, 'replace_selection')
-            if prefs.proxy:
-                layout.prop(self, 'autoproxy')
-                layout.prop(self, 'autogenerateproxy')
 
     def invoke(self, context, event):
         del event
@@ -540,12 +524,6 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
             self.autoparent = scene.vseqf.autoparent
         else:
             self.autoparent = False
-        if prefs.proxy:
-            self.autoproxy = scene.vseqf.enable_proxy
-            self.autogenerateproxy = scene.vseqf.build_proxy
-        else:
-            self.autoproxy = False
-            self.autogenerateproxy = False
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
@@ -555,10 +533,6 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
             if sequence.frame_final_end > frame:
                 frame = sequence.frame_final_end
         return frame
-
-    def setup_proxies(self, sequences):
-        for sequence in sequences:
-            vseqf.apply_proxy_settings(sequence)
 
     def execute(self, context):
         sequencer = context.scene.sequence_editor
@@ -613,9 +587,6 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
             for pair in self.to_parent:
                 movie, sound = pair
                 parenting.add_children(movie, [sound])
-        if self.autoproxy:
-            #auto-set proxy settings
-            self.setup_proxies(self.all_imported)
         if not self.replace_selection:
             bpy.ops.sequencer.select_all(action='DESELECT')
             for sequence in selected:
@@ -626,8 +597,6 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
             bpy.ops.sequencer.select_all(action='DESELECT')
             for sequence in self.all_imported:
                 sequence.select = True
-        if self.autoproxy and self.autogenerateproxy and not context.scene.vseqf.build_proxy:
-            bpy.ops.sequencer.rebuild_proxy('INVOKE_DEFAULT')
         for file in self.all_imported:
             if file.frame_final_end > last_frame:
                 last_frame = file.frame_final_end
@@ -685,7 +654,6 @@ def vseqf_continuous(scene):
             return
         new_sequences = []
         new_end = scene.frame_current
-        build_proxies = False
         for sequence in sequences:
             if sequence.new:
                 if not (sequence.type == 'META' or hasattr(sequence, 'input_1')):
@@ -719,37 +687,6 @@ def vseqf_continuous(scene):
                                 if seq.filepath == sequence.sound.filepath:
                                     sequence.parent = seq.name
                                     break
-                if vseqf.proxy():
-                    #enable proxies on sequence
-                    applied_proxies = vseqf.apply_proxy_settings(sequence)
-                    if applied_proxies and scene.vseqf.build_proxy:
-                        build_proxies = True
-            if build_proxies:
-                #Build proxies if needed
-                last_selected = bpy.context.selected_sequences
-                for seq in sequences:
-                    if seq in new_sequences:
-                        seq.select = True
-                    else:
-                        seq.select = False
-                area = False
-                region = False
-                for screenarea in bpy.context.window.screen.areas:
-                    if screenarea.type == 'SEQUENCE_EDITOR':
-                        area = screenarea
-                        for arearegion in area.regions:
-                            if arearegion.type == 'WINDOW':
-                                region = arearegion
-                if area and region:
-                    override = bpy.context.copy()
-                    override['area'] = area
-                    override['region'] = region
-                    bpy.ops.sequencer.rebuild_proxy(override, 'INVOKE_DEFAULT')
-                for seq in sequences:
-                    if seq in last_selected:
-                        seq.select = True
-                    else:
-                        seq.select = False
             if scene.vseqf.snap_new_end:
                 scene.frame_current = new_end
 
@@ -925,17 +862,6 @@ class VSEQFSettingsMenu(bpy.types.Menu):
             layout.prop(scene.vseqf, 'delete_children')
             layout.prop(scene.vseqf, 'autoparent')
             layout.prop(scene.vseqf, 'select_children')
-        if prefs.proxy:
-            layout.separator()
-            layout.label(text='QuickProxy Settings')
-            layout.separator()
-            layout.prop(scene.vseqf, 'enable_proxy')
-            layout.prop(scene.vseqf, 'build_proxy')
-            layout.prop(scene.vseqf, "proxy_quality", text='Proxy Quality')
-            layout.prop(scene.vseqf, "proxy_25", text='Generate 25% Proxy')
-            layout.prop(scene.vseqf, "proxy_50", text='Generate 50% Proxy')
-            layout.prop(scene.vseqf, "proxy_75", text='Generate 75% Proxy')
-            layout.prop(scene.vseqf, "proxy_100", text='Generate 100% Proxy')
 
 
 class VSEQFSetting(bpy.types.PropertyGroup):
@@ -1007,30 +933,6 @@ class VSEQFSetting(bpy.types.PropertyGroup):
         default=0,
         min=0,
         description="Current Fade Out Length In Frames")
-
-    enable_proxy: bpy.props.BoolProperty(
-        name="Enable Proxy On Import",
-        default=False)
-    build_proxy: bpy.props.BoolProperty(
-        name="Auto-Build Proxy On Import",
-        default=False)
-    proxy_25: bpy.props.BoolProperty(
-        name="25%",
-        default=True)
-    proxy_50: bpy.props.BoolProperty(
-        name="50%",
-        default=False)
-    proxy_75: bpy.props.BoolProperty(
-        name="75%",
-        default=False)
-    proxy_100: bpy.props.BoolProperty(
-        name="100%",
-        default=False)
-    proxy_quality: bpy.props.IntProperty(
-        name="Quality",
-        default=90,
-        min=1,
-        max=100)
 
     current_marker_frame: bpy.props.IntProperty(
         default=0)
@@ -1108,9 +1010,6 @@ class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
     fades: bpy.props.BoolProperty(
         name="Enable Quick Fades",
         default=True)
-    proxy: bpy.props.BoolProperty(
-        name="Enable Quick Proxy",
-        default=True)
     markers: bpy.props.BoolProperty(
         name="Enable Quick Markers",
         default=True)
@@ -1159,7 +1058,6 @@ class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
         layout = self.layout
         layout.prop(self, "parenting")
         layout.prop(self, "fades")
-        layout.prop(self, "proxy")
         layout.prop(self, "markers")
         layout.prop(self, "tags")
         layout.prop(self, "cuts")

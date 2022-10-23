@@ -145,8 +145,6 @@ The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' o
 * __Import Additions__
 
    Allows the cursor to automatically move to the end of the imported sequence, allowing multiple files to be added in sequence very easily. This must be enabled in the Quick Functions Settings menu.  
-   Allows automatic proxy settings to be applied to Movie and Image types while being imported.  
-   Allows proxies to be automatically generated when importing a Movie or Image.  
    Allows setting the length of a single imported image in frames.  
    When a movie sequence with sound is imported, the sound may be automatically parented to the video.  
    Provides additional options for placing an imported sequence on the timeline:  
@@ -466,25 +464,6 @@ Parenting relationships are show in the timeline view for the active sequence, a
    When a parent sequence is deleted, all children will be deleted as well.
 
 These settings can also be found in the Quick Functions Settings menu.
-
-
-
-## QuickProxy
-Automatically sets proxies for imported strips, and optionally can generate them automatically as well.
-
-All settings for QuickProxy are found in the Quick Functions Settings menu.
-
-* __Enable Proxy On Import__
-
-   Enables the given proxy settings on any compatible sequence type when it is imported.
-
-* __Auto-Build Proxy On Import__
-
-   Starts the proxy building process on imported sequences.  
-   Will only function if Enable Proxy On Import is active.  
-   This will cause a performance hit on Blender as it is generating the proxies in the background.
-
-The other settings are standard proxy settings, see the Blender help documentation for information on them.
 
 
 

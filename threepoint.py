@@ -208,8 +208,6 @@ class ThreePointSetup:
                             override = bpy.context.copy()
                             override['area'] = area
                             override['space_data'] = space
-                            if bpy.context.scene.vseqf.build_proxy:
-                                bpy.ops.clip.rebuild_proxy(override)
             self.remove_handler()
             return
 
@@ -244,9 +242,6 @@ class VSEQFThreePointImportToClip(bpy.types.Operator):
             bpy.ops.file.cancel()
 
             clip = self.clip
-            proxy = vseqf.proxy()
-            if proxy:
-                vseqf.apply_proxy_settings(clip)
 
             handlers = bpy.app.handlers.depsgraph_update_post
             for handler in handlers:
