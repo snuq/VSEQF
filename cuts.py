@@ -161,10 +161,11 @@ class VSEQFCut(bpy.types.Operator):
             self.reset()
             return{"CANCELLED"}
 
+        sequencer = context.scene.sequence_editor
         selected = timeline.current_selected(context)
         to_uncut = []
         for sequence in selected:
-            if not sequence.lock and not hasattr(sequence, 'input_1'):
+            if not timeline.is_locked(sequencer, sequence) and not hasattr(sequence, 'input_1'):
                 to_uncut.append(sequence)
         for sequence in to_uncut:
             if side == 'LEFT':
@@ -174,7 +175,7 @@ class VSEQFCut(bpy.types.Operator):
             sequences = timeline.current_sequences(context)
             merge_to = timeline.find_close_sequence(sequences, sequence, direction=direction, mode='channel', sounds=True)
             if merge_to:
-                if not merge_to.lock:
+                if not timeline.is_locked(sequencer, merge_to):
                     source_matches = self.check_source(sequence, merge_to)
                     if source_matches:
                         merge_to_children = parenting.find_children(merge_to)
@@ -231,7 +232,7 @@ class VSEQFCut(bpy.types.Operator):
         #determine all sequences available to cut
         to_cut_temp = []
         for sequence in sequences:
-            if not sequence.lock and timeline.under_cursor(sequence, self.frame) and not hasattr(sequence, 'input_1'):
+            if not timeline.is_locked(sequencer, sequence) and timeline.under_cursor(sequence, self.frame) and not hasattr(sequence, 'input_1'):
                 if self.all:
                     to_cut.append(sequence)
                     to_cut_temp.append(sequence)
@@ -241,7 +242,7 @@ class VSEQFCut(bpy.types.Operator):
                     if vseqf.parenting():
                         children = parenting.get_recursive(sequence, [])
                         for child in children:
-                            if not child.lock and (not hasattr(child, 'input_1')) and child not in to_cut:
+                            if not timeline.is_locked(sequencer, child) and (not hasattr(child, 'input_1')) and child not in to_cut:
                                 to_cut.append(child)
 
         #find the ripple amount

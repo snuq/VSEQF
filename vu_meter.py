@@ -25,7 +25,8 @@ def get_volume_unit(frame=None):
     total = 0
     if bpy.context.scene.sequence_editor is None:
         return 0
-    sequences = bpy.context.scene.sequence_editor.sequences_all
+    sequence_editor = bpy.context.scene.sequence_editor
+    sequences = sequence_editor.sequences_all
     depsgraph = bpy.context.evaluated_depsgraph_get()
     if frame is None:
         frame = bpy.context.scene.frame_current
@@ -34,7 +35,7 @@ def get_volume_unit(frame=None):
         evaluate_volume = True
     fps = vseqf.get_fps()
     for sequence in sequences:
-        if sequence.type == 'SOUND' and timeline.under_cursor(sequence, frame) and not sequence.mute:
+        if sequence.type == 'SOUND' and timeline.under_cursor(sequence, frame) and not timeline.is_muted(sequence_editor, sequence):
             time_from = (frame - 1 - sequence.frame_start) / fps
             time_to = (frame - sequence.frame_start) / fps
             audio = sequence.sound.evaluated_get(depsgraph).factory

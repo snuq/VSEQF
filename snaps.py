@@ -100,6 +100,7 @@ class VSEQFQuickSnaps(bpy.types.Operator):
     def execute(self, context):
         bpy.ops.ed.undo_push()
         #Set up variables needed for operator
+        sequencer = context.scene.sequence_editor
         selected = timeline.current_selected(context)
         scene = context.scene
         active = timeline.current_active(context)
@@ -137,11 +138,11 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                 #Avoid snapping sequences if they are a child of something selected (they will be moved automatically)
                 for sequence in sequences:
                     if sequence not in dont_snap:
-                        if sequence.select and not hasattr(sequence, 'input_1') and not sequence.lock:
+                        if sequence.select and not hasattr(sequence, 'input_1') and not timeline.is_locked(sequencer, sequence):
                             to_snap.append(sequence)
             else:
                 for sequence in sequences:
-                    if sequence.select and not hasattr(sequence, 'input_1') and not sequence.lock:
+                    if sequence.select and not hasattr(sequence, 'input_1') and not timeline.is_locked(sequencer, sequence):
                         to_snap.append(sequence)
 
             if not to_snap:
@@ -226,6 +227,5 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                 snap_target = context.scene.frame_current
                 offset_x = (snap_target - start.frame_final_start)
                 grabs.move_sequences(context, starting_data, offset_x, 0, to_snap)
-
 
         return{'FINISHED'}

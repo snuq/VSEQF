@@ -411,6 +411,34 @@ def under_cursor(sequence, frame):
         return False
 
 
+def in_muted_channel(sequence_editor, sequence):
+    """Check if a sequence is in a muted channel
+    Arguments:
+        sequence_editor: current sequencer
+        sequence: VSE sequence object to check
+
+    Returns: True or False"""
+    return sequence_editor.channels[sequence.channel].mute
+
+
+def in_locked_channel(sequence_editor, sequence):
+    """Check if a sequence is in a locked channel
+    Arguments:
+        sequence_editor: current sequencer
+        sequence: VSE sequence object to check
+
+    Returns: True or False"""
+    return sequence_editor.channels[sequence.channel].lock
+
+
+def is_muted(sequence_editor, sequence):
+    return sequence.mute or in_muted_channel(sequence_editor, sequence)
+
+
+def is_locked(sequence_editor, sequence):
+    return sequence.lock or in_locked_channel(sequence_editor, sequence)
+
+
 def get_vse_position(context):
     region = context.region
     view = region.view2d

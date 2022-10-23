@@ -656,8 +656,9 @@ class VSEQFGrabAdd(bpy.types.Operator):
         bpy.types.SpaceSequenceEditor.draw_handler_remove(self._handle, 'WINDOW')
 
     def invoke(self, context, event):
+        sequencer = context.scene.sequence_editor
         self.start_frame = context.scene.frame_current
-        self.start_overlay_frame = context.scene.sequence_editor.overlay_frame
+        self.start_overlay_frame = sequencer.overlay_frame
         bpy.ops.ed.undo_push()
         self.cancelled = False
         self.prefs = vseqf.get_prefs()
@@ -682,7 +683,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
                 ripple_point = sequence.frame_final_end
             else:
                 ripple_point = sequence.frame_final_start
-            if ripple_point < self.ripple_start and not hasattr(sequence, 'input_1') and not sequence.lock:
+            if ripple_point < self.ripple_start and not hasattr(sequence, 'input_1') and not timeline.is_locked(sequencer, sequence):
                 self.ripple_start = ripple_point
                 self.ripple_left = ripple_point
             if is_parenting:
@@ -699,7 +700,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
         self.starting_data = grab_starting_data(sequences)
         #generate grabbed sequences and ripple sequences lists
         for sequence in sequences:
-            if not sequence.lock and not hasattr(sequence, 'input_1'):
+            if not timeline.is_locked(sequencer, sequence) and not hasattr(sequence, 'input_1'):
                 self.sequences.append(sequence)
                 if sequence.select:
                     self.grabbed_sequences.append(sequence)
