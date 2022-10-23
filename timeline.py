@@ -88,7 +88,7 @@ class VSEQFMeta(bpy.types.Operator):
     """Creates meta strip while adding children"""
 
     bl_idname = 'vseqf.meta_make'
-    bl_label = 'Make Meta Strip'
+    bl_label = 'Make Meta Strip (Include Children)'
 
     def execute(self, context):
         bpy.ops.ed.undo_push()
