@@ -344,9 +344,7 @@ class VSEQFThreePointImport(bpy.types.Operator):
                     override_area = area
                 if area.spaces[0].view_type != 'PREVIEW':
                     override_area = area
-        override = context.copy()
         if override_area:
-            override['area'] = override_area
             active_strip = timeline.current_active(context)
             sequencer = context.scene.sequence_editor
             if not sequencer:
@@ -359,7 +357,8 @@ class VSEQFThreePointImport(bpy.types.Operator):
             clip = context.space_data.clip
             filepath = bpy.path.abspath(clip.filepath)
             frame_start = timeline.find_sequences_start(sequences) - clip.frame_duration - 1
-            bpy.ops.sequencer.movie_strip_add(override, filepath=filepath, frame_start=frame_start, replace_sel=True, use_framerate=False)
+            with context.temp_override(area=override_area):
+                bpy.ops.sequencer.movie_strip_add(filepath=filepath, frame_start=frame_start, replace_sel=True, use_framerate=False)
             sound_sequence = False
             movie_sequence = False
             sequences = context.scene.sequence_editor.sequences_all
@@ -406,14 +405,16 @@ class VSEQFThreePointImport(bpy.types.Operator):
                     move_frame = active_strip.frame_final_start
                 else:
                     move_frame = active_strip.frame_final_end
-                bpy.ops.sequencer.select_all(override, action='DESELECT')
+                with context.temp_override(area=override_area):
+                    bpy.ops.sequencer.select_all(action='DESELECT')
                 active_strip.select = True
                 for child in children:
                     if child.type == 'SOUND' and child.sound.filepath == original_filepath and child.frame_final_start == active_strip.frame_final_start and child.frame_start == active_strip.frame_start and child.frame_final_end == active_strip.frame_final_end:
                         child.select = True
                         children.remove(child)
                         break
-                bpy.ops.sequencer.delete(override)
+                with context.temp_override(area=override_area):
+                    bpy.ops.sequencer.delete()
                 if move_forward != 0:
                     #Have to set the frame_current because for some reason the frame variable in vseqf.cut doesnt work...
                     old_current = context.scene.frame_current
@@ -437,7 +438,8 @@ class VSEQFThreePointImport(bpy.types.Operator):
             movie_sequence.frame_offset_start = frame_in  #crashing blender in replace mode???
             movie_sequence.frame_final_duration = frame_length
             movie_sequence.frame_start = frame_start
-            bpy.ops.sequencer.select_all(override, action='DESELECT')
+            with context.temp_override(area=override_area):
+                bpy.ops.sequencer.select_all(action='DESELECT')
             movie_sequence.select = True
             if sound_sequence:
                 sound_sequence.select = True

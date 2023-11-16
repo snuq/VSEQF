@@ -32,11 +32,9 @@ Future Possibilities:
 
 Todo:
     Feature: ripple markers option
-    Bug: grab operator sometimes doesnt activate on click-drag in blender 2.83??
     Bug: vu meter can be REALLY slow sometimes...
     Bug: snapping a strip can try to snap to its own child, which causes weirdness when both are a bit offset
     Feature: add maximize volume option for strip, maybe add a compressor via animations?
-    Once the tools panel is implemented in sequencer, rework all panels and menus to make better use of it.
 
 Features:
     Strip parenting
@@ -83,7 +81,6 @@ Features:
 
 import os
 import bpy
-import bgl
 import gpu
 import math
 from bpy_extras.io_utils import ImportHelper
@@ -110,8 +107,8 @@ bl_info = {
     "name": "VSE Quick Functions",
     "description": "Improves functionality of the sequencer by adding new menus and functions for snapping, adding fades, zooming, sequence parenting, ripple editing, playback speed, and more.",
     "author": "Hudson Barkley (Snu/snuq/Aritodo)",
-    "version": (3, 4, 1),
-    "blender": (3, 4, 1),
+    "version": (4, 0, 0),
+    "blender": (4, 0, 0),
     "location": "Sequencer Panels; Sequencer Menus; Sequencer S, F, Shift-F, Z, Ctrl-P, Shift-P, Alt-M, Alt-K Shortcuts",
     "wiki_url": "https://github.com/snuq/VSEQF",
     "tracker_url": "https://github.com/snuq/VSEQF/issues",
@@ -308,7 +305,6 @@ class VSEQF_PT_CompactEdit(bpy.types.Panel):
             row.prop(strip, "lock", toggle=True, icon_only=True)
             row = layout.row()
             row.prop(strip, "pan")
-            row.prop(strip, "pitch")
         else:
             row = layout.row(align=True)
             sub = row.row(align=True)
@@ -763,7 +759,6 @@ def draw_strip_info(context, active_strip, fps, frame_px, channel_px, min_x, max
                 vseqf.draw_text(active_right - (text_size * 4), active_top, text_size, 'Out: '+str(fadeout), text_color)
 
     if show_parenting:
-        bgl.glEnable(bgl.GL_BLEND)
         children = parenting.find_children(active_strip)
         parent = parenting.find_parent(active_strip)
         if parent:
@@ -788,15 +783,13 @@ def draw_strip_info(context, active_strip, fps, frame_px, channel_px, min_x, max
             pixel_y = active_pos_y + pixel_y_distance
             coords.append((strip_x, active_pos_y))
             coords.append((pixel_x, pixel_y))
-        shader = gpu.shader.from_builtin('2D_UNIFORM_COLOR')
+        shader = gpu.shader.from_builtin('UNIFORM_COLOR')
         batch = batch_for_shader(shader, 'LINES', {'pos': coords})
         shader.bind()
         shader.uniform_float('color', (1.0, 1.0, 1.0, 0.2))
         batch.draw(shader)
-        bgl.glDisable(bgl.GL_BLEND)
 
     if show_markers:
-        bgl.glEnable(bgl.GL_BLEND)
         for tag in active_strip.tags:
             if tag.use_offset:
                 if active_strip.frame_offset_start < tag.offset <= active_strip.frame_final_duration + active_strip.frame_offset_start:
@@ -805,10 +798,8 @@ def draw_strip_info(context, active_strip, fps, frame_px, channel_px, min_x, max
                     width = tag.length * frame_px
                     if left + width > active_right:
                         width = active_right - left
-                    bgl.glEnable(bgl.GL_BLEND)
                     vseqf.draw_rect(left, active_bottom, width, channel_px, color=(tag.color[0], tag.color[1], tag.color[2], 0.33))
                     vseqf.draw_text(left, active_top, text_size, tag.text)
-        bgl.glDisable(bgl.GL_BLEND)
 
 
 #Functions related to QuickSpeed
@@ -1097,11 +1088,11 @@ class SEQUENCER_MT_strip_transform(Menu):
             layout.operator("transform.rotate", text="Rotate")
             layout.operator("transform.resize", text="Scale")
         else:
-            #layout.operator("transform.seq_slide", text="Move")
+            #layout.operator("transform.seq_slide", text="Move").view2d_edge_pan = True
             #layout.operator("transform.transform", text="Move/Extend from Current Frame").mode = 'TIME_EXTEND'
             #layout.operator("sequencer.slip", text="Slip Strip Contents")
             layout.operator("vseqf.grab", text="Grab/Move")
-            layout.operator("vseqf.grab", text="Move/Extend from playhead").mode = 'TIME_EXTEND'
+            layout.operator("vseqf.grab", text="Move/Extend from Current Frame").mode = 'TIME_EXTEND'
             layout.operator("vseqf.grab", text="Slip Strip Contents").mode = 'SLIP'
 
         if has_sequencer:
@@ -1129,42 +1120,48 @@ class SEQUENCER_MT_strip(Menu):
     bl_label = "Strip"
 
     def draw(self, context):
+        from bl_ui_utils.layout import operator_context
+
         layout = self.layout
         st = context.space_data
         has_sequencer, _has_preview = _space_view_types(st)
 
         layout.menu("SEQUENCER_MT_strip_transform")
-        layout.separator()
 
         if has_sequencer:
-
-            #layout.operator("sequencer.split", text="Split").type = 'SOFT'
-            #layout.operator("sequencer.split", text="Hold Split").type = 'HARD'
-            layout.operator("vseqf.cut", text="Cut/Split").type = 'SOFT'
-            layout.operator("vseqf.cut", text="Hold Cut/Split").type = 'HARD'
+            layout.menu("SEQUENCER_MT_strip_retiming")
             layout.separator()
 
-        if has_sequencer:
+            with operator_context(layout, 'EXEC_REGION_WIN'):
+                #props = layout.operator("sequencer.split", text="Split")
+                #props.type = 'SOFT'
+                layout.operator("vseqf.cut", text="Cut/Split").type = 'SOFT'
+
+                #props = layout.operator("sequencer.split", text="Hold Split")
+                #props.type = 'HARD'
+                layout.operator("vseqf.cut", text="Hold Cut/Split").type = 'HARD'
+
+            layout.separator()
+
             layout.operator("sequencer.copy", text="Copy")
             layout.operator("sequencer.paste", text="Paste")
             layout.operator("sequencer.duplicate_move")
 
+        layout.separator()
         layout.operator("sequencer.delete", text="Delete")
 
-        #strip = context.active_sequence_strip
-        strip = timeline.current_active(context)
+        strip = context.active_sequence_strip
 
         if strip and strip.type == 'SCENE':
             layout.operator("sequencer.delete", text="Delete Strip & Data").delete_data = True
+            layout.operator("sequencer.scene_frame_range_update")
 
         if has_sequencer:
             if strip:
                 strip_type = strip.type
-
-                if strip_type != 'SOUND':
-                    layout.separator()
-                    layout.operator_menu_enum("sequencer.strip_modifier_add", "type", text="Add Modifier")
-                    layout.operator("sequencer.strip_modifier_copy", text="Copy Modifiers to Selection")
+                layout.separator()
+                layout.operator_menu_enum("sequencer.strip_modifier_add", "type", text="Add Modifier")
+                layout.operator("sequencer.strip_modifier_copy", text="Copy Modifiers to Selection")
 
                 if strip_type in {
                         'CROSS', 'ADD', 'SUBTRACT', 'ALPHA_OVER', 'ALPHA_UNDER',
@@ -1206,9 +1203,6 @@ class SEQUENCER_MT_strip(Menu):
             layout.separator()
             layout.menu("SEQUENCER_MT_strip_input")
 
-        layout.separator()
-        layout.operator("sequencer.rebuild_proxy")
-
 
 def selected_sequences_len(context):
     try:
@@ -1219,6 +1213,7 @@ def selected_sequences_len(context):
 
 class SEQUENCER_MT_add(Menu):
     bl_label = "Add"
+    bl_options = {'SEARCH_ON_KEY_PRESS'}
 
     def draw(self, context):
 
@@ -1316,8 +1311,9 @@ def remove_continuous_handler(add=False):
 
 
 #Register properties, operators, menus and shortcuts
-classes = classes + [VSEQFSettingsMenu, VSEQFSetting, VSEQFFollow, VSEQFImport, VSEQF_PT_CompactEdit,
-                     SEQUENCER_MT_strip, SEQUENCER_MT_strip_transform, SEQUENCER_MT_add]
+classes = classes + [VSEQFSettingsMenu, VSEQFSetting, VSEQFFollow, VSEQFImport, VSEQF_PT_CompactEdit]
+#originals found in C:\Program Files\Blender Foundation\Blender x.x\x.x\scripts\startup\bl_ui\space_sequencer.py
+classes = classes + [SEQUENCER_MT_strip, SEQUENCER_MT_strip_transform, SEQUENCER_MT_add]
 
 
 def replace_default_keymap():
@@ -1373,9 +1369,9 @@ def register_keymaps():
 
         keymapitems.new('vseqf.grab', 'G', 'PRESS')
         keymapitems.new('vseqf.context_menu', 'ACCENT_GRAVE', 'PRESS')
-        keymapitems.new('vseqf.context_menu', 'W', 'PRESS')
         keymapitems.new('vseqf.select_grab', 'LEFTMOUSE', 'PRESS')
         keymapitems.new('vseqf.select_grab', 'RIGHTMOUSE', 'PRESS')
+        keymapitems.new('vseqf.select_grab', 'LEFTMOUSE', 'CLICK_DRAG')
 
         keymapgrabextend = keymapitems.new('vseqf.grab', 'E', 'PRESS')
         keymapgrabextend.properties.mode = 'TIME_EXTEND'

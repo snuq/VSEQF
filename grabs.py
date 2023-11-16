@@ -375,6 +375,7 @@ class VSEQFSelectGrab(bpy.types.Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
+        bpy.ops.ed.undo_push()
         self.click_mode = get_click_mode(context)
         if self.click_mode == 'RIGHT' and event.type == 'LEFTMOUSE':
             #in RCS, left click on squencer, move cursor if nothing is clickd on
@@ -395,7 +396,6 @@ class VSEQFSelectGrab(bpy.types.Operator):
             bpy.ops.vseqf.context_menu('INVOKE_DEFAULT')
             if self.click_mode == 'LEFT':
                 return {'FINISHED'}
-        bpy.ops.ed.undo_push()
         self.selected = []
         original_selected_sequences = timeline.current_selected(context)
         for sequence in original_selected_sequences:
@@ -534,7 +534,6 @@ class VSEQFGrabAdd(bpy.types.Operator):
                 sequence.frame_start = data.frame_start
             else:
                 sequence.channel = data.channel
-        return
 
     def modal(self, context, event):
         release_confirm = bpy.context.preferences.inputs.use_drag_immediately
@@ -609,7 +608,27 @@ class VSEQFGrabAdd(bpy.types.Operator):
         if context.scene.vseqf.ripple_markers:
             grab_ripple_markers(self.ripple_markers, self.ripple, ripple_offset)
 
-        if event.type in {'LEFTMOUSE', 'RET'} or (release_confirm and event.value == 'RELEASE'):
+        if event.type in ['RIGHTMOUSE', 'ESC']:
+            #cancel movement and put everything back
+            if not self.cancelled:
+                self.cancelled = True
+                current_frame = context.scene.frame_current
+                self.ripple = False
+                self.ripple_pop = False
+                self.reset_sequences()
+                #bpy.ops.ed.undo()
+                if not context.screen.is_animation_playing:
+                    context.scene.frame_current = self.start_frame
+                    context.scene.sequence_editor.overlay_frame = self.start_overlay_frame
+                else:
+                    if context.scene.frame_current != current_frame:
+                        bpy.ops.screen.animation_play()
+                        context.scene.frame_current = current_frame
+                        bpy.ops.screen.animation_play()
+                self.remove_draw_handler()
+            return {'CANCELLED'}
+
+        if event.type in ['LEFTMOUSE', 'RET'] or (release_confirm and event.value == 'RELEASE'):
             vu_meter.vu_meter_calculate(context.scene)
             self.remove_draw_handler()
             vseqf.redraw_sequencers()
@@ -630,26 +649,6 @@ class VSEQFGrabAdd(bpy.types.Operator):
                     context.scene.frame_current = self.ripple_left
             return {'FINISHED'}
 
-        elif event.type in {'RIGHTMOUSE', 'ESC'}:
-            #cancel movement and put everything back
-            if not self.cancelled:
-                self.cancelled = True
-                current_frame = context.scene.frame_current
-                self.ripple = False
-                self.ripple_pop = False
-                self.reset_sequences()
-                #bpy.ops.ed.undo()
-                if not context.screen.is_animation_playing:
-                    context.scene.frame_current = self.start_frame
-                    context.scene.sequence_editor.overlay_frame = self.start_overlay_frame
-                else:
-                    if context.scene.frame_current != current_frame:
-                        bpy.ops.screen.animation_play()
-                        context.scene.frame_current = current_frame
-                        bpy.ops.screen.animation_play()
-                self.remove_draw_handler()
-            return {'CANCELLED'}
-
         return {'PASS_THROUGH'}
 
     def remove_draw_handler(self):
@@ -659,7 +658,6 @@ class VSEQFGrabAdd(bpy.types.Operator):
         sequencer = context.scene.sequence_editor
         self.start_frame = context.scene.frame_current
         self.start_overlay_frame = sequencer.overlay_frame
-        bpy.ops.ed.undo_push()
         self.cancelled = False
         self.prefs = vseqf.get_prefs()
         region = context.region
@@ -802,7 +800,6 @@ class VSEQFGrabAdd(bpy.types.Operator):
             self.can_pop = True
         else:
             self.can_pop = False
-        #bpy.ops.ed.undo_push()
         context.window_manager.modal_handler_add(self)
         args = (context, )
         self._handle = bpy.types.SpaceSequenceEditor.draw_handler_add(self.vseqf_grab_draw, args, 'WINDOW', 'POST_PIXEL')
@@ -813,6 +810,7 @@ class VSEQFGrab(bpy.types.Operator):
     """Wrapper operator for the built-in grab operator, runs the added features as well as the original."""
     bl_idname = "vseqf.grab"
     bl_label = "Replacement for the default grab operator with more features"
+    bl_options = {"UNDO"}
 
     mode: bpy.props.StringProperty("")
 
@@ -884,12 +882,10 @@ class VSEQFContextMenu(bpy.types.Operator):
 
 class VSEQFDoubleUndo(bpy.types.Operator):
     """Undo previous action"""
-    bl_idname = "vseqf.double_undo"
+    bl_idname = "vseqf.undo"
     bl_label = "Undo previous action"
 
     def execute(self, context):
-        del context
-        bpy.ops.ed.undo()
         bpy.ops.ed.undo()
         return {'FINISHED'}
 
@@ -900,7 +896,7 @@ class VSEQFContextMarker(bpy.types.Menu):
 
     def draw(self, context):
         layout = self.layout
-        layout.operator('vseqf.double_undo', text='Undo')
+        layout.operator('vseqf.undo', text='Undo')
         layout.separator()
         if timeline.inside_meta_strip():
             layout.operator('vseqf.meta_exit')
@@ -928,7 +924,7 @@ class VSEQFContextCursor(bpy.types.Menu):
 
     def draw(self, context):
         layout = self.layout
-        layout.operator('vseqf.double_undo', text='Undo')
+        layout.operator('vseqf.undo', text='Undo')
         layout.separator()
         if timeline.inside_meta_strip():
             layout.operator('vseqf.meta_exit')
@@ -965,7 +961,7 @@ class VSEQFContextNone(bpy.types.Menu):
     def draw(self, context):
         del context
         layout = self.layout
-        layout.operator('vseqf.double_undo', text='Undo')
+        layout.operator('vseqf.undo', text='Undo')
         layout.separator()
         if timeline.inside_meta_strip():
             layout.operator('vseqf.meta_exit')
@@ -982,7 +978,7 @@ class VSEQFContextSequenceLeft(bpy.types.Menu):
     def draw(self, context):
         strip = timeline.current_active(context)
         layout = self.layout
-        layout.operator('vseqf.double_undo', text='Undo')
+        layout.operator('vseqf.undo', text='Undo')
         if timeline.inside_meta_strip():
             layout.separator()
             layout.operator('vseqf.meta_exit')
@@ -1002,7 +998,7 @@ class VSEQFContextSequenceRight(bpy.types.Menu):
     def draw(self, context):
         strip = timeline.current_active(context)
         layout = self.layout
-        layout.operator('vseqf.double_undo', text='Undo')
+        layout.operator('vseqf.undo', text='Undo')
         if timeline.inside_meta_strip():
             layout.separator()
             layout.operator('vseqf.meta_exit')
@@ -1024,7 +1020,7 @@ class VSEQFContextSequence(bpy.types.Menu):
         strip = timeline.current_active(context)
         selected = timeline.current_selected(context)
         layout = self.layout
-        layout.operator('vseqf.double_undo', text='Undo')
+        layout.operator('vseqf.undo', text='Undo')
         if timeline.inside_meta_strip():
             layout.separator()
             layout.operator('vseqf.meta_exit')

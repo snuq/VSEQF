@@ -60,6 +60,7 @@ class VSEQFCut(bpy.types.Operator):
 
     bl_idname = "vseqf.cut"
     bl_label = "Wrapper for the built in sequence cut operator that maintains parenting relationships and provides extra cut operations."
+    bl_options = {"UNDO"}
 
     tooltip: bpy.props.StringProperty("Cut the selected strips")
     use_frame: bpy.props.BoolProperty(default=False)
@@ -197,7 +198,7 @@ class VSEQFCut(bpy.types.Operator):
         if not sequencer:
             self.reset()
             return{'CANCELLED'}
-        bpy.ops.ed.undo_push()
+        #bpy.ops.ed.undo_push()
         if not self.use_all:
             self.all = context.scene.vseqf.quickcuts_all
         if self.type == 'UNCUT_LEFT':

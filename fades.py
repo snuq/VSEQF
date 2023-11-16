@@ -1,5 +1,4 @@
 import bpy
-import bgl
 import gpu
 from gpu_extras.batch import batch_for_shader
 import math
@@ -326,13 +325,11 @@ def volume_operator_draw(self, context):
         last_coords = current_coords
         if point[0] > self.active_frame_end:
             break
-    bgl.glEnable(bgl.GL_BLEND)
-    shader = gpu.shader.from_builtin('2D_UNIFORM_COLOR')
+    shader = gpu.shader.from_builtin('UNIFORM_COLOR')
     batch = batch_for_shader(shader, 'LINES', {'pos': coords})
     shader.bind()
     shader.uniform_float('color', (1, .5, .5, .5))
     batch.draw(shader)
-    bgl.glDisable(bgl.GL_BLEND)
 
 
 class VSEQFModalVolumeDraw(bpy.types.Operator):
@@ -452,9 +449,6 @@ class VSEQFModalVolumeDraw(bpy.types.Operator):
         return {'CANCELLED'}
 
     def invoke(self, context, event):
-        bpy.ops.ed.undo_push()
-        bpy.ops.ed.undo_push()
-
         #set up necessary variables
         self.mode = 'ADD'
         self.last_press = ''
@@ -488,13 +482,15 @@ class VSEQFModalVolumeDraw(bpy.types.Operator):
         args = (self, context)
         self._handle = bpy.types.SpaceSequenceEditor.draw_handler_add(volume_operator_draw, args, 'WINDOW', 'POST_PIXEL')
         context.area.tag_redraw()
+        bpy.ops.ed.undo_push()
+        #bpy.ops.ed.undo_push()
         return {'RUNNING_MODAL'}
 
 
 class VSEQFModalFades(bpy.types.Operator):
     bl_idname = 'vseqf.modal_fades'
     bl_label = "Add and modify strip fade in and out"
-    bl_options = {'REGISTER', 'BLOCKING', 'GRAB_CURSOR'}
+    bl_options = {'REGISTER', 'BLOCKING', 'GRAB_CURSOR', 'UNDO'}
 
     mode: bpy.props.EnumProperty(name='Fade To Set', default="DEFAULT", items=[("DEFAULT", "Based On Selection", "", 1), ("LEFT", "Fade In", "", 2), ("RIGHT", "Fade Out", "", 3), ("BOTH", "Fade In And Out", "", 4)])
     strip_data = []
@@ -653,6 +649,7 @@ class VSEQFModalFades(bpy.types.Operator):
         area.tag_redraw()
 
         if event.type in {'LEFTMOUSE', 'RET'}:
+            bpy.ops.ed.undo_push()
             #finalize fades
             for data in self.strip_data:
                 sequence = data['sequence']
@@ -680,7 +677,6 @@ class VSEQFModalFades(bpy.types.Operator):
             self.remove_draw_handler()
             area.header_text_set(None)
             context.workspace.status_text_set(None)
-            bpy.ops.ed.undo()
             self.mode = 'DEFAULT'
             return {'CANCELLED'}
 
@@ -691,9 +687,6 @@ class VSEQFModalFades(bpy.types.Operator):
         if not selected:
             self.mode = 'DEFAULT'
             return {'CANCELLED'}
-
-        bpy.ops.ed.undo_push()
-        bpy.ops.ed.undo_push()
 
         self.mouse_move_x = 0
         self.mouse_move_y = 0
