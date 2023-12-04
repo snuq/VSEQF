@@ -327,7 +327,7 @@ class VSEQFCut(bpy.types.Operator):
                 markers = context.scene.timeline_markers
             else:
                 markers = []
-            grabs.ripple_timeline(sequences, ripple_frame - 1, insert, markers=markers)
+            grabs.ripple_timeline(sequencer, sequences, ripple_frame - 1, insert, markers=markers)
         else:
             for sequence in to_select:
                 if sequence:
@@ -543,7 +543,7 @@ class VSEQFDelete(bpy.types.Operator):
                         markers = context.scene.timeline_markers
                     else:
                         markers = []
-                    grabs.ripple_timeline(sequences, start_frame, -ripple_length, markers=markers)
+                    grabs.ripple_timeline(context.scene.sequence_editor, sequences, start_frame, -ripple_length, markers=markers)
                     start_frame = frame
                 end_frame = frame
             context.scene.frame_current = ripple_frames[0]

@@ -266,13 +266,13 @@ def grab_ripple_sequences(starting_data, ripple_sequences, ripple, ripple_offset
                 data.rippled = False
 
 
-def ripple_timeline(sequences, start_frame, ripple_amount, select_ripple=True, markers=[]):
+def ripple_timeline(sequencer, sequences, start_frame, ripple_amount, select_ripple=True, markers=[]):
     """Moves all given sequences starting after the frame given as 'start_frame', by moving them forward by 'ripple_amount' frames.
     'select_ripple' will select all sequences that were moved."""
 
     to_change = []
     for sequence in sequences:
-        if sequence.frame_final_end > start_frame - ripple_amount and sequence.frame_final_start > start_frame:
+        if not timeline.is_locked(sequencer, sequence) and sequence.frame_final_end > start_frame - ripple_amount and sequence.frame_final_start > start_frame:
             to_change.append([sequence, sequence.channel, sequence.frame_start + ripple_amount, True])
     for seq in to_change:
         sequence = seq[0]
