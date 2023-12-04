@@ -47,8 +47,8 @@ def zoom_custom(begin, end, bottom=None, top=None, preroll=True):
     scene.sequence_editor.active_strip = zoom_clip
     for region in bpy.context.area.regions:
         if region.type == 'WINDOW':
-            override = {'region': region, 'window': bpy.context.window, 'screen': bpy.context.screen, 'area': bpy.context.area, 'scene': bpy.context.scene}
-            bpy.ops.sequencer.view_selected(override)
+            with bpy.context.temp_override(region=region, window=bpy.context.window, screen=bpy.context.screen, area=bpy.context.area, scene=bpy.context.scene):
+                bpy.ops.sequencer.view_selected()
     bpy.ops.sequencer.delete()
 
     #Reset selected sequences and active strip
