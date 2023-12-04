@@ -462,7 +462,7 @@ class VSEQFQuickTimeline(bpy.types.Operator):
             'sequences_end': Like 'sequences, but only trims the end frame.
             'selected_start': Like 'selected', but only trims the start frame.
             'selected_end': Like 'selected', but only trims the end frame.
-            'full_auto': moves sequences back or up to match with frame 1, then sets start and end to encompass all sequences."""
+            'full_auto': moves sequences and markers back or up to match with frame 1, then sets start and end to encompass all sequences."""
 
     bl_idname = 'vseqf.quicktimeline'
     bl_label = 'VSEQF Quick Timeline'
@@ -489,6 +489,9 @@ class VSEQFQuickTimeline(bpy.types.Operator):
                     #move all sequences forward then back
                     offset_1 = end_frame - start_frame + 1
                     offset_2 = -offset_1 - start_frame + 1
+
+                    for marker in context.scene.timeline_markers:
+                        marker.frame = int(marker.frame - start_frame + 1)
 
                     for sequence in sequences:
                         if not hasattr(sequence, 'input_1'):
@@ -558,5 +561,5 @@ class VSEQFQuickTimelineMenu(bpy.types.Menu):
         row = layout.row()
         props = row.operator('vseqf.quicktimeline', text='Full Timeline Setup')
         props.operation = 'full_auto'
-        props.tooltip = 'Moves sequences back up to frame 1, then sets start and end to encompass all sequences'
+        props.tooltip = 'Moves sequences and markers back up to frame 1, then sets start and end to encompass all sequences'
         row.enabled = not inside_meta_strip()
