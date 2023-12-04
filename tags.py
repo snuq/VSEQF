@@ -408,7 +408,7 @@ class VSEQFQuickTagsAddMarker(bpy.types.Operator):
                 tag = sequence.tags.add()
                 tag.text = text
                 tag.use_offset = True
-                tag.offset = offset
+                tag.offset = int(offset)
         return{'FINISHED'}
 
 
