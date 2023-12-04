@@ -126,7 +126,8 @@ continuous_handler = None
 classes = []
 
 classes = classes + [cuts.VSEQFCut, cuts.VSEQFQuickCutsMenu, cuts.VSEQF_PT_QuickCutsPanel, cuts.VSEQFDelete,
-                     cuts.VSEQFDeleteConfirm, cuts.VSEQFDeleteRippleConfirm]
+                     cuts.VSEQFDeleteConfirm, cuts.VSEQFDeleteConfirmMenu, cuts.VSEQFDeleteRippleConfirm,
+                     cuts.VSEQFDeleteRippleConfirmMenu]
 classes = classes + [fades.VSEQFModalFades, fades.VSEQF_PT_QuickFadesPanel, fades.VSEQFQuickFadesMenu,
                      fades.VSEQFQuickFadesSet, fades.VSEQFQuickFadesClear, fades.VSEQFQuickFadesCross,
                      fades.VSEQFModalVolumeDraw, fades.VSEQF_PT_QuickFadesStripPanel]
@@ -842,6 +843,7 @@ class VSEQFSettingsMenu(Menu):
         layout.prop(scene.vseqf, 'snap_new_end')
         layout.prop(scene.vseqf, 'shortcut_skip')
         layout.prop(scene.vseqf, 'ripple_markers')
+        layout.prop(scene.vseqf, 'delete_confirm')
         if prefs.parenting:
             layout.separator()
             layout.label(text='QuickParenting Settings')
@@ -986,6 +988,9 @@ class VSEQFSetting(bpy.types.PropertyGroup):
         default=False)
     snap_cursor_to_edge: bpy.props.BoolProperty(
         name='Snap Cursor When Dragging Edges',
+        default=False)
+    delete_confirm: bpy.props.BoolProperty(
+        name='Popup Confirm Strip Delete',
         default=False)
 
 
@@ -1374,14 +1379,10 @@ def register_keymaps():
         keymapgrabextend.properties.mode = 'TIME_EXTEND'
         keymapslip = keymapitems.new('vseqf.grab', 'S', 'PRESS', alt=True)
         keymapslip.properties.mode = 'SLIP'
-        keymapdelete1 = keymapitems.new('wm.call_menu', 'X', 'PRESS')
-        keymapdelete1.properties.name = 'VSEQF_MT_delete_menu'
-        keymapdelete2 = keymapitems.new('wm.call_menu', 'DEL', 'PRESS')
-        keymapdelete2.properties.name = 'VSEQF_MT_delete_menu'
-        keymapdelete3 = keymapitems.new('wm.call_menu', 'X', 'PRESS', alt=True)
-        keymapdelete3.properties.name = 'VSEQF_MT_delete_ripple_menu'
-        keymapdelete4 = keymapitems.new('wm.call_menu', 'DEL', 'PRESS', alt=True)
-        keymapdelete4.properties.name = 'VSEQF_MT_delete_ripple_menu'
+        keymapitems.new('vseqf.delete_confirm', 'X', 'PRESS')
+        keymapitems.new('vseqf.delete_confirm', 'DEL', 'PRESS')
+        keymapitems.new('vseqf.delete_ripple_confirm', 'X', 'PRESS', alt=True)
+        keymapitems.new('vseqf.delete_ripple_confirm', 'DEL', 'PRESS', alt=True)
 
         #QuickShortcuts Shortcuts
         keymapitems.new('vseqf.cut', 'NUMPAD_SLASH', 'PRESS')

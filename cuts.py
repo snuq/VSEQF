@@ -551,7 +551,21 @@ class VSEQFDelete(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class VSEQFDeleteConfirm(bpy.types.Menu):
+class VSEQFDeleteConfirm(bpy.types.Operator):
+    """Operator to call the delete menu if it's setting is activated"""
+
+    bl_idname = 'vseqf.delete_confirm'
+    bl_label = 'VSEQF Delete'
+
+    def execute(self, context):
+        if context.scene.vseqf.delete_confirm:
+            bpy.ops.wm.call_menu(name='VSEQF_MT_delete_menu')
+        else:
+            bpy.ops.vseqf.delete()
+        return {'FINISHED'}
+
+
+class VSEQFDeleteConfirmMenu(bpy.types.Menu):
     bl_idname = "VSEQF_MT_delete_menu"
     bl_label = "Delete Selected?"
 
@@ -561,7 +575,21 @@ class VSEQFDeleteConfirm(bpy.types.Menu):
         layout.operator("vseqf.delete", text='Delete')
 
 
-class VSEQFDeleteRippleConfirm(bpy.types.Menu):
+class VSEQFDeleteRippleConfirm(bpy.types.Operator):
+    """Operator to call the ripple delete menu if it's setting is activated"""
+
+    bl_idname = 'vseqf.delete_ripple_confirm'
+    bl_label = 'VSEQF Ripple Delete'
+
+    def execute(self, context):
+        if context.scene.vseqf.delete_confirm:
+            bpy.ops.wm.call_menu(name='VSEQF_MT_delete_ripple_menu')
+        else:
+            bpy.ops.vseqf.delete(ripple=True)
+        return {'FINISHED'}
+
+
+class VSEQFDeleteRippleConfirmMenu(bpy.types.Menu):
     bl_idname = "VSEQF_MT_delete_ripple_menu"
     bl_label = "Ripple Delete Selected?"
 
