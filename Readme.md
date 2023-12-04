@@ -165,6 +165,9 @@ The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' o
 
       Places the imported sequences at the end of the timeline.
 
+* __Follow Cursor__
+
+    When activated from the Sequencer header, this will adjust the sequencer viewport to keep the cursor in view when playback is active.
 
 
 ## QuickShortcuts

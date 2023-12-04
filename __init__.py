@@ -227,15 +227,12 @@ class VSEQFFollow(bpy.types.Operator):
                 delta_x = new_x - old_x
                 self.cursor_target = self.cursor_target + delta_x
 
-        if event.type == 'TIMER':
-            if context.screen.is_animation_playing:
-                override = context.copy()
-                override['region'] = self.region
-                override['view2d'] = self.view
-                cursor_location = view.view_to_region(context.scene.frame_current, 0, clip=False)[0]
-                if cursor_location != 12000:
-                    offset = (self.cursor_target - cursor_location)
-                    bpy.ops.view2d.pan(override, deltax=-offset)
+        if event.type == 'TIMER' and context.screen.is_animation_playing and not context.screen.is_scrubbing:
+            cursor_location = view.view_to_region(context.scene.frame_current, 0, clip=False)[0]
+            if cursor_location != 12000:
+                offset = (self.cursor_target - cursor_location)
+                with bpy.context.temp_override(region=self.region, view2d=self.view):
+                    bpy.ops.view2d.pan(deltax=-offset)
         self.animation_playing_last = context.screen.is_animation_playing
         return {'PASS_THROUGH'}
 

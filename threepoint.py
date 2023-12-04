@@ -205,9 +205,6 @@ class ThreePointSetup:
                     for space in area.spaces:
                         if space.type == 'CLIP_EDITOR':
                             space.clip = self.clip
-                            override = bpy.context.copy()
-                            override['area'] = area
-                            override['space_data'] = space
             self.remove_handler()
             return
 
