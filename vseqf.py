@@ -95,8 +95,9 @@ def draw_text(x, y, size, text, justify='left', color=(1.0, 1.0, 1.0, 1.0)):
 
 #Miscellaneous Functions
 def get_prefs():
-    if __name__ in bpy.context.preferences.addons:
-        prefs = bpy.context.preferences.addons[__name__].preferences
+    name = __name__.strip('.vseqf')
+    if name in bpy.context.preferences.addons:
+        prefs = bpy.context.preferences.addons[name].preferences
     else:
         prefs = VSEQFTempSettings()
     return prefs
