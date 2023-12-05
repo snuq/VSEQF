@@ -712,7 +712,7 @@ def vseqf_draw():
     min_x = 25
     max_x = width - 10
     fps = vseqf.get_fps()
-    draw_strip_info(context, active_strip, fps, frame_px, channel_px, min_x, max_x, view, width, text_color, prefs.fades, prefs.parenting, True, True)
+    draw_strip_info(context, active_strip, fps, frame_px, channel_px, min_x, max_x, view, width, text_color, prefs.fades, prefs.parenting, context.scene.vseqf.display_length, True)
     selected = timeline.current_selected(context)
     for strip in selected:
         if strip != active_strip:
@@ -738,7 +738,7 @@ def draw_strip_info(context, active_strip, fps, frame_px, channel_px, min_x, max
     #display length
     if show_length:
         length_timecode = vseqf.timecode_from_frames(length, fps)
-        vseqf.draw_text(strip_x - (strip_x / width) * 40, active_bottom + (channel_px * .1), text_size, '('+length_timecode+')', text_color)
+        vseqf.draw_text(strip_x - (strip_x / width) * 40, active_bottom + (channel_px * .33), text_size, '('+length_timecode+')', text_color)
 
     #display fades
     if show_fades and active_width > text_size * 6:
@@ -844,6 +844,7 @@ class VSEQFSettingsMenu(Menu):
         layout.prop(scene.vseqf, 'shortcut_skip')
         layout.prop(scene.vseqf, 'ripple_markers')
         layout.prop(scene.vseqf, 'delete_confirm')
+        layout.prop(scene.vseqf, 'display_length')
         if prefs.parenting:
             layout.separator()
             layout.label(text='QuickParenting Settings')
@@ -992,6 +993,10 @@ class VSEQFSetting(bpy.types.PropertyGroup):
     delete_confirm: bpy.props.BoolProperty(
         name='Popup Confirm Strip Delete',
         default=False)
+
+    display_length: bpy.props.BoolProperty(
+        name='Display Length Of Active Strip',
+        default=True)
 
 
 class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
