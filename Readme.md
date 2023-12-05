@@ -108,11 +108,6 @@ The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' o
    Ripple-Pop will allow you to move a sequence above and out of a line, automatically closing the gap left behind.  This will only operate when one sequence is grabbed.
    Enable the 'Ripple Edit Markers' option to cause markers to behave by ripple rules as well.
 
-* __Grab Multiple With Right-Click Drag__
-
-   Option to change the behavior of the right click drag to grab, the previous selected sequences will be added to the grab before it is activated.  
-   This can be enabled in the Quick Functions Settings menu.
-
 * __Edge Grab Improvements__
 
    When an edge is moved into another sequence, the selected sequence will be moved up a channel to allow the edge to be moved.  
