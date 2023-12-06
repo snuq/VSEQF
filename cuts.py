@@ -557,6 +557,10 @@ class VSEQFDeleteConfirm(bpy.types.Operator):
     bl_idname = 'vseqf.delete_confirm'
     bl_label = 'VSEQF Delete'
 
+    @classmethod
+    def poll(cls, context):
+        return not context.scene.sequence_editor.selected_retiming_keys
+
     def execute(self, context):
         if context.scene.vseqf.delete_confirm:
             bpy.ops.wm.call_menu(name='VSEQF_MT_delete_menu')
@@ -580,6 +584,10 @@ class VSEQFDeleteRippleConfirm(bpy.types.Operator):
 
     bl_idname = 'vseqf.delete_ripple_confirm'
     bl_label = 'VSEQF Ripple Delete'
+
+    @classmethod
+    def poll(cls, context):
+        return not context.scene.sequence_editor.selected_retiming_keys
 
     def execute(self, context):
         if context.scene.vseqf.delete_confirm:

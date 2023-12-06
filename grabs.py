@@ -346,6 +346,10 @@ class VSEQFSelectGrab(bpy.types.Operator):
     _timer = None
     click_mode = None
 
+    @classmethod
+    def poll(cls, context):
+        return not context.scene.sequence_editor.selected_retiming_keys
+
     def modal(self, context, event):
         region = context.region
         view = region.view2d
