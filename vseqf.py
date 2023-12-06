@@ -52,6 +52,7 @@ def add_to_value(value, character, is_float=True):
 
 #Drawing functions
 def draw_line(sx, sy, ex, ey, color=(1.0, 1.0, 1.0, 1.0)):
+    gpu.state.blend_set("ALPHA")
     coords = [(sx, sy), (ex, ey)]
     shader = gpu.shader.from_builtin('UNIFORM_COLOR')
     batch = batch_for_shader(shader, 'LINES', {'pos': coords})
@@ -61,6 +62,7 @@ def draw_line(sx, sy, ex, ey, color=(1.0, 1.0, 1.0, 1.0)):
 
 
 def draw_rect(x, y, w, h, color=(1.0, 1.0, 1.0, 1.0)):
+    gpu.state.blend_set("ALPHA")
     vertices = ((x, y), (x+w, y), (x, y+h), (x+w, y+h))
     indices = ((0, 1, 2), (2, 1, 3))
     shader = gpu.shader.from_builtin('UNIFORM_COLOR')
@@ -71,6 +73,7 @@ def draw_rect(x, y, w, h, color=(1.0, 1.0, 1.0, 1.0)):
 
 
 def draw_tri(v1, v2, v3, color=(1.0, 1.0, 1.0, 1.0)):
+    gpu.state.blend_set("ALPHA")
     vertices = (v1, v2, v3)
     indices = ((0, 1, 2), )
     shader = gpu.shader.from_builtin('UNIFORM_COLOR')
@@ -82,6 +85,7 @@ def draw_tri(v1, v2, v3, color=(1.0, 1.0, 1.0, 1.0)):
 
 def draw_text(x, y, size, text, justify='left', color=(1.0, 1.0, 1.0, 1.0)):
     #Draws basic text at a given location
+    gpu.state.blend_set("ALPHA")
     font_id = 0
     blf.color(font_id, *color)
     if justify == 'right':
