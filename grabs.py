@@ -376,6 +376,7 @@ class VSEQFSelectGrab(bpy.types.Operator):
 
     def invoke(self, context, event):
         bpy.ops.ed.undo_push()
+        prefs = vseqf.get_prefs()
         self.click_mode = get_click_mode(context)
         if self.click_mode == 'RIGHT' and event.type == 'LEFTMOUSE':
             #in RCS, left click on squencer, move cursor if nothing is clickd on
@@ -393,7 +394,10 @@ class VSEQFSelectGrab(bpy.types.Operator):
                 return {'FINISHED'}
         if event.type == 'RIGHTMOUSE':
             #right click, maybe do context menus
-            bpy.ops.vseqf.context_menu('INVOKE_DEFAULT')
+            if prefs.context_menu:
+                bpy.ops.vseqf.context_menu('INVOKE_DEFAULT')
+            else:
+                bpy.ops.wm.call_menu(name="SEQUENCER_MT_context_menu")
             if self.click_mode == 'LEFT':
                 return {'FINISHED'}
         self.selected = []

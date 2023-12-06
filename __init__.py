@@ -1024,6 +1024,9 @@ class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
     threepoint: bpy.props.BoolProperty(
         name="Enable Quick Three Point",
         default=True)
+    context_menu: bpy.props.BoolProperty(
+        name="Enable Right-Click Menus (In Left-Click Mode)",
+        default=True)
 
     auto_check_update: bpy.props.BoolProperty(
         name="Auto-check for Update",
@@ -1062,6 +1065,7 @@ class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
         layout.prop(self, "cuts")
         layout.prop(self, "edit")
         layout.prop(self, "threepoint")
+        layout.prop(self, "context_menu")
 
         mainrow = layout.row()
         col = mainrow.column()
