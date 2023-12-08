@@ -602,11 +602,24 @@ I welcome any help with these problems, if you have an idea on how to fix them, 
 
 * Right now the script cannot apply a vertical zoom level, as far as I can tell this is missing functionality in Blenders python api.
 
+* Quick 3point causes recursion errors sometimes when adjusting in/out.
+
+* Snapping a strip can try to snap to its own child, which causes weirdness when both are a bit offset.
+
 
 
 # Future Possibilities
-These are things I want to add, but I don't yet know how to do so.
+These are things I want to add, but I don't yet know how to, or have not yet had the time to implement.
 
 * Ripple insert (opposite of ripple pop).  Not entirely sure how to code this yet, but I want it!
 
 * Copy/paste wrapper that will copy sequence animation data.
+
+* Add grab mode options for strip marker moving
+
+* Ability to ripple cut beyond the edge of the selected strips to ADD to the clip
+
+* Showing a visual offset on the active audio sequence, showing how far out of sync it is from it's video parent 
+
+* Add maximize volume option for strip, maybe add a compressor via animations?
+

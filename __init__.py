@@ -16,68 +16,6 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-"""
-Known Issues:
-    Quick 3point causes recursion errors sometimes when adjusting in/out
-    Uncut does not work on movieclip type sequences... there appears to be no way of getting the sequence's source file.
-    Right now the script cannot apply a vertical zoom level, as far as I can tell this is missing functionality in Blender's python api.
-
-Future Possibilities:
-    Add grab mode options for marker moving (press m while grabbing to change, show real-time updates of position)
-    Remove multiple drag feature (Apparently it will be implemented in blender at some point?)
-    Ripple insert in real-time while grabbing... need to think about how to do this, but I want it!
-    Ability to ripple cut beyond the edge of the selected strips to ADD to the clip
-    Copy/paste wrapper that copies strip animation data
-    Showing a visual offset on the active audio sequence, showing how far out of sync it is from it's video parent
-
-Todo:
-    Feature: ripple markers option
-    Bug: vu meter can be REALLY slow sometimes...
-    Bug: snapping a strip can try to snap to its own child, which causes weirdness when both are a bit offset
-    Feature: add maximize volume option for strip, maybe add a compressor via animations?
-
-Features:
-    Strip parenting
-        Have you ever wanted to keep your video and audio strips in sync?  Parenting will let you synchronize strip movements and cuts from one to another.
-        You can have chains of child sequences, or parent everything in the sequencer to one strip.
-    Strip movement
-        When moving strips, press the alt key to toggle ripple mode.  This will automatically move all strips following the selected along with it.
-        New snapping options: snap a sequence to the previous, snap sequence ends to the cursor, and more.
-        Want to move the second half of the timeline back a second?  Just grab one strip, activate ripple, and move it back.
-        Ripple options are available when deleting or cutting strips as well.
-    Adding fades
-        Quickly add, modify, or remove precise fades to multiple strips.
-        Add or modify fades with visual feedback simply by pressing 'f' in the sequencer.
-        Add crossfades to multiple strips with a single click.
-    Interface additions
-        Added panels and menus to provide better access to tools, including a zooms menu, snaps menu, cuts menu and panel, and a compact strip info panel.
-    Three point editing
-        Use a three point editing style workflow, import strips and set their start and end points with timecodes before dropping them in the timeline.
-    Timeline display
-        The timeline can now remain centered on the cursor.
-        Zoom levels can be saved and recalled, quickly zoom to a visual area of one minute around the cursor, for instance.
-    Numpad shortcuts
-        Have full control over the timeline and selected strips with the numpad only.
-        Control playback speed, move strips around, or move the cursor, even cut strips, all without moving from the numpad.
-    Working with markers
-        Create markers based on named presets, easily add several 'Fix This Later' markers for instance.
-        See all marker time indexes in a list, and quickly jump to whichever you wish.
-    Sequence Tags
-        Add tags to sequences to classify or organize them.  You can see a list of all tags, and select all strips with a specific tag.
-    Cutting improvements
-        Trim the left or right side of a strip off with a single click, or even ripple back the entire timeline to match that cut.
-        Realized you made a cut you didnt want?  Use uncut to rejoin two strips if their positions match up.
-    Context menus that are actually contextual
-        Context menus will now vary depending on what the mouse is over when activated.
-        For instance: click on the cursor to get cursor snapping options, or click on a strip to get options specific to that strip
-    Blender bug fixes
-        A few small bugs or odd behavior relating to the VSE have been fixed by this addon.
-        Making meta strips will now auto-select effect strips tied to the strip, rather than just showing an error message.
-        Cutting strips with effect strips applied will now duplicate the effects to both cut strips.
-        Cutting strips with a crossfade could cause the crossfade to be applied to the wrong cut strip, it is now applied to the correct strip.  https://developer.blender.org/T50877
-    And much more
-
-"""
 
 import os
 import bpy
