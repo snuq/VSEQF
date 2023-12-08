@@ -573,7 +573,6 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
 def vseqf_continuous(scene):
     if not bpy.context.scene or bpy.context.scene != scene:
         return
-    replace_default_keymap()
     if scene.vseqf.last_frame != scene.frame_current:
         #scene frame was changed, assume nothing else happened
         pass
@@ -1265,17 +1264,6 @@ classes = classes + [VSEQFSettingsMenu, VSEQFSetting, VSEQFFollow, VSEQFImport, 
 classes = classes + [SEQUENCER_MT_strip, SEQUENCER_MT_strip_transform, SEQUENCER_MT_add]
 
 
-def replace_default_keymap():
-    #replace sequencer select tool keymaps
-    default_keymaps = bpy.context.window_manager.keyconfigs.default.keymaps
-    if 'Sequencer Tool: Select' not in default_keymaps:
-        return
-    select_tool_keymap = default_keymaps['Sequencer Tool: Select']
-    if 'sequencer.select' in select_tool_keymap.keymap_items:
-        current_select = select_tool_keymap.keymap_items['sequencer.select']
-        select_tool_keymap.keymap_items.remove(current_select)
-
-
 def register_keymaps():
     #register standard keymaps
     if bpy.context.window_manager.keyconfigs.addon:
@@ -1407,6 +1395,24 @@ def register_keymaps():
         keymapitems.new('sequencer.view_all', 'NUMPAD_9', 'PRESS', shift=True)
 
 
+def disable_tweak_default_keymaps(enable=False):
+    #disable sequencer tweak tool keymaps
+    keymaps = bpy.context.window_manager.keyconfigs['Blender'].keymaps
+    if 'Sequencer Tool: Tweak (fallback)' in keymaps:
+        keymap = keymaps['Sequencer Tool: Tweak (fallback)']
+        for item in keymap.keymap_items:
+            if 'Select' in item.name:
+                item.active = enable
+    if 'Sequencer Tool: Tweak' in keymaps:
+        keymap = keymaps['Sequencer Tool: Tweak']
+        for item in keymap.keymap_items:
+            if 'Select' in item.name:
+                item.active = enable
+    else:
+        print('Unable to find default shortcut, VSEQF mouse shortcuts will not work properly.')
+        return
+
+
 def register():
     addon_updater_ops.register(bl_info)
     updater.user = "snuq"
@@ -1454,6 +1460,7 @@ def register():
 
     #Register shortcuts
     register_keymaps()
+    disable_tweak_default_keymaps()
 
     #Register handlers
     remove_frame_step_handler(add=True)
@@ -1476,6 +1483,7 @@ def unregister():
     bpy.types.SEQUENCER_HT_header.remove(draw_follow_header)
 
     #Remove shortcuts
+    disable_tweak_default_keymaps(enable=True)
     keymapitems = bpy.context.window_manager.keyconfigs.addon.keymaps['Sequencer'].keymap_items
     for keymapitem in keymapitems:
         if (keymapitem.type == 'Z') | (keymapitem.type == 'F') | (keymapitem.type == 'S') | (keymapitem.type == 'G') | (keymapitem.type == 'RIGHTMOUSE') | (keymapitem.type == 'K') | (keymapitem.type == 'E') | (keymapitem.type == 'X') | (keymapitem.type == 'DEL') | (keymapitem.type == 'M') | (keymapitem.type == 'NUMPAD_0') | (keymapitem.type == 'NUMPAD_1') | (keymapitem.type == 'NUMPAD_2') | (keymapitem.type == 'NUMPAD_3') | (keymapitem.type == 'NUMPAD_4') | (keymapitem.type == 'NUMPAD_5') | (keymapitem.type == 'NUMPAD_6') | (keymapitem.type == 'NUMPAD_7') | (keymapitem.type == 'NUMPAD_8') | (keymapitem.type == 'NUMPAD_9'):
