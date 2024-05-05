@@ -45,7 +45,7 @@ bl_info = {
     "name": "VSE Quick Functions",
     "description": "Improves functionality of the sequencer by adding new menus and functions for snapping, adding fades, zooming, sequence parenting, ripple editing, playback speed, and more.",
     "author": "Hudson Barkley (Snu/snuq/Aritodo)",
-    "version": (4, 0, 1),
+    "version": (4, 0, 2),
     "blender": (4, 0, 0),
     "location": "Sequencer Panels; Sequencer Menus; Sequencer S, F, Shift-F, Z, Ctrl-P, Shift-P, Alt-M, Alt-K Shortcuts",
     "wiki_url": "https://github.com/snuq/VSEQF",
