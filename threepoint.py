@@ -1,7 +1,6 @@
 import bpy
 import os
 from . import timeline
-from . import parenting
 from . import vseqf
 
 
@@ -393,11 +392,6 @@ class VSEQFThreePointImport(bpy.types.Operator):
                 movie_sequence.channel = active_strip.channel
                 frame_start = active_strip.frame_final_start - frame_in
                 move_forward = offset - active_strip.frame_final_duration
-                children = parenting.find_children(active_strip)
-                if active_strip.type == 'MOVIE':
-                    original_filepath = active_strip.filepath
-                else:
-                    original_filepath = None
                 if move_forward > 0:
                     move_frame = active_strip.frame_final_start
                 else:
@@ -405,11 +399,6 @@ class VSEQFThreePointImport(bpy.types.Operator):
                 with context.temp_override(area=override_area):
                     bpy.ops.sequencer.select_all(action='DESELECT')
                 active_strip.select = True
-                for child in children:
-                    if child.type == 'SOUND' and child.sound.filepath == original_filepath and child.frame_final_start == active_strip.frame_final_start and child.frame_start == active_strip.frame_start and child.frame_final_end == active_strip.frame_final_end:
-                        child.select = True
-                        children.remove(child)
-                        break
                 with context.temp_override(area=override_area):
                     bpy.ops.sequencer.delete()
                 if move_forward != 0:
@@ -418,8 +407,6 @@ class VSEQFThreePointImport(bpy.types.Operator):
                     context.scene.frame_current = move_frame
                     bpy.ops.vseqf.cut(type='INSERT_ONLY', use_insert=True, insert=move_forward, use_all=True, all=True)
                     context.scene.frame_current = old_current
-                for child in children:
-                    child.parent = movie_sequence.name
             elif self.type == 'end':
                 import_pos = timeline.find_sequences_end(sequences)
                 frame_start = import_pos - frame_in
@@ -447,8 +434,6 @@ class VSEQFThreePointImport(bpy.types.Operator):
                 sound_sequence.frame_start = frame_start
                 if sound_sequence.frame_final_end > movie_sequence.frame_final_end:
                     sound_sequence.frame_final_end = movie_sequence.frame_final_end
-                if context.scene.vseqf.autoparent:
-                    sound_sequence.parent = movie_sequence.name
             if context.scene.vseqf.snap_new_end:
                 context.scene.frame_current = movie_sequence.frame_final_end
 

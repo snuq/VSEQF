@@ -1,6 +1,5 @@
 import bpy
 from . import vseqf
-from . import parenting
 
 
 #Effect manipulation and cleanup
@@ -84,34 +83,6 @@ def inside_meta_strip():
     return False
 
 
-class VSEQFMeta(bpy.types.Operator):
-    """Creates meta strip while adding children"""
-
-    bl_idname = 'vseqf.meta_make'
-    bl_label = 'Make Meta Strip (Include Children)'
-
-    def execute(self, context):
-        bpy.ops.ed.undo_push()
-        is_parenting = vseqf.parenting()
-        if is_parenting:
-            selected = current_selected(context)
-            for sequence in selected:
-                children = parenting.find_children(sequence)
-                for child in children:
-                    child.select = True
-        selected = current_selected(context)
-        sequences = current_sequences(context)
-        for sequence in sequences:
-            if hasattr(sequence, 'input_1'):
-                if sequence.input_1 in selected:
-                    sequence.select = True
-        try:
-            bpy.ops.sequencer.meta_make()
-        except RuntimeError:
-            self.report({'ERROR'}, "Please select all related strips")
-        return {'FINISHED'}
-
-
 class VSEQFMetaExit(bpy.types.Operator):
     bl_idname = 'vseqf.meta_exit'
     bl_label = 'Exit The Current Meta Strip'
@@ -178,13 +149,12 @@ def find_timeline_height(sequences):
     return height
 
 
-def sequences_after_frame(sequences, frame, add_locked=True, add_parented=True, add_effect=True):
+def sequences_after_frame(sequences, frame, add_locked=True, add_effect=True):
     """Finds sequences after a given frame
     Arguments:
         sequences: List containing the VSE Sequence objects that will be searched
         frame: Integer, the frame to check for sequences following
         add_locked: Boolean, if false, locked sequences will be ignored
-        add_parented: Boolean, if false, sequences with a set parent will be ignored
         add_effect: Boolean, if false, sequences of the effect type will be ignored
 
     Returns: A list of VSE Sequence objects"""
@@ -194,21 +164,18 @@ def sequences_after_frame(sequences, frame, add_locked=True, add_parented=True, 
             #sequence starts after frame
             if (not seq.lock) or add_locked:
                 #always adding locked, or sequence is not locked
-                if add_parented or (not parenting.find_parent(seq)):
-                    #always adding parents, or parent not found
-                    if add_effect or (not hasattr(seq, 'input_1')):
-                        update_sequences.append(seq)
+                if add_effect or (not hasattr(seq, 'input_1')):
+                    update_sequences.append(seq)
     return update_sequences
 
 
-def sequences_between_frames(sequences, start_frame, end_frame, add_locked=True, add_parented=True, add_effect=True):
+def sequences_between_frames(sequences, start_frame, end_frame, add_locked=True, add_effect=True):
     """Finds sequences that are visible between two given frames
     Arguments:
         sequences: List containing the VSE Sequence objects that will be searched
         start_frame: Integer, beginning frame number to search at
         end_frame: Integer, ending frame to search at
         add_locked: Boolean, if false, locked sequences will be ignored
-        add_parented: Boolean, if false, sequences with a set parent will be ignored
         add_effect: Boolean, if false, sequences of the effect type will be ignored
 
     Returns: A list of VSE Sequence objects"""
@@ -217,14 +184,12 @@ def sequences_between_frames(sequences, start_frame, end_frame, add_locked=True,
         if seq.frame_final_start >= start_frame and seq.frame_final_end <= end_frame:
             if (not seq.lock) or add_locked:
                 #always adding locked, or sequence is not locked
-                if add_parented or (not parenting.find_parent(seq)):
-                    #always adding parents, or parent not found
-                    if add_effect or (not hasattr(seq, 'input_1')):
-                        update_sequences.append(seq)
+                if add_effect or (not hasattr(seq, 'input_1')):
+                    update_sequences.append(seq)
     return update_sequences
 
 
-def find_close_sequence(sequences, selected_sequence, direction, mode='overlap', sounds=False, effects=True, children=True):
+def find_close_sequence(sequences, selected_sequence, direction, mode='overlap', sounds=False, effects=True):
     """Finds the closest sequence in one direction to the given sequence
     Arguments:
         sequences: List of sequences to search through
@@ -238,7 +203,6 @@ def find_close_sequence(sequences, selected_sequence, direction, mode='overlap',
             <any other string>: All sequences are returned
         sounds: Boolean, if False, 'SOUND' sequence types are ignored
         effects: Boolean, if False, effect strips that are applied to another strip are ignored
-        children: Boolean, if False, strips that are children of another will be ignored
 
     Returns: VSE Sequence object, or Boolean False if no matching sequence is found
     :rtype: bpy.types.Sequence"""
@@ -255,10 +219,6 @@ def find_close_sequence(sequences, selected_sequence, direction, mode='overlap',
         for current_sequence in sequences:
             #don't bother with sound or effect type sequences
             if (current_sequence.type != 'SOUND') or sounds:
-                #check if the sequence is a child of another, ignore if needed
-                if not children:
-                    if parenting.find_parent(current_sequence):
-                        continue
                 #check if the sequence is an effect of the selected sequence, ignore if so
                 if hasattr(current_sequence, 'input_1'):
                     if current_sequence.input_1 == selected_sequence or not effects:
@@ -278,10 +238,6 @@ def find_close_sequence(sequences, selected_sequence, direction, mode='overlap',
         for current_sequence in sequences:
             #don't bother with sound or effect type sequences
             if (current_sequence.type != 'SOUND') or sounds:
-                #check if the sequence is a child of another, ignore if needed
-                if not children:
-                    if parenting.find_parent(current_sequence):
-                        continue
                 #check if the sequence is an effect of the selected sequence, ignore if so
                 if hasattr(current_sequence, 'input_1'):
                     if current_sequence.input_1 == selected_sequence or not effects:

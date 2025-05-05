@@ -1,5 +1,4 @@
 import bpy
-from . import parenting
 from . import vseqf
 
 
@@ -8,10 +7,7 @@ def nudge_selected(frame=0, channel=0):
 
     to_nudge = []
     for sequence in bpy.context.selected_sequences:
-        if vseqf.parenting():
-            parenting.get_recursive(sequence, to_nudge)
-        else:
-            to_nudge.append(sequence)
+        to_nudge.append(sequence)
     if channel > 0:
         to_nudge.sort(key=lambda x: x.channel, reverse=True)
     if channel < 0:

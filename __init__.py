@@ -30,7 +30,6 @@ from . import cuts
 from . import fades
 from . import grabs
 from . import markers
-from . import parenting
 from . import shortcuts
 from . import snaps
 from . import tags
@@ -52,9 +51,6 @@ bl_info = {
     "tracker_url": "https://github.com/snuq/VSEQF/issues",
     "category": "Sequencer"
 }
-from .addon_updater import Updater as updater
-updater.addon = "vseqf"
-from . import addon_updater_ops
 
 vseqf_draw_handler = None
 vu_meter_draw_handler = None
@@ -77,8 +73,6 @@ classes = classes + [markers.VSEQF_PT_QuickMarkersPanel, markers.VSEQF_UL_QuickM
                      markers.VSEQFQuickMarkerRename, markers.VSEQFQuickMarkerJump, markers.VSEQFQuickMarkersMenu,
                      markers.VSEQFQuickMarkersPlace, markers.VSEQFQuickMarkersRemovePreset,
                      markers.VSEQFQuickMarkersAddPreset, markers.VSEQFMarkerPreset]
-classes = classes + [parenting.VSEQF_PT_Parenting, parenting.VSEQFQuickParentsMenu, parenting.VSEQFQuickParents,
-                     parenting.VSEQFQuickParentsClear]
 classes = classes + [snaps.VSEQFQuickSnapsMenu, snaps.VSEQFQuickSnaps]
 classes = classes + [shortcuts.VSEQFQuickShortcutsNudge, shortcuts.VSEQFQuickShortcutsSpeed,
                      shortcuts.VSEQFQuickShortcutsSkip, shortcuts.VSEQFQuickShortcutsResetPlay]
@@ -90,7 +84,7 @@ classes = classes + [tags.VSEQFQuickTagsMenu, tags.VSEQF_PT_QuickTagsPanel, tags
 classes = classes + [threepoint.VSEQF_PT_ThreePointBrowserPanel, threepoint.VSEQFThreePointImportToClip,
                      threepoint.VSEQF_PT_ThreePointPanel, threepoint.VSEQFThreePointImport,
                      threepoint.VSEQFThreePointOperator, threepoint.VSEQFQuick3PointValues]
-classes = classes + [timeline.VSEQFMeta, timeline.VSEQFMetaExit, timeline.VSEQFQuickTimeline,
+classes = classes + [timeline.VSEQFMetaExit, timeline.VSEQFQuickTimeline,
                      timeline.VSEQFQuickTimelineMenu]
 classes = classes + [zoom.VSEQFQuickZoomsMenu, zoom.VSEQFQuickZoomPresetMenu, zoom.VSEQFQuickZoomPreset,
                      zoom.VSEQFClearZooms, zoom.VSEQFRemoveZoom, zoom.VSEQFAddZoom, zoom.VSEQFQuickZooms,
@@ -286,58 +280,19 @@ class VSEQF_PT_CompactEdit(bpy.types.Panel):
             else:
                 row.label(text="No Fadeout Detected")
 
-        if prefs.parenting:
-            #display info about parenting relationships
-            sequence = timeline.current_active(context)
-            selected = context.selected_sequences
-            if len(scene.sequence_editor.meta_stack) > 0:
-                #inside a meta strip
-                sequencer = scene.sequence_editor.meta_stack[-1]
-            else:
-                #not inside a meta strip
-                sequencer = scene.sequence_editor
-            if hasattr(sequencer, 'sequences'):
-                sequences = sequencer.sequences
-            else:
-                sequences = []
-
-            children = parenting.find_children(sequence, sequences=sequences)
-            parent = parenting.find_parent(sequence)
-
-            box = layout.box()
-            #List relationships for active sequence
-            if parent:
-                row = box.row()
-                split = row.split(factor=.8, align=True)
-                split.label(text="Parent: "+parent.name)
-                split.operator('vseqf.quickparents', text='', icon="ARROW_LEFTRIGHT").action = 'select_parent'
-                split.operator('vseqf.quickparents', text='', icon="X").action = 'clear_parent'
-            if len(children) > 0:
-                row = box.row()
-                split = row.split(factor=.8, align=True)
-                subsplit = split.split(factor=.1)
-                subsplit.prop(scene.vseqf, 'expanded_children', icon="TRIA_DOWN" if scene.vseqf.expanded_children else "TRIA_RIGHT", icon_only=True, emboss=False)
-                subsplit.label(text="Children: "+children[0].name)
-                split.operator('vseqf.quickparents', text='', icon="ARROW_LEFTRIGHT").action = 'select_children'
-                split.operator('vseqf.quickparents', text='', icon="X").action = 'clear_children'
-                if scene.vseqf.expanded_children:
-                    index = 1
-                    while index < len(children):
-                        row = box.row()
-                        split = row.split(factor=.1)
-                        split.label(text='')
-                        split.label(text=children[index].name)
-                        index = index + 1
-
-            row = box.row()
-            split = row.split()
-            split.operator('vseqf.quickparents', text='Set Active As Parent').action = 'add'
-            if len(selected) <= 1:
-                split.enabled = False
-            row.prop(scene.vseqf, 'children', toggle=True)
-            row = box.row()
-            row.prop(scene.vseqf, 'select_children', toggle=True)
-            row.prop(scene.vseqf, 'delete_children', toggle=True)
+        #display info about parenting relationships
+        sequence = timeline.current_active(context)
+        selected = context.selected_sequences
+        if len(scene.sequence_editor.meta_stack) > 0:
+            #inside a meta strip
+            sequencer = scene.sequence_editor.meta_stack[-1]
+        else:
+            #not inside a meta strip
+            sequencer = scene.sequence_editor
+        if hasattr(sequencer, 'sequences'):
+            sequences = sequencer.sequences
+        else:
+            sequences = []
 
 
 class VSEQFImport(bpy.types.Operator, ImportHelper):
@@ -381,10 +336,6 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
         description="Location to import strips at",
         items=(("IMPORT_FRAME", "Import At Frame", ""), ("INSERT_FRAME", "Insert At Frame", ""), ("CUT_INSERT", "Cut And Insert At Frame", ""), ("END", "Import At End", "")),
         default="IMPORT_FRAME")
-    autoparent: bpy.props.BoolProperty(
-        name="Auto-Parent A/V",
-        description="Automatically parent audio strips to their movie strips",
-        default=True)
     use_placeholders: bpy.props.BoolProperty(
         name="Use Placeholders",
         description="Use placeholders for missing frames of the strip",
@@ -415,8 +366,6 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
             layout.prop(self, 'replace_selection')
             layout.prop(self, 'sound')
             layout.prop(self, 'use_movie_framerate')
-            if vseqf.parenting():
-                layout.prop(self, 'autoparent')
         elif self.type == 'IMAGE':
             context.space_data.params.use_filter_image = True
             layout = self.layout
@@ -453,10 +402,6 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
         self.start_frame = context.scene.frame_current
         if len(context.scene.sequence_editor.sequences_all) == 0:
             self.use_movie_framerate = True
-        if prefs.parenting and scene.vseqf.children:
-            self.autoparent = scene.vseqf.autoparent
-        else:
-            self.autoparent = False
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
@@ -515,11 +460,6 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
             bpy.ops.vseqf.cut(type=cut_type, use_insert=True, insert=move_forward, use_all=True, all=True)
             for sequence in self.all_imported:
                 sequence.frame_start = sequence.frame_start - move_back
-        if self.sound and self.autoparent:
-            #autoparent audio strips to video
-            for pair in self.to_parent:
-                movie, sound = pair
-                parenting.add_children(movie, [sound])
         if not self.replace_selection:
             bpy.ops.sequencer.select_all(action='DESELECT')
             for sequence in selected:
@@ -590,35 +530,11 @@ def vseqf_continuous(scene):
             if sequence.new:
                 if not (sequence.type == 'META' or hasattr(sequence, 'input_1')):
                     new_sequences.append(sequence)
-                sequence.last_name = sequence.name
                 sequence.new = False
-            if sequence.last_name != sequence.name:
-                #sequence was renamed or duplicated, update parenting if the original doesnt still exist
-                if sequence.name and sequence.last_name:
-                    original = False
-                    for seq in sequences:
-                        if seq.name == sequence.last_name:
-                            #this sequence was just duplicated or copied, dont do anything
-                            original = seq
-                            break
-                    if not original:
-                        #sequence was renamed, update parenting
-                        children = parenting.find_children(sequence.last_name, name=True, sequences=sequences)
-                        for child in children:
-                            child.parent = sequence.name
-                sequence.last_name = sequence.name
         if new_sequences:
             for sequence in new_sequences:
                 if sequence.type not in ['ADJUSTMENT', 'TEXT', 'COLOR', 'MULTICAM'] and sequence.frame_final_end > new_end:
                     new_end = sequence.frame_final_end
-                if vseqf.parenting() and scene.vseqf.autoparent:
-                    #autoparent
-                    if sequence.type == 'SOUND':
-                        for seq in new_sequences:
-                            if seq.type == 'MOVIE':
-                                if seq.filepath == sequence.sound.filepath:
-                                    sequence.parent = seq.name
-                                    break
             if scene.vseqf.snap_new_end:
                 scene.frame_current = new_end
 
@@ -649,14 +565,14 @@ def vseqf_draw():
     min_x = 25
     max_x = width - 10
     fps = vseqf.get_fps()
-    draw_strip_info(context, active_strip, fps, frame_px, channel_px, min_x, max_x, view, width, text_color, prefs.fades, prefs.parenting, context.scene.vseqf.display_length, True)
+    draw_strip_info(context, active_strip, fps, frame_px, channel_px, min_x, max_x, view, width, text_color, prefs.fades, context.scene.vseqf.display_length, True)
     selected = timeline.current_selected(context)
     for strip in selected:
         if strip != active_strip:
-            draw_strip_info(context, strip, fps, frame_px, channel_px, min_x, max_x, view, width, text_color, prefs.fades, prefs.parenting, False, True)
+            draw_strip_info(context, strip, fps, frame_px, channel_px, min_x, max_x, view, width, text_color, prefs.fades, False, True)
 
 
-def draw_strip_info(context, active_strip, fps, frame_px, channel_px, min_x, max_x, view, width, text_color, show_fades, show_parenting, show_length, show_markers):
+def draw_strip_info(context, active_strip, fps, frame_px, channel_px, min_x, max_x, view, width, text_color, show_fades, show_length, show_markers):
     length = active_strip.frame_final_duration
     active_x = active_strip.frame_final_start + (length / 2)
     active_y = active_strip.channel + 0.5
@@ -692,37 +608,6 @@ def draw_strip_info(context, active_strip, fps, frame_px, channel_px, min_x, max
                 fadeout_width = active_width * fadeout_percent
                 vseqf.draw_rect(active_right - fadeout_width, active_top - (fade_height * 2), fadeout_width, fade_height, color=(.5, .5, 1, .75))
                 vseqf.draw_text(active_right - (text_size * 4), active_top, text_size, 'Out: '+str(fadeout), text_color)
-
-    if show_parenting:
-        children = parenting.find_children(active_strip)
-        parent = parenting.find_parent(active_strip)
-        if parent:
-            parent_x = parent.frame_final_start + (parent.frame_final_duration / 2)
-            parent_y = parent.channel + 0.5
-            distance_x = parent_x - active_x
-            distance_y = parent_y - active_y
-            pixel_x_distance = int(distance_x * frame_px)
-            pixel_y_distance = int(distance_y * channel_px)
-            pixel_x = active_pos_x + pixel_x_distance
-            pixel_y = active_pos_y + pixel_y_distance
-            vseqf.draw_line(strip_x, active_pos_y, pixel_x, pixel_y, color=(0.0, 0.0, 0.0, 0.5))
-        coords = []
-        for child in children:
-            child_x = child.frame_final_start + (child.frame_final_duration / 2)
-            child_y = child.channel + 0.5
-            distance_x = child_x - active_x
-            distance_y = child_y - active_y
-            pixel_x_distance = int(distance_x * frame_px)
-            pixel_y_distance = int(distance_y * channel_px)
-            pixel_x = active_pos_x + pixel_x_distance
-            pixel_y = active_pos_y + pixel_y_distance
-            coords.append((strip_x, active_pos_y))
-            coords.append((pixel_x, pixel_y))
-        shader = gpu.shader.from_builtin('UNIFORM_COLOR')
-        batch = batch_for_shader(shader, 'LINES', {'pos': coords})
-        shader.bind()
-        shader.uniform_float('color', (1.0, 1.0, 1.0, 0.2))
-        batch.draw(shader)
 
     if show_markers:
         for tag in active_strip.tags:
@@ -782,15 +667,6 @@ class VSEQFSettingsMenu(Menu):
         layout.prop(scene.vseqf, 'ripple_markers')
         layout.prop(scene.vseqf, 'delete_confirm')
         layout.prop(scene.vseqf, 'display_length')
-        if prefs.parenting:
-            layout.separator()
-            layout.label(text='QuickParenting Settings')
-            layout.separator()
-            layout.prop(scene.vseqf, 'children')
-            layout.prop(scene.vseqf, 'move_edges')
-            layout.prop(scene.vseqf, 'delete_children')
-            layout.prop(scene.vseqf, 'autoparent')
-            layout.prop(scene.vseqf, 'select_children')
 
 
 class VSEQFSetting(bpy.types.PropertyGroup):
@@ -825,14 +701,6 @@ class VSEQFSetting(bpy.types.PropertyGroup):
         name="Cut/Move Children",
         default=True,
         description="Automatically cut and move child strips along with a parent.")
-    autoparent: bpy.props.BoolProperty(
-        name="Auto-Parent New Audio To Video",
-        default=True,
-        description="Automatically parent audio strips to video when importing a movie with both types of strips.")
-    select_children: bpy.props.BoolProperty(
-        name="Auto-Select Children",
-        default=False,
-        description="Automatically select child strips when a parent is selected.")
     expanded_children: bpy.props.BoolProperty(default=True)
     delete_children: bpy.props.BoolProperty(
         name="Auto-Delete Children",
@@ -940,9 +808,6 @@ class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
     """Addon preferences for QuickFunctions, used to enable and disable features"""
     bl_idname = __name__
 
-    parenting: bpy.props.BoolProperty(
-        name="Enable Quick Parenting",
-        default=True)
     fades: bpy.props.BoolProperty(
         name="Enable Quick Fades",
         default=True)
@@ -965,37 +830,8 @@ class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
         name="Enable Right-Click Menus (In Left-Click Mode)",
         default=True)
 
-    auto_check_update: bpy.props.BoolProperty(
-        name="Auto-check for Update",
-        description="If enabled, auto-check for updates using an interval",
-        default=False)
-    updater_interval_months: bpy.props.IntProperty(
-        name='Months',
-        description="Number of months between checking for updates",
-        default=0,
-        min=0)
-    updater_interval_days: bpy.props.IntProperty(
-        name='Days',
-        description="Number of days between checking for updates",
-        default=7,
-        min=0,
-        max=31)
-    updater_interval_hours: bpy.props.IntProperty(
-        name='Hours',
-        description="Number of hours between checking for updates",
-        default=0,
-        min=0,
-        max=23)
-    updater_interval_minutes: bpy.props.IntProperty(
-        name='Minutes',
-        description="Number of minutes between checking for updates",
-        default=0,
-        min=0,
-        max=59)
-
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "parenting")
         layout.prop(self, "fades")
         layout.prop(self, "markers")
         layout.prop(self, "tags")
@@ -1003,10 +839,6 @@ class VSEQuickFunctionSettings(bpy.types.AddonPreferences):
         layout.prop(self, "edit")
         layout.prop(self, "threepoint")
         layout.prop(self, "context_menu")
-
-        mainrow = layout.row()
-        col = mainrow.column()
-        addon_updater_ops.update_settings_ui(self, context)
 
 
 #Replaced Blender Menus
@@ -1132,13 +964,11 @@ class SEQUENCER_MT_strip(Menu):
                 elif strip_type == 'META':
                     layout.separator()
                     layout.operator("sequencer.meta_make")
-                    layout.operator("vseqf.meta_make")
                     layout.operator("sequencer.meta_separate")
                     layout.operator("sequencer.meta_toggle", text="Toggle Meta")
                 if strip_type != 'META':
                     layout.separator()
                     layout.operator("sequencer.meta_make")
-                    layout.operator("vseqf.meta_make")
                     layout.operator("sequencer.meta_toggle", text="Toggle Meta")
 
         if has_sequencer:
@@ -1278,7 +1108,6 @@ def register_keymaps():
         keymapmarker.properties.name = 'VSEQF_MT_quickmarkers_menu'
         keymapstripmarker = keymapitems.new('wm.call_menu', 'M', 'PRESS', shift=True)
         keymapstripmarker.properties.name = 'VSEQF_MT_quickmarkers_strip_menu'
-        keymapitems.new('vseqf.meta_make', 'G', 'PRESS', ctrl=True)
         keymapzoom = keymapitems.new('wm.call_menu', 'Z', 'PRESS')
         keymapzoom.properties.name = 'VSEQF_MT_quickzooms_menu'
         keymapitems.new('vseqf.modal_fades', 'F', 'PRESS')
@@ -1289,10 +1118,6 @@ def register_keymaps():
         keymapsnapto = keymapitems.new('vseqf.quicksnaps', 'S', 'PRESS', shift=True)
         keymapsnapto.properties.type = 'selection_to_cursor'
         keymapsnap.properties.name = 'VSEQF_MT_quicksnaps_menu'
-        keymapparent = keymapitems.new('wm.call_menu', 'P', 'PRESS', ctrl=True)
-        keymapparent.properties.name = 'VSEQF_MT_quickparents_menu'
-        keymapparentselect = keymapitems.new('vseqf.quickparents', 'P', 'PRESS', shift=True)
-        keymapparentselect.properties.action = 'select_children'
 
         keymapcuts = keymapitems.new('wm.call_menu', 'K', 'PRESS', ctrl=True)
         keymapcuts.properties.name = 'VSEQF_MT_quickcuts_menu'
@@ -1414,17 +1239,14 @@ def disable_tweak_default_keymaps(enable=False):
 
 
 def register():
-    addon_updater_ops.register(bl_info)
-    updater.user = "snuq"
-    updater.repo = "VSEQF"
-    updater.website = "https://github.com/snuq/VSEQF"
-    updater.verbose = False
-
     bpy.utils.register_class(VSEQuickFunctionSettings)
 
     #Register classes
     for cls in classes:
-        bpy.utils.register_class(cls)
+        try:
+            bpy.utils.register_class(cls)
+        except Exception as e:
+            print('Unable to register class: '+str(cls)+' : '+str(e))
 
     #Register toolbar buttons
     #bpy.utils.register_tool(grabs.VSEQFSelectGrabTool, separator=True)
@@ -1452,10 +1274,9 @@ def register():
     #New variables
     bpy.types.Scene.vseqf_skip_interval = bpy.props.IntProperty(default=0, min=0)
     bpy.types.Scene.vseqf = bpy.props.PointerProperty(type=VSEQFSetting)
-    bpy.types.Sequence.parent = bpy.props.StringProperty()
-    bpy.types.Sequence.tags = bpy.props.CollectionProperty(type=tags.VSEQFTags)
-    bpy.types.Sequence.new = bpy.props.BoolProperty(default=True)
-    bpy.types.Sequence.last_name = bpy.props.StringProperty()
+    bpy.types.Strip.parent = bpy.props.StringProperty()
+    bpy.types.Strip.tags = bpy.props.CollectionProperty(type=tags.VSEQFTags)
+    bpy.types.Strip.new = bpy.props.BoolProperty(default=True)
     bpy.types.MovieClip.import_settings = bpy.props.PointerProperty(type=threepoint.VSEQFQuick3PointValues)
 
     #Register shortcuts
@@ -1502,8 +1323,6 @@ def unregister():
     #Unregister classes
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
-
-    addon_updater_ops.unregister()
 
 
 if __name__ == "__main__":

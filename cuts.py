@@ -1,16 +1,10 @@
 import bpy
-from . import parenting
 from . import timeline
 from . import grabs
 from . import vseqf
 
 
 def vseqf_cut(sequence, frame=0, cut_type="SOFT"):
-    #Check parenting settings, remove if parent strip doesnt exist (prevents cut strips from getting false parents)
-    parent = parenting.find_parent(sequence)
-    if not parent:
-        sequence.parent = ''
-
     bpy.ops.sequencer.select_all(action='DESELECT')
     left_sequence = False
     right_sequence = False
@@ -59,7 +53,7 @@ class VSEQFCut(bpy.types.Operator):
             UNCUT_RIGHT: Uncut, to the right"""
 
     bl_idname = "vseqf.cut"
-    bl_label = "Wrapper for the built in sequence cut operator that maintains parenting relationships and provides extra cut operations."
+    bl_label = "Wrapper for the built in sequence cut operator that provides extra cut operations."
     bl_options = {"UNDO"}
 
     tooltip: bpy.props.StringProperty("Cut the selected strips")
@@ -179,9 +173,6 @@ class VSEQFCut(bpy.types.Operator):
                 if not timeline.is_locked(sequencer, merge_to):
                     source_matches = self.check_source(sequence, merge_to)
                     if source_matches:
-                        merge_to_children = parenting.find_children(merge_to)
-                        parenting.add_children(sequence, merge_to_children)
-                        parenting.clear_children(merge_to)
                         if direction == 'next':
                             newend = merge_to.frame_final_end
                             self.delete_sequence(merge_to)
@@ -240,11 +231,6 @@ class VSEQFCut(bpy.types.Operator):
                 elif sequence.select:
                     to_cut.append(sequence)
                     to_cut_temp.append(sequence)
-                    if vseqf.parenting():
-                        children = parenting.get_recursive(sequence, [])
-                        for child in children:
-                            if not timeline.is_locked(sequencer, child) and (not hasattr(child, 'input_1')) and child not in to_cut:
-                                to_cut.append(child)
 
         #find the ripple amount
         ripple_amount = 0
@@ -304,14 +290,6 @@ class VSEQFCut(bpy.types.Operator):
                 if active and left == active and side != 'BOTH':
                     to_active = right
         timeline.fix_effects(cut_pairs, sequences)
-        #fix parenting of cut sequences
-        for cut_pair in cut_pairs:
-            left, right = cut_pair
-            if right and left:
-                children = parenting.find_children(left)
-                for child in children:
-                    if child.frame_final_start >= right.frame_final_start:
-                        child.parent = right.name
 
         #ripple/insert
         if self.type == 'INSERT' or self.type == 'RIPPLE' or self.type == 'INSERT_ONLY':
@@ -489,7 +467,7 @@ class VSEQF_PT_QuickCutsPanel(bpy.types.Panel):
 
 
 class VSEQFDelete(bpy.types.Operator):
-    """Operator to perform sequencer delete operations, while handling parents and rippling."""
+    """Operator to perform sequencer delete operations, while handling rippling."""
 
     bl_idname = 'vseqf.delete'
     bl_label = 'VSEQF Delete'
@@ -519,12 +497,6 @@ class VSEQFDelete(bpy.types.Operator):
                 ripple_frames.add(frame)
 
         #Delete selected
-        for sequence in to_delete:
-            if vseqf.parenting() and context.scene.vseqf.delete_children:
-                children = parenting.find_children(sequence)
-                for child in children:
-                    if child not in to_delete:
-                        child.select = True
         bpy.ops.sequencer.delete()
 
         if self.ripple:

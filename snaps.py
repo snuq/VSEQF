@@ -1,6 +1,5 @@
 import bpy
 from . import timeline
-from . import parenting
 from . import vseqf
 from . import grabs
 from . import shortcuts
@@ -125,25 +124,10 @@ class VSEQFQuickSnaps(bpy.types.Operator):
 
         #Sequence snaps
         else:
-            is_parenting = vseqf.parenting()
             to_snap = []
-            if is_parenting:
-                dont_snap = []
-                #Get a list of all children of the selected strips
-                for sequence in selected:
-                    all_children = parenting.get_recursive(sequence, [])
-                    for child in all_children:
-                        if child != sequence:
-                            dont_snap.append(child)
-                #Avoid snapping sequences if they are a child of something selected (they will be moved automatically)
-                for sequence in sequences:
-                    if sequence not in dont_snap:
-                        if sequence.select and not hasattr(sequence, 'input_1') and not timeline.is_locked(sequencer, sequence):
-                            to_snap.append(sequence)
-            else:
-                for sequence in sequences:
-                    if sequence.select and not hasattr(sequence, 'input_1') and not timeline.is_locked(sequencer, sequence):
-                        to_snap.append(sequence)
+            for sequence in sequences:
+                if sequence.select and not hasattr(sequence, 'input_1') and not timeline.is_locked(sequencer, sequence):
+                    to_snap.append(sequence)
 
             if not to_snap:
                 self.report({'WARNING'}, 'Nothing To Snap')
@@ -207,7 +191,7 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                     else:
                         snap_start = sequence.frame_final_start
                     offset_x = (snap_target - snap_start)
-                    grabs.move_sequences(context, starting_data, offset_x, 0, [sequence], fix_fades=True, child_edges=True)
+                    grabs.move_sequences(context, starting_data, offset_x, 0, [sequence], fix_fades=True)
                     check_snap.append([sequence, offset_x])
                 for data in check_snap:
                     #Check positions again because the strip collisions thing can mess them up

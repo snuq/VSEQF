@@ -2,7 +2,6 @@ import bpy
 import os
 from . import vseqf
 from . import timeline
-from . import parenting
 from . import fades
 from . import vu_meter
 
@@ -191,44 +190,6 @@ def move_sequences(context, starting_data, offset_x, offset_y, grabbed_sequences
                     ripple_offset = data.frame_final_end - sequence.frame_final_end
                     ripple_offset = 0 - ripple_offset
 
-        if vseqf.parenting():
-            #Adjust children of grabbed sequence
-            children = parenting.get_recursive(sequence, [])
-            root_offset_x = sequence.frame_start - data.frame_start
-            root_offset_y = sequence.channel - data.channel
-            for child in children:
-                if child == sequence:
-                    continue
-                child_data = starting_data[child.name]
-                if child.parent == sequence.name:
-                    #Primary children
-                    if data.select_left_handle or data.select_right_handle:
-                        #Move edges along with parent if applicable
-                        if context.scene.vseqf.move_edges:
-                            if child_data.frame_final_start == data.frame_final_start:
-                                select_left = data.select_left_handle
-                            else:
-                                select_left = False
-                            if child_data.frame_final_end == data.frame_final_end:
-                                select_right = data.select_right_handle
-                            else:
-                                select_right = False
-                            if select_left or select_right:
-                                move_sequence(context, child, offset_x, offset_y, select_left, select_right, child_data.channel, child_data.frame_start, child_data.frame_final_start, child_data.frame_final_end, ripple=ripple, fix_fades=fix_fades)
-                        if not data.select_right_handle:
-                            child.frame_start = child_data.frame_start + ripple_offset
-                    else:
-                        move_sequence(context, child, root_offset_x, root_offset_y, False, False, child_data.channel, child_data.frame_start, child_data.frame_final_start, child_data.frame_final_end)
-                else:
-                    #Children of children, only move them if the root sequence has moved
-                    move_sequence(context, child, root_offset_x, root_offset_y, False, False, child_data.channel, child_data.frame_start, child_data.frame_final_start, child_data.frame_final_end)
-                if child_edges:
-                    #Snap edges of children to edge of parent
-                    if sequence.select_left_handle:
-                        child.frame_final_start = sequence.frame_final_start
-                    if sequence.select_right_handle:
-                        child.frame_final_end = sequence.frame_final_end
-
     return ripple_offset
 
 
@@ -313,7 +274,7 @@ class VSEQFSelectGrabTool(bpy.types.WorkSpaceTool):
     bl_idname = "vseqf.select_grab_tool"
     bl_label = "Move Plus"
     bl_description = (
-        "Select and move a strip, with parenting and extra features."
+        "Select and move a strip, with extra features."
     )
     bl_icon = "ops.generic.select"
     bl_widget = None
@@ -437,14 +398,6 @@ class VSEQFSelectGrab(bpy.types.Operator):
                         if area.type == 'CLIP_EDITOR':
                             area.spaces[0].clip = newclip
 
-        if context.scene.vseqf.select_children:
-            to_select = []
-            for sequence in selected_sequences:
-                to_select = parenting.get_recursive(sequence, to_select)
-                for seq in to_select:
-                    seq.select = sequence.select
-                    seq.select_left_handle = sequence.select_left_handle
-                    seq.select_right_handle = sequence.select_right_handle
         self.mouse_start_x = event.mouse_x
         self.mouse_start_y = event.mouse_y
         self.mouse_start_region_x = event.mouse_region_x
@@ -681,7 +634,6 @@ class VSEQFGrabAdd(bpy.types.Operator):
         self.timeline_end = timeline.find_sequences_end(sequences)
         self.ripple_start = self.timeline_end
         self.timeline_height = timeline.find_timeline_height(sequences)
-        is_parenting = vseqf.parenting()
         to_move = []
         selected_sequences = timeline.current_selected(context)
         for sequence in selected_sequences:
@@ -692,10 +644,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
             if ripple_point < self.ripple_start and not hasattr(sequence, 'input_1') and not timeline.is_locked(sequencer, sequence):
                 self.ripple_start = ripple_point
                 self.ripple_left = ripple_point
-            if is_parenting:
-                to_move = parenting.get_recursive(sequence, to_move)
-            else:
-                to_move.append(sequence)
+            to_move.append(sequence)
 
         #store markers to ripple
         self.ripple_markers = []
@@ -711,9 +660,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
                 if sequence.select:
                     self.grabbed_sequences.append(sequence)
                 else:
-                    if is_parenting and sequence in to_move:
-                        pass
-                    elif sequence.frame_final_start >= self.ripple_start:
+                    if sequence.frame_final_start >= self.ripple_start:
                         self.ripple_sequences.append(sequence)
         self._timer = context.window_manager.event_timer_add(time_step=0.01, window=context.window)
         self.ripple_sequences.sort(key=lambda x: x.frame_final_start)
@@ -1051,7 +998,5 @@ class VSEQFContextSequence(bpy.types.Menu):
             layout.operator('sequencer.meta_make')
             if prefs.cuts:
                 layout.menu('VSEQF_MT_quickcuts_menu')
-            if prefs.parenting:
-                layout.menu('VSEQF_MT_quickparents_menu')
             layout.operator('sequencer.duplicate_move', text='Duplicate')
             layout.operator('vseqf.grab', text='Grab/Move')

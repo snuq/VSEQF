@@ -7,7 +7,6 @@ from gpu_extras.batch import batch_for_shader
 
 class VSEQFTempSettings(object):
     """Substitute for the addon preferences when this script isn't loaded as an addon"""
-    parenting = True
     fades = True
     markers = True
     tags = True
@@ -105,14 +104,6 @@ def get_prefs():
     else:
         prefs = VSEQFTempSettings()
     return prefs
-
-
-def parenting():
-    prefs = get_prefs()
-    if prefs.parenting and bpy.context.scene.vseqf.children:
-        return True
-    else:
-        return False
 
 
 def redraw_sequencers():
