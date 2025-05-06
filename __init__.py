@@ -22,7 +22,6 @@ Todo:
 uncut will break parenting
 right handle ripple grab is hard to control
 parenting breaks when cutting (blender bug?)
-markers context menu not opening
 """
 
 import os
