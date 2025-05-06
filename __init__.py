@@ -20,8 +20,7 @@
 """
 Todo:
 uncut will break parenting
-right handle ripple grab is hard to control
-parenting breaks when cutting (blender bug?)
+parenting on right strip breaks when cutting
 """
 
 import os

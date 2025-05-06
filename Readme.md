@@ -111,9 +111,6 @@ The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' o
 * __Cut Strip Additions__
 
    Ripple cuts enabled, press Alt-K to trim and slide one side of the selected strips.  
-   Effect strips are now duplicated to both sides of a cut strip, this includes an entire effect stack.  
-   Crossfades and other two-input effect strips are handled properly now. If the effect is applied to the right side of a cut, it will be applied correctly. (See https://developer.blender.org/T50877 )  
-   The active strip after a cut is correctly handled now, if the mouse is on the right side of a cut, the right strip will be active as well as selected.
 
 * __Delete Strip Additions__
 

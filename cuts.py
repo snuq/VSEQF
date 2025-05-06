@@ -10,10 +10,7 @@ def vseqf_cut(strip, frame=0, cut_type="SOFT"):
     right_strip = False
     if frame > strip.frame_final_start and frame < strip.frame_final_end:
         strip.select = True
-        try:
-            bpy.ops.sequencer.split(frame=frame, type=cut_type, side="BOTH")  #Changed in 2.83
-        except AttributeError:
-            bpy.ops.sequencer.cut(frame=frame, type=cut_type, side="BOTH")
+        bpy.ops.sequencer.split(frame=frame, type=cut_type, side="BOTH")
         strips = timeline.current_selected(bpy.context)
         for seq in strips:
             seq.select = False
@@ -220,7 +217,6 @@ class VSEQFCut(bpy.types.Operator):
         to_cut = []
         to_select = []
         to_active = None
-        cut_pairs = []
 
         #determine all strips available to cut
         to_cut_temp = []
@@ -279,7 +275,6 @@ class VSEQFCut(bpy.types.Operator):
                     cut_type = self.type
                 if cutable:
                     left, right = vseqf_cut(strip=strip, frame=self.frame, cut_type=cut_type)
-                    cut_pairs.append([left, right])
             else:
                 to_select.append(strip)
             if (side == 'LEFT' or side == 'BOTH') and left:
@@ -290,7 +285,6 @@ class VSEQFCut(bpy.types.Operator):
                 to_select.append(right)
                 if active and left == active and side != 'BOTH':
                     to_active = right
-        timeline.fix_effects(cut_pairs, strips)
 
         #ripple/insert
         if self.type == 'INSERT' or self.type == 'RIPPLE' or self.type == 'INSERT_ONLY':
