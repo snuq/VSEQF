@@ -199,103 +199,6 @@ class VSEQFFollow(bpy.types.Operator):
             self.cursor_target = cursor_location
 
 
-class VSEQF_PT_CompactEdit(bpy.types.Panel):
-    """Panel for displaying QuickList"""
-    bl_label = "Edit Strip Compact"
-    bl_space_type = 'SEQUENCE_EDITOR'
-    bl_region_type = 'UI'
-    bl_category = "Strip"
-
-    @classmethod
-    def poll(cls, context):
-        prefs = vseqf.get_prefs()
-
-        if not timeline.current_active(context):
-            return False
-        else:
-            return prefs.edit
-
-    def draw(self, context):
-        prefs = vseqf.get_prefs()
-        scene = context.scene
-        strip = timeline.current_active(context)
-        layout = self.layout
-        fps = vseqf.get_fps(scene)
-
-        row = layout.row()
-        split = row.split(factor=.8)
-        split.prop(strip, 'name', text="")
-        split.label(text="("+strip.type+")")
-
-        if strip.type == 'SOUND':
-            row = layout.row(align=True)
-            sub = row.row(align=True)
-            sub.active = not strip.mute
-            sub.prop(strip, 'volume', text='Volume')
-            row.prop(strip, "mute", toggle=True, icon_only=True)
-            row.prop(strip, "lock", toggle=True, icon_only=True)
-            row = layout.row()
-            row.prop(strip, "pan")
-        else:
-            row = layout.row(align=True)
-            sub = row.row(align=True)
-            sub.active = not strip.mute
-            split = sub.split(factor=.3, align=True)
-            split.prop(strip, "blend_type", text="")
-            split.prop(strip, "blend_alpha", text="Opacity", slider=True)
-            row.prop(strip, "mute", toggle=True, icon_only=True)
-            row.prop(strip, "lock", toggle=True, icon_only=True)
-            row = layout.row(align=True)
-            row.prop(strip, "color_saturation", text="Saturation")
-            row.prop(strip, "color_multiply", text="Multiply")
-
-        col = layout.column()
-        sub = col.column()
-        sub.enabled = not strip.lock
-        row = sub.row(align=True)
-        row.prop(strip, "channel")
-        row.prop(strip, "frame_start", text="Position: ("+vseqf.timecode_from_frames(strip.frame_final_start, fps)+")")
-        row = sub.row()
-        row.prop(strip, "frame_final_duration", text="Length: ("+vseqf.timecode_from_frames(strip.frame_final_duration, fps)+")")
-        row = sub.row(align=True)
-        row.prop(strip, "frame_offset_start", text="In Offset: ("+vseqf.timecode_from_frames(strip.frame_offset_start, fps)+")")
-        row.prop(strip, "frame_offset_end", text="Out Offset: ("+vseqf.timecode_from_frames(strip.frame_offset_end, fps)+")")
-
-        if prefs.fades:
-            #display info about the fade in and out of the current strip
-            fade_curve = fades.get_fade_curve(context, strip, create=False)
-            if fade_curve:
-                fadein = fades.fades(fade_curve, strip, 'detect', 'in')
-                fadeout = fades.fades(fade_curve, strip, 'detect', 'out')
-            else:
-                fadein = 0
-                fadeout = 0
-
-            row = layout.row()
-            if fadein > 0:
-                row.label(text="Fadein: "+str(round(fadein))+" Frames")
-            else:
-                row.label(text="No Fadein Detected")
-            if fadeout > 0:
-                row.label(text="Fadeout: "+str(round(fadeout))+" Frames")
-            else:
-                row.label(text="No Fadeout Detected")
-
-        #display info about parenting relationships
-        strip = timeline.current_active(context)
-        selected = context.selected_strips
-        if len(scene.sequence_editor.meta_stack) > 0:
-            #inside a meta strip
-            sequencer = scene.sequence_editor.meta_stack[-1]
-        else:
-            #not inside a meta strip
-            sequencer = scene.sequence_editor
-        if hasattr(sequencer, 'strips'):
-            strips = sequencer.strips
-        else:
-            strips = []
-
-
 class VSEQFImport(bpy.types.Operator, ImportHelper):
     """Loads different types of files into the sequencer"""
     bl_idname = 'vseqf.import_strip'
@@ -829,7 +732,7 @@ def remove_frame_step_handler(add=False):
 
 
 #Register properties, operators, menus and shortcuts
-classes = classes + [VSEQFSettingsMenu, VSEQFSetting, VSEQFFollow, VSEQFImport, VSEQF_PT_CompactEdit]
+classes = classes + [VSEQFSettingsMenu, VSEQFSetting, VSEQFFollow, VSEQFImport]
 classes = classes + [replace_menus.SEQUENCER_MT_strip, replace_menus.SEQUENCER_MT_strip_transform, replace_menus.SEQUENCER_MT_add]
 
 
