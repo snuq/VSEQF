@@ -67,9 +67,9 @@ class VSEQFCut(bpy.types.Operator):
     use_insert: bpy.props.BoolProperty(default=False)
 
     def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         if not self.use_frame:
             self.frame = bpy.context.scene.frame_current
-        super().__init__(*args, **kwargs)
 
     @classmethod
     def description(cls, context, properties):
