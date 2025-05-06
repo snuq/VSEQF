@@ -72,7 +72,7 @@ def get_fade_curve(context, strip, create=False):
     action = animation_data.action
     if not action:
         if create:
-            action = bpy.data.actions.new(strip.name+'Action')
+            action = bpy.data.actions.new(context.scene.name+'Action')
             animation_data.action = action
         else:
             return None
@@ -80,7 +80,7 @@ def get_fade_curve(context, strip, create=False):
     all_curves = action.fcurves
     fade_curve = None  #curve for the fades
     for curve in all_curves:
-        if curve.data_path == 'sequence_editor.sequences_all["'+strip.name+'"].'+fade_variable:
+        if curve.data_path == 'sequence_editor.sequences_all["'+strip.name+'"].'+fade_variable or curve.data_path == 'sequence_editor.strips_all["'+strip.name+'"].'+fade_variable:
             #keyframes found
             fade_curve = curve
             break
@@ -97,6 +97,8 @@ def get_fade_curve(context, strip, create=False):
         fade_curve.keyframe_points.add(1)
         point = fade_curve.keyframe_points[0]
         point.co = (strip.frame_final_start, value)
+        if not animation_data.action_slot:
+            animation_data.action_slot = action.slots[0]
 
     return fade_curve
 
