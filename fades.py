@@ -6,57 +6,57 @@ from . import vseqf
 from . import timeline
 
 
-def fix_fades(context, sequence, old_start, old_end):
-    fix_fade_in(context, sequence, old_start)
-    fix_fade_out(context, sequence, old_end)
+def fix_fades(context, strip, old_start, old_end):
+    fix_fade_in(context, strip, old_start)
+    fix_fade_out(context, strip, old_end)
 
 
-def fix_fade_in(context, sequence, old_start):
-    if old_start != sequence.frame_final_start:
+def fix_fade_in(context, strip, old_start):
+    if old_start != strip.frame_final_start:
         # fix fade in
-        fade_curve = get_fade_curve(context, sequence, create=False)
+        fade_curve = get_fade_curve(context, strip, create=False)
         if fade_curve:
-            fade_in = fades(fade_curve, sequence, 'detect', 'in', fade_low_point_frame=old_start)
+            fade_in = fades(fade_curve, strip, 'detect', 'in', fade_low_point_frame=old_start)
             if fade_in > 0:
-                fades(fade_curve, sequence, 'set', 'in', fade_length=fade_in)
+                fades(fade_curve, strip, 'set', 'in', fade_length=fade_in)
 
 
-def fix_fade_out(context, sequence, old_end):
-    if old_end != sequence.frame_final_end:
+def fix_fade_out(context, strip, old_end):
+    if old_end != strip.frame_final_end:
         # fix fade out
-        fade_curve = get_fade_curve(context, sequence, create=False)
+        fade_curve = get_fade_curve(context, strip, create=False)
         if fade_curve:
-            fade_out = fades(fade_curve, sequence, 'detect', 'out', fade_low_point_frame=old_end)
+            fade_out = fades(fade_curve, strip, 'detect', 'out', fade_low_point_frame=old_end)
             if fade_out > 0:
-                fades(fade_curve, sequence, 'set', 'out', fade_length=fade_out)
+                fades(fade_curve, strip, 'set', 'out', fade_length=fade_out)
 
 
-def find_crossfade(sequences, first_sequence, second_sequence):
-    for sequence in sequences:
-        if hasattr(sequence, 'input_1') and hasattr(sequence, 'input_2'):
-            if (sequence.input_1 == first_sequence and sequence.input_2 == second_sequence) or (sequence.input_2 == first_sequence and sequence.input_1 == second_sequence):
-                return sequence
+def find_crossfade(strips, first_strip, second_strip):
+    for strip in strips:
+        if hasattr(strip, 'input_1') and hasattr(strip, 'input_2'):
+            if (strip.input_1 == first_strip and strip.input_2 == second_strip) or (strip.input_2 == first_strip and strip.input_1 == second_strip):
+                return strip
     return False
 
 
-def vseqf_crossfade(first_sequence, second_sequence):
-    """Add a crossfade between two sequences, the transition type is determined by the vseqf variable 'transition'
+def vseqf_crossfade(first_strip, second_strip):
+    """Add a crossfade between two strips, the transition type is determined by the vseqf variable 'transition'
     Arguments:
-        first_sequence: VSE Sequence object being transitioned from
-        second_sequence: VSE Sequence object being transitioned to"""
+        first_strip: VSE Strip object being transitioned from
+        second_strip: VSE Strip object being transitioned to"""
 
     transition_type = bpy.context.scene.vseqf.transition
-    frame_start = first_sequence.frame_final_end
-    frame_end = second_sequence.frame_final_start
-    channel = first_sequence.channel
+    frame_start = first_strip.frame_final_end
+    frame_end = second_strip.frame_final_start
+    channel = first_strip.channel
     while timeline.sequencer_area_filled(frame_start, frame_end, channel, channel, []):
         channel = channel + 1
-    bpy.context.scene.sequence_editor.sequences.new_effect(name=transition_type, type=transition_type, channel=channel,  frame_start=frame_start, frame_end=frame_end, seq1=first_sequence, seq2=second_sequence)
+    bpy.context.scene.sequence_editor.strips.new_effect(name=transition_type, type=transition_type, channel=channel,  frame_start=frame_start, frame_end=frame_end, seq1=first_strip, seq2=second_strip)
 
 
-def get_fade_curve(context, sequence, create=False):
-    #Returns the fade curve for a given sequence.  If create is True, a curve will always be returned, if False, None will be returned if no curve is found.
-    if sequence.type == 'SOUND':
+def get_fade_curve(context, strip, create=False):
+    #Returns the fade curve for a given strip.  If create is True, a curve will always be returned, if False, None will be returned if no curve is found.
+    if strip.type == 'SOUND':
         fade_variable = 'volume'
     else:
         fade_variable = 'blend_alpha'
@@ -72,7 +72,7 @@ def get_fade_curve(context, sequence, create=False):
     action = animation_data.action
     if not action:
         if create:
-            action = bpy.data.actions.new(sequence.name+'Action')
+            action = bpy.data.actions.new(strip.name+'Action')
             animation_data.action = action
         else:
             return None
@@ -80,44 +80,44 @@ def get_fade_curve(context, sequence, create=False):
     all_curves = action.fcurves
     fade_curve = None  #curve for the fades
     for curve in all_curves:
-        if curve.data_path == 'sequence_editor.sequences_all["'+sequence.name+'"].'+fade_variable:
+        if curve.data_path == 'sequence_editor.sequences_all["'+strip.name+'"].'+fade_variable:
             #keyframes found
             fade_curve = curve
             break
 
     #Create curve if needed
     if fade_curve is None and create:
-        fade_curve = all_curves.new(data_path=sequence.path_from_id(fade_variable))
+        fade_curve = all_curves.new(data_path=strip.path_from_id(fade_variable))
 
         #add a single keyframe to prevent blender from making the waveform invisible (bug)
-        if sequence.type == 'SOUND':
-            value = sequence.volume
+        if strip.type == 'SOUND':
+            value = strip.volume
         else:
-            value = sequence.blend_alpha
+            value = strip.blend_alpha
         fade_curve.keyframe_points.add(1)
         point = fade_curve.keyframe_points[0]
-        point.co = (sequence.frame_final_start, value)
+        point.co = (strip.frame_final_start, value)
 
     return fade_curve
 
 
-def fades(fade_curve, sequence, mode, direction, fade_length=0, fade_low_point_frame=False):
-    """Detects, creates, and edits fadein and fadeout for sequences.
+def fades(fade_curve, strip, mode, direction, fade_length=0, fade_low_point_frame=False):
+    """Detects, creates, and edits fadein and fadeout for strips.
     Arguments:
         fade_curve: Curve to detect or adjust fades on
-        sequence: VSE Sequence object that will be operated on
+        strip: VSE Strip object that will be operated on
         mode: String, determines the operation that will be done
-            detect: determines the fade length set to the sequence
-            set: sets a desired fade length to the sequence
+            detect: determines the fade length set to the strip
+            set: sets a desired fade length to the strip
         direction: String, determines if the function works with fadein or fadeout
             in: fadein is operated on
             out: fadeout is operated on
         fade_length: Integer, optional value used only when setting fade lengths
-        fade_low_point_frame: Integer, optional value used for detecting a fade at a point other than at the edge of the sequence"""
+        fade_low_point_frame: Integer, optional value used for detecting a fade at a point other than at the edge of the strip"""
 
     if not fade_curve:
         return 0
-    if sequence.type == 'SOUND':
+    if strip.type == 'SOUND':
         fade_variable = 'volume'
     else:
         fade_variable = 'blend_alpha'
@@ -126,10 +126,10 @@ def fades(fade_curve, sequence, mode, direction, fade_length=0, fade_low_point_f
     fade_high_point = False  #keyframe that the fade starts maximum value at
     if direction == 'in':
         if not fade_low_point_frame:
-            fade_low_point_frame = sequence.frame_final_start
+            fade_low_point_frame = strip.frame_final_start
     else:
         if not fade_low_point_frame:
-            fade_low_point_frame = sequence.frame_final_end
+            fade_low_point_frame = strip.frame_final_end
         fade_length = -fade_length
     fade_high_point_frame = fade_low_point_frame + fade_length
 
@@ -141,7 +141,7 @@ def fades(fade_curve, sequence, mode, direction, fade_length=0, fade_low_point_f
     if len(fade_keyframes) == 0:
         #no keyframes found, create them if instructed to do so
         if mode == 'set':
-            fade_max_value = getattr(sequence, fade_variable)
+            fade_max_value = getattr(strip, fade_variable)
             set_fade(fade_curve, direction, fade_low_point_frame, fade_high_point_frame, fade_max_value)
         else:
             return 0
@@ -215,6 +215,7 @@ def fades(fade_curve, sequence, mode, direction, fade_length=0, fade_low_point_f
                 return fade_length
             else:
                 return 0
+    return 0
 
 
 def set_fade(fade_curve, direction, fade_low_point_frame, fade_high_point_frame, fade_max_value, fade_low_point=None, fade_high_point=None):
@@ -289,20 +290,20 @@ def fade_operator_draw(self, context):
     region = context.region
     view = region.view2d
     for data in self.strip_data:
-        sequence = data['sequence']
+        strip = data['strip']
         fade_in = data['fade_in']
         fade_out = data['fade_out']
         channel_buffer = 0.05
-        channel_bottom = sequence.channel + channel_buffer
-        channel_top = sequence.channel + 1 - channel_buffer
+        channel_bottom = strip.channel + channel_buffer
+        channel_top = strip.channel + 1 - channel_buffer
         if fade_in > 0:
-            strip_left, strip_bottom = view.view_to_region(sequence.frame_final_start, channel_bottom, clip=False)
-            fade_in_loc, strip_top = view.view_to_region(sequence.frame_final_start + fade_in, channel_top, clip=False)
+            strip_left, strip_bottom = view.view_to_region(strip.frame_final_start, channel_bottom, clip=False)
+            fade_in_loc, strip_top = view.view_to_region(strip.frame_final_start + fade_in, channel_top, clip=False)
             vseqf.draw_line(strip_left, strip_bottom, fade_in_loc, strip_top, color=(.8, .2, .2, 1))
             vseqf.draw_text(fade_in_loc, strip_top - 12, 11, str(int(fade_in)), color=(1, 1, 1, 1))
         if fade_out > 0:
-            strip_right, strip_bottom = view.view_to_region(sequence.frame_final_end, channel_bottom, clip=False)
-            fade_out_loc, strip_top = view.view_to_region(sequence.frame_final_end - fade_out, channel_top, clip=False)
+            strip_right, strip_bottom = view.view_to_region(strip.frame_final_end, channel_bottom, clip=False)
+            fade_out_loc, strip_top = view.view_to_region(strip.frame_final_end - fade_out, channel_top, clip=False)
             vseqf.draw_line(strip_right, strip_bottom, fade_out_loc, strip_top, color=(.8, .2, .2, 1))
             vseqf.draw_text(fade_out_loc, strip_top - 12, 11, str(int(fade_out)), justify='right', color=(1, 1, 1, 1))
 
@@ -505,8 +506,8 @@ class VSEQFModalFades(bpy.types.Operator):
 
     value = ''  #Used for storing typed-in grab values
 
-    mouse_scale_x = 1  #Frames to move sequences per pixel of mouse x movement
-    mouse_scale_y = 1  #Channels to move sequences per pixel of mouse y movement
+    mouse_scale_x = 1  #Frames to move strips per pixel of mouse x movement
+    mouse_scale_y = 1  #Channels to move strips per pixel of mouse y movement
 
     view_frame_start = 0  #Leftmost frame in the 2d view
     view_frame_end = 0  #Rightmost frame in the 2d view
@@ -516,13 +517,13 @@ class VSEQFModalFades(bpy.types.Operator):
     def remove_draw_handler(self):
         bpy.types.SpaceSequenceEditor.draw_handler_remove(self._handle, 'WINDOW')
 
-    def get_fades(self, sequence, fade_mode, fade_curve):
+    def get_fades(self, strip, fade_mode, fade_curve):
         fade_in = 0
         fade_out = 0
         if fade_mode in ['LEFT', 'BOTH']:
-            fade_in = fades(fade_curve, sequence, 'detect', 'in')
+            fade_in = fades(fade_curve, strip, 'detect', 'in')
         if fade_mode in ['RIGHT', 'BOTH']:
-            fade_out = fades(fade_curve, sequence, 'detect', 'out')
+            fade_out = fades(fade_curve, strip, 'detect', 'out')
         return [fade_in, fade_out]
 
     def modal(self, context, event):
@@ -596,7 +597,7 @@ class VSEQFModalFades(bpy.types.Operator):
 
         #Adjust fades
         for data in self.strip_data:
-            sequence = data['sequence']
+            strip = data['strip']
 
             if reset_fades:
                 data['fade_in'] = data['original_fade_in']
@@ -612,13 +613,13 @@ class VSEQFModalFades(bpy.types.Operator):
                 if self.value:
                     new_fade_in = int(self.value)
                 elif snapping:
-                    new_fade_in = self.snap_to_frame - sequence.frame_final_start
+                    new_fade_in = self.snap_to_frame - strip.frame_final_start
                 else:
                     new_fade_in = fade_in + offset_x + offset_y
                 if new_fade_in < 0:
                     new_fade_in = 0
-                if new_fade_in > sequence.frame_final_duration:
-                    new_fade_in = sequence.frame_final_duration
+                if new_fade_in > strip.frame_final_duration:
+                    new_fade_in = strip.frame_final_duration
                 data['fade_in'] = new_fade_in
 
             if fade_mode in ['RIGHT', 'BOTH']:
@@ -627,22 +628,22 @@ class VSEQFModalFades(bpy.types.Operator):
                 if self.value:
                     new_fade_out = int(self.value)
                 elif snapping:
-                    new_fade_out = sequence.frame_final_end - self.snap_to_frame
+                    new_fade_out = strip.frame_final_end - self.snap_to_frame
                 else:
                     new_fade_out = fade_out - offset_x + offset_y
                 if new_fade_out < 0:
                     new_fade_out = 0
-                if new_fade_out > sequence.frame_final_duration:
-                    new_fade_out = sequence.frame_final_duration
+                if new_fade_out > strip.frame_final_duration:
+                    new_fade_out = strip.frame_final_duration
                 data['fade_out'] = new_fade_out
 
             if fade_mode == 'BOTH':
                 #Check if fades are too long for each other
                 fade_in = data['fade_in']
                 fade_out = data['fade_out']
-                if fade_in + fade_out >= sequence.frame_final_duration:
+                if fade_in + fade_out >= strip.frame_final_duration:
                     fade_overdrive = fade_in + fade_out
-                    fade_over_percent = fade_overdrive / sequence.frame_final_duration
+                    fade_over_percent = fade_overdrive / strip.frame_final_duration
                     data['fade_in'] = int(fade_in / fade_over_percent)
                     data['fade_out'] = int(fade_out / fade_over_percent)
 
@@ -652,19 +653,19 @@ class VSEQFModalFades(bpy.types.Operator):
             bpy.ops.ed.undo_push()
             #finalize fades
             for data in self.strip_data:
-                sequence = data['sequence']
+                strip = data['strip']
                 fade_curve = data['fade_curve']
                 fade_in = data['fade_in']
                 fade_out = data['fade_out']
                 if fade_in != data['original_fade_in']:
-                    fades(fade_curve, sequence, 'set', 'in', fade_length=fade_in)
+                    fades(fade_curve, strip, 'set', 'in', fade_length=fade_in)
                 if fade_out != data['original_fade_out']:
-                    fades(fade_curve, sequence, 'set', 'out', fade_length=fade_out)
-                if not get_fade_curve(context, sequence):
-                    if sequence.type == 'SOUND':
-                        sequence.volume = 1
+                    fades(fade_curve, strip, 'set', 'out', fade_length=fade_out)
+                if not get_fade_curve(context, strip):
+                    if strip.type == 'SOUND':
+                        strip.volume = 1
                     else:
-                        sequence.blend_alpha = 1
+                        strip.blend_alpha = 1
 
             self.remove_draw_handler()
             area.header_text_set(None)
@@ -683,7 +684,7 @@ class VSEQFModalFades(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
     def invoke(self, context, event):
-        selected = context.selected_sequences
+        selected = context.selected_strips
         if not selected:
             self.mode = 'DEFAULT'
             return {'CANCELLED'}
@@ -695,20 +696,20 @@ class VSEQFModalFades(bpy.types.Operator):
         #Store strip data for quick access, and to prevent it from being overwritten
         self.strip_data = []
         self.snap_edges = [context.scene.frame_current]
-        for sequence in context.sequences:
-            self.snap_edges.extend([sequence.frame_final_start, sequence.frame_final_end])
-            if sequence.select:
-                fade_curve = get_fade_curve(context, sequence, create=True)
+        for strip in context.strips:
+            self.snap_edges.extend([strip.frame_final_start, strip.frame_final_end])
+            if strip.select:
+                fade_curve = get_fade_curve(context, strip, create=True)
 
-                if sequence.select_left_handle and not sequence.select_right_handle:
+                if strip.select_left_handle and not strip.select_right_handle:
                     fade_mode = 'LEFT'
-                elif sequence.select_right_handle and not sequence.select_left_handle:
+                elif strip.select_right_handle and not strip.select_left_handle:
                     fade_mode = 'RIGHT'
                 else:
                     fade_mode = 'BOTH'
-                fade_in, fade_out = self.get_fades(sequence, fade_mode, fade_curve)
+                fade_in, fade_out = self.get_fades(strip, fade_mode, fade_curve)
                 data = {
-                    'sequence': sequence,
+                    'strip': strip,
                     'fade_mode': fade_mode,
                     'fade_in': fade_in,
                     'fade_out': fade_out,
@@ -754,9 +755,9 @@ class VSEQF_PT_QuickFadesPanel(bpy.types.Panel):
     def poll(cls, context):
         prefs = vseqf.get_prefs()
         try:
-            #Check for an active sequence to operate on
-            sequence = timeline.current_active(context)
-            if sequence:
+            #Check for an active strip to operate on
+            strip = timeline.current_active(context)
+            if strip:
                 return prefs.fades
             else:
                 return False
@@ -767,11 +768,11 @@ class VSEQF_PT_QuickFadesPanel(bpy.types.Panel):
     def draw(self, context):
         #Set up basic variables needed by panel
         scene = bpy.context.scene
-        active_sequence = timeline.current_active(context)
-        fade_curve = get_fade_curve(context, active_sequence, create=False)
+        active_strip = timeline.current_active(context)
+        fade_curve = get_fade_curve(context, active_strip, create=False)
         if fade_curve:
-            fadein = fades(fade_curve, active_sequence, 'detect', 'in')
-            fadeout = fades(fade_curve, active_sequence, 'detect', 'out')
+            fadein = fades(fade_curve, active_strip, 'detect', 'in')
+            fadeout = fades(fade_curve, active_strip, 'detect', 'out')
         else:
             fadein = 0
             fadeout = 0
@@ -795,13 +796,13 @@ class VSEQF_PT_QuickFadesPanel(bpy.types.Panel):
         row = layout.row(align=True)
         prop = row.operator('vseqf.quickfades_set', text='Set Fadein', icon='BACK')
         prop.type = 'in'
-        prop.tooltip = 'Set fade-in on selected sequences to '+str(scene.vseqf.fade)+' frames'
+        prop.tooltip = 'Set fade-in on selected strips to '+str(scene.vseqf.fade)+' frames'
         prop = row.operator('vseqf.quickfades_set', text='Set In/Out')
         prop.type = 'both'
-        prop.tooltip = 'Set fade-in and fade-out on selected sequences to '+str(scene.vseqf.fade)+' frames'
+        prop.tooltip = 'Set fade-in and fade-out on selected strips to '+str(scene.vseqf.fade)+' frames'
         prop = row.operator('vseqf.quickfades_set', text='Set Fadeout', icon='FORWARD')
         prop.type = 'out'
-        prop.tooltip = 'Set fade-out on selected sequences to '+str(scene.vseqf.fade)+' frames'
+        prop.tooltip = 'Set fade-out on selected strips to '+str(scene.vseqf.fade)+' frames'
         row = layout.row()
         row.operator('vseqf.quickfades_clear', text='Clear Fades').direction = 'both'
         row = layout.row()
@@ -813,17 +814,17 @@ class VSEQF_PT_QuickFadesPanel(bpy.types.Panel):
         row = layout.row(align=True)
         prop = row.operator('vseqf.quickfades_cross', text='Crossfade Prev Clip', icon='BACK')
         prop.type = 'previous'
-        prop.tooltip = 'Add a basic transition from each selected sequence to the previous sequence'
+        prop.tooltip = 'Add a basic transition from each selected strip to the previous strip'
         prop = row.operator('vseqf.quickfades_cross', text='Crossfade Next Clip', icon='FORWARD')
         prop.type = 'next'
-        prop.tooltip = 'Add a basic transition from each selected sequence to the next sequence'
+        prop.tooltip = 'Add a basic transition from each selected strip to the next strip'
         row = layout.row(align=True)
         prop = row.operator('vseqf.quickfades_cross', text='Smart Cross to Prev', icon='BACK')
         prop.type = 'previoussmart'
-        prop.tooltip = 'Add a transition from each selected sequence to the previous sequence, ensure trasitions are '+str(scene.vseqf.fade)+' frames long'
+        prop.tooltip = 'Add a transition from each selected strip to the previous strip, ensure trasitions are '+str(scene.vseqf.fade)+' frames long'
         prop = row.operator('vseqf.quickfades_cross', text='Smart Cross to Next', icon='FORWARD')
         prop.type = 'nextsmart'
-        prop.tooltip = 'Add a transition from each selected sequence to the next sequence, ensure trasitions are '+str(scene.vseqf.fade)+' frames long'
+        prop.tooltip = 'Add a transition from each selected strip to the next strip, ensure trasitions are '+str(scene.vseqf.fade)+' frames long'
 
 
 class VSEQF_PT_QuickFadesStripPanel(bpy.types.Panel):
@@ -838,9 +839,9 @@ class VSEQF_PT_QuickFadesStripPanel(bpy.types.Panel):
     def poll(cls, context):
         prefs = vseqf.get_prefs()
         try:
-            #Check for an active sequence to operate on
-            sequence = timeline.current_active(context)
-            if sequence:
+            #Check for an active strip to operate on
+            strip = timeline.current_active(context)
+            if strip:
                 return prefs.fades
             else:
                 return False
@@ -851,11 +852,11 @@ class VSEQF_PT_QuickFadesStripPanel(bpy.types.Panel):
     def draw(self, context):
         #Set up basic variables needed by panel
         scene = bpy.context.scene
-        active_sequence = timeline.current_active(context)
-        fade_curve = get_fade_curve(context, active_sequence, create=False)
+        active_strip = timeline.current_active(context)
+        fade_curve = get_fade_curve(context, active_strip, create=False)
         if fade_curve:
-            fadein = fades(fade_curve, active_sequence, 'detect', 'in')
-            fadeout = fades(fade_curve, active_sequence, 'detect', 'out')
+            fadein = fades(fade_curve, active_strip, 'detect', 'in')
+            fadeout = fades(fade_curve, active_strip, 'detect', 'out')
         else:
             fadein = 0
             fadeout = 0
@@ -887,16 +888,16 @@ class VSEQFQuickFadesMenu(bpy.types.Menu):
 
     def draw(self, context):
         scene = context.scene
-        sequences = timeline.current_selected(context)
-        sequence = timeline.current_active(context)
+        strips = timeline.current_selected(context)
+        strip = timeline.current_active(context)
 
         layout = self.layout
-        if sequence and len(sequences) > 0:
-            #If a sequence is active
-            fade_curve = get_fade_curve(context, sequence, create=False)
+        if strip and len(strips) > 0:
+            #If a strip is active
+            fade_curve = get_fade_curve(context, strip, create=False)
             if fade_curve:
-                fadein = fades(fade_curve, sequence, 'detect', 'in')
-                fadeout = fades(fade_curve, sequence, 'detect', 'out')
+                fadein = fades(fade_curve, strip, 'detect', 'in')
+                fadeout = fades(fade_curve, strip, 'detect', 'out')
             else:
                 fadein = 0
                 fadeout = 0
@@ -915,34 +916,34 @@ class VSEQFQuickFadesMenu(bpy.types.Menu):
             layout.prop(scene.vseqf, 'fade')
             prop = layout.operator('vseqf.quickfades_set', text='Set Fadein')
             prop.type = 'in'
-            prop.tooltip = 'Set fade-in on selected sequences to '+str(scene.vseqf.fade)+' frames'
+            prop.tooltip = 'Set fade-in on selected strips to '+str(scene.vseqf.fade)+' frames'
             prop = layout.operator('vseqf.quickfades_set', text='Set Fadeout')
             prop.type = 'out'
-            prop.tooltip = 'Set fade-out on selected sequences to '+str(scene.vseqf.fade)+' frames'
+            prop.tooltip = 'Set fade-out on selected strips to '+str(scene.vseqf.fade)+' frames'
             layout.operator('vseqf.quickfades_clear', text='Clear Fades').direction = 'both'
 
             #Add crossfades
             layout.separator()
             layout.prop(scene.vseqf, 'transition', text='')
-            prop = layout.operator('vseqf.quickfades_cross', text='Crossfade Prev Sequence')
+            prop = layout.operator('vseqf.quickfades_cross', text='Crossfade Prev Strip')
             prop.type = 'previous'
-            prop.tooltip = 'Add a basic transition from each selected sequence to the previous sequence'
-            prop = layout.operator('vseqf.quickfades_cross', text='Crossfade Next Sequence')
+            prop.tooltip = 'Add a basic transition from each selected strip to the previous strip'
+            prop = layout.operator('vseqf.quickfades_cross', text='Crossfade Next Strip')
             prop.type = 'next'
-            prop.tooltip = 'Add a basic transition from each selected sequence to the next sequence'
+            prop.tooltip = 'Add a basic transition from each selected strip to the next strip'
             prop = layout.operator('vseqf.quickfades_cross', text='Smart Cross to Prev')
             prop.type = 'previoussmart'
-            prop.tooltip = 'Add a transition from each selected sequence to the previous sequence, ensure trasitions are '+str(scene.vseqf.fade)+' frames long'
+            prop.tooltip = 'Add a transition from each selected strip to the previous strip, ensure trasitions are '+str(scene.vseqf.fade)+' frames long'
             prop = layout.operator('vseqf.quickfades_cross', text='Smart Cross to Next')
             prop.type = 'nextsmart'
-            prop.tooltip = 'Add a transition from each selected sequence to the next sequence, ensure trasitions are '+str(scene.vseqf.fade)+' frames long'
+            prop.tooltip = 'Add a transition from each selected strip to the next strip, ensure trasitions are '+str(scene.vseqf.fade)+' frames long'
 
         else:
-            layout.label(text="No Sequence Selected")
+            layout.label(text="No Strip Selected")
 
 
 class VSEQFQuickFadesSet(bpy.types.Operator):
-    """Operator to add fades to selected sequences
+    """Operator to add fades to selected strips
     Uses the vseqf fade_length variable for length
     Argument:
         type: String, determines if a fadein or fadeout should be set
@@ -952,7 +953,7 @@ class VSEQFQuickFadesSet(bpy.types.Operator):
 
     bl_idname = 'vseqf.quickfades_set'
     bl_label = 'VSEQF Quick Fades Set Fade'
-    bl_description = 'Adds or changes fade for selected sequences'
+    bl_description = 'Adds or changes fade for selected strips'
 
     #Should be set to 'in' or 'out'
     type: bpy.props.StringProperty()
@@ -964,30 +965,30 @@ class VSEQFQuickFadesSet(bpy.types.Operator):
 
     def execute(self, context):
         bpy.ops.ed.undo_push()
-        #iterate through selected sequences and apply fades to them
-        selected_sequences = timeline.current_selected(context)
-        for sequence in selected_sequences:
-            fade_curve = get_fade_curve(context, sequence, create=True)
+        #iterate through selected strips and apply fades to them
+        selected_strips = timeline.current_selected(context)
+        for strip in selected_strips:
+            fade_curve = get_fade_curve(context, strip, create=True)
             if self.type == 'both':
-                fades(fade_curve, sequence, 'set', 'in', fade_length=context.scene.vseqf.fade)
-                fades(fade_curve, sequence, 'set', 'out', fade_length=context.scene.vseqf.fade)
+                fades(fade_curve, strip, 'set', 'in', fade_length=context.scene.vseqf.fade)
+                fades(fade_curve, strip, 'set', 'out', fade_length=context.scene.vseqf.fade)
             else:
-                fades(fade_curve, sequence, 'set', self.type, fade_length=context.scene.vseqf.fade)
-            if not get_fade_curve(context, sequence):
-                if sequence.type == 'SOUND':
-                    sequence.volume = 1
+                fades(fade_curve, strip, 'set', self.type, fade_length=context.scene.vseqf.fade)
+            if not get_fade_curve(context, strip):
+                if strip.type == 'SOUND':
+                    strip.volume = 1
                 else:
-                    sequence.blend_alpha = 1
+                    strip.blend_alpha = 1
 
         vseqf.redraw_sequencers()
         return{'FINISHED'}
 
 
 class VSEQFQuickFadesClear(bpy.types.Operator):
-    """Operator to clear fades on selected sequences"""
+    """Operator to clear fades on selected strips"""
     bl_idname = 'vseqf.quickfades_clear'
     bl_label = 'VSEQF Quick Fades Clear Fades'
-    bl_description = 'Clears fade in and out for selected sequences'
+    bl_description = 'Clears fade in and out for selected strips'
 
     direction: bpy.props.StringProperty('both')
     active_only: bpy.props.BoolProperty(False)
@@ -995,23 +996,23 @@ class VSEQFQuickFadesClear(bpy.types.Operator):
     def execute(self, context):
         bpy.ops.ed.undo_push()
         if self.active_only:
-            sequences = [timeline.current_active(context)]
+            strips = [timeline.current_active(context)]
         else:
-            sequences = timeline.current_selected(context)
+            strips = timeline.current_selected(context)
 
-        for sequence in sequences:
-            fade_curve = get_fade_curve(context, sequence, create=False)
-            #iterate through selected sequences and remove fades
+        for strip in strips:
+            fade_curve = get_fade_curve(context, strip, create=False)
+            #iterate through selected strips and remove fades
             if fade_curve:
                 if self.direction != 'both':
-                    fades(fade_curve, sequence, 'set', self.direction, fade_length=0)
+                    fades(fade_curve, strip, 'set', self.direction, fade_length=0)
                 else:
-                    fades(fade_curve, sequence, 'set', 'in', fade_length=0)
-                    fades(fade_curve, sequence, 'set', 'out', fade_length=0)
-                if sequence.type == 'SOUND':
-                    sequence.volume = 1
+                    fades(fade_curve, strip, 'set', 'in', fade_length=0)
+                    fades(fade_curve, strip, 'set', 'out', fade_length=0)
+                if strip.type == 'SOUND':
+                    strip.volume = 1
                 else:
-                    sequence.blend_alpha = 1
+                    strip.blend_alpha = 1
 
         vseqf.redraw_sequencers()
         self.direction = 'both'
@@ -1020,19 +1021,19 @@ class VSEQFQuickFadesClear(bpy.types.Operator):
 
 
 class VSEQFQuickFadesCross(bpy.types.Operator):
-    """Operator to add crossfades from selected sequences
-    This operator will maintain selected and active sequences
+    """Operator to add crossfades from selected strips
+    This operator will maintain selected and active strips
 
     Argument:
         type: String, determines how a fade should be added
-            'next': detects the next sequence and adds a simple fade
-            'previous': detects the previous sequence and adds a simple fade
-            'nextsmart': detects the next sequence, adjusts the edges to create a fade of the length set in the vseqf variable 'fade', then adds the crossfade
-            'previoussmart': same as nextsmart, but detects the previous sequence"""
+            'next': detects the next strip and adds a simple fade
+            'previous': detects the previous strip and adds a simple fade
+            'nextsmart': detects the next strip, adjusts the edges to create a fade of the length set in the vseqf variable 'fade', then adds the crossfade
+            'previoussmart': same as nextsmart, but detects the previous strip"""
 
     bl_idname = 'vseqf.quickfades_cross'
     bl_label = 'VSEQF Quick Fades Add Crossfade'
-    bl_description = 'Adds a crossfade between selected sequence and next or previous sequence in timeline'
+    bl_description = 'Adds a crossfade between selected strip and next or previous strip in timeline'
 
     type: bpy.props.StringProperty()
     tooltip: bpy.props.StringProperty("")
@@ -1042,79 +1043,79 @@ class VSEQFQuickFadesCross(bpy.types.Operator):
         return properties.tooltip
 
     def execute(self, context):
-        sequences = timeline.current_sequences(context)
+        strips = timeline.current_strips(context)
 
-        #store a list of selected sequences since adding a crossfade destroys the selection
-        selected_sequences = timeline.current_selected(context)
-        active_sequence = timeline.current_active(context)
+        #store a list of selected strips since adding a crossfade destroys the selection
+        selected_strips = timeline.current_selected(context)
+        active_strip = timeline.current_active(context)
 
-        for sequence in selected_sequences:
-            if sequence.type != 'SOUND' and not hasattr(sequence, 'input_1'):
+        for strip in selected_strips:
+            if strip.type != 'SOUND' and not hasattr(strip, 'input_1'):
                 bpy.ops.ed.undo_push()
-                first_sequence = None
-                second_sequence = None
-                #iterate through selected sequences and add crossfades to previous or next sequence
+                first_strip = None
+                second_strip = None
+                #iterate through selected strips and add crossfades to previous or next strip
                 if self.type == 'nextsmart':
-                    #Need to find next sequence
-                    first_sequence = sequence
-                    second_sequence = timeline.find_close_sequence(sequences, first_sequence, 'next', mode='all')
+                    #Need to find next strip
+                    first_strip = strip
+                    second_strip = timeline.find_close_strip(strips, first_strip, 'next', mode='all')
                 elif self.type == 'previoussmart':
-                    #Need to find previous sequence
-                    second_sequence = sequence
-                    first_sequence = timeline.find_close_sequence(sequences, second_sequence, 'previous', mode='all')
+                    #Need to find previous strip
+                    second_strip = strip
+                    first_strip = timeline.find_close_strip(strips, second_strip, 'previous', mode='all')
                 elif self.type == 'next':
-                    #Need to find next sequence
-                    first_sequence = sequence
-                    second_sequence = timeline.find_close_sequence(sequences, first_sequence, 'next', mode='all')
+                    #Need to find next strip
+                    first_strip = strip
+                    second_strip = timeline.find_close_strip(strips, first_strip, 'next', mode='all')
                 elif self.type == 'previous':
-                    #Need to find previous sequence
-                    second_sequence = sequence
-                    first_sequence = timeline.find_close_sequence(sequences, second_sequence, 'previous', mode='all')
-                if (second_sequence is not None) & (first_sequence is not None):
+                    #Need to find previous strip
+                    second_strip = strip
+                    first_strip = timeline.find_close_strip(strips, second_strip, 'previous', mode='all')
+                if (second_strip is not None) & (first_strip is not None):
                     if 'smart' in self.type:
-                        #adjust start and end frames of sequences based on frame_offset_end/start to overlap by amount of crossfade
+                        #adjust start and end frames of strips based on frame_offset_end/start to overlap by amount of crossfade
                         target_fade = bpy.context.scene.vseqf.fade
-                        current_fade = first_sequence.frame_final_end - second_sequence.frame_final_start
+                        current_fade = first_strip.frame_final_end - second_strip.frame_final_start
                         #if current_fade is negative, there is open space between clips, if positive, clips are overlapping
                         if current_fade <= 0:
                             fade_offset = abs(current_fade + target_fade)
-                            first_sequence_offset = -round((fade_offset/2)+.1)
-                            second_sequence_offset = -round((fade_offset/2)-.1)
+                            first_strip_offset = -round((fade_offset/2)+.1)
+                            second_strip_offset = -round((fade_offset/2)-.1)
                         else:
                             fade_offset = abs(current_fade - target_fade)
-                            first_sequence_offset = round((fade_offset/2)+.1)
-                            second_sequence_offset = round((fade_offset/2)-.1)
+                            first_strip_offset = round((fade_offset/2)+.1)
+                            second_strip_offset = round((fade_offset/2)-.1)
 
                         if abs(current_fade) < target_fade:
-                            #detected overlap is not enough, extend the ends of the sequences to match the target overlap
+                            #detected overlap is not enough, extend the ends of the strips to match the target overlap
 
-                            if ((first_sequence.frame_offset_end > first_sequence_offset) & (second_sequence.frame_offset_start > second_sequence_offset)) | ((first_sequence.frame_offset_end == 0) & (first_sequence.frame_offset_start == 0)):
-                                #both sequence offsets are larger than both target offsets or neither sequence has offsets
-                                first_sequence.frame_final_end = first_sequence.frame_final_end + first_sequence_offset
-                                second_sequence.frame_final_start = second_sequence.frame_final_start - second_sequence_offset
+                            if ((first_strip.frame_offset_end > first_strip_offset) & (second_strip.frame_offset_start > second_strip_offset)) | ((first_strip.frame_offset_end == 0) & (first_strip.frame_offset_start == 0)):
+                                #both strip offsets are larger than both target offsets or neither strip has offsets
+                                first_strip.frame_final_end = first_strip.frame_final_end + first_strip_offset
+                                second_strip.frame_final_start = second_strip.frame_final_start - second_strip_offset
 
                             else:
-                                #sequence offsets need to be adjusted individually
-                                current_offset = first_sequence.frame_offset_end + second_sequence.frame_offset_start
-                                first_sequence_offset_percent = first_sequence.frame_offset_end / current_offset
-                                second_sequence_offset_percent = second_sequence.frame_offset_start / current_offset
-                                first_sequence.frame_final_end = int(first_sequence.frame_final_end + (round(first_sequence_offset_percent * fade_offset)))
-                                second_sequence.frame_final_start = int(second_sequence.frame_final_start - (round(second_sequence_offset_percent * fade_offset)))
+                                #strip offsets need to be adjusted individually
+                                current_offset = first_strip.frame_offset_end + second_strip.frame_offset_start
+                                first_strip_offset_percent = first_strip.frame_offset_end / current_offset
+                                second_strip_offset_percent = second_strip.frame_offset_start / current_offset
+                                first_strip.frame_final_end = int(first_strip.frame_final_end + (round(first_strip_offset_percent * fade_offset)))
+                                second_strip.frame_final_start = int(second_strip.frame_final_start - (round(second_strip_offset_percent * fade_offset)))
 
                         elif abs(current_fade) > target_fade:
-                            #detected overlap is larger than target fade, subtract equal amounts from each sequence
-                            first_sequence.frame_final_end = first_sequence.frame_final_end - first_sequence_offset
-                            second_sequence.frame_final_start = second_sequence.frame_final_start + second_sequence_offset
-                    fade_exists = find_crossfade(sequences, first_sequence, second_sequence)
+                            #detected overlap is larger than target fade, subtract equal amounts from each strip
+                            first_strip.frame_final_end = first_strip.frame_final_end - first_strip_offset
+                            second_strip.frame_final_start = second_strip.frame_final_start + second_strip_offset
+                    fade_exists = find_crossfade(strips, first_strip, second_strip)
                     if not fade_exists:
-                        vseqf_crossfade(first_sequence, second_sequence)
+                        vseqf_crossfade(first_strip, second_strip)
 
                 else:
-                    self.report({'WARNING'}, 'No Second Sequence Found')
+                    self.report({'WARNING'}, 'No Second Strip Found')
 
         bpy.ops.sequencer.select_all(action='DESELECT')
-        for sequence in selected_sequences:
-            sequence.select = True
-        if active_sequence:
-            context.scene.sequence_editor.active_strip = active_sequence
+        for strip in selected_strips:
+            strip.select = True
+        if active_strip:
+            context.scene.sequence_editor.active_strip = active_strip
         return{'FINISHED'}

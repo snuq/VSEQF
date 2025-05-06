@@ -3,32 +3,32 @@ from . import vseqf
 
 
 def nudge_selected(frame=0, channel=0):
-    """Moves the selected sequences by a given amount."""
+    """Moves the selected strips by a given amount."""
 
     to_nudge = []
-    for sequence in bpy.context.selected_sequences:
-        to_nudge.append(sequence)
+    for strip in bpy.context.selected_strips:
+        to_nudge.append(strip)
     if channel > 0:
         to_nudge.sort(key=lambda x: x.channel, reverse=True)
     if channel < 0:
         to_nudge.sort(key=lambda x: x.channel)
-    for sequence in to_nudge:
-        oldframe = sequence.frame_start
+    for strip in to_nudge:
+        oldframe = strip.frame_start
         if frame:
-            if sequence.select_left_handle or sequence.select_right_handle:
-                if sequence.select_left_handle:
-                    sequence.frame_final_start = sequence.frame_final_start + frame
-                if sequence.select_right_handle:
-                    sequence.frame_final_end = sequence.frame_final_end + frame
+            if strip.select_left_handle or strip.select_right_handle:
+                if strip.select_left_handle:
+                    strip.frame_final_start = strip.frame_final_start + frame
+                if strip.select_right_handle:
+                    strip.frame_final_end = strip.frame_final_end + frame
             else:
-                newframe = sequence.frame_start + frame
-                sequence.frame_start = newframe
+                newframe = strip.frame_start + frame
+                strip.frame_start = newframe
                 oldframe = newframe
         if channel:
-            newchannel = sequence.channel + channel
+            newchannel = strip.channel + channel
             if newchannel > 0:
-                sequence.channel = newchannel
-                sequence.frame_start = oldframe
+                strip.channel = newchannel
+                strip.frame_start = oldframe
 
 
 def find_marker(frame, direction):
@@ -61,15 +61,15 @@ def find_marker(frame, direction):
 
 
 def find_edge(frame, direction):
-    """Attemts to find the closest sequence edge in the given direction.
+    """Attemts to find the closest strip edge in the given direction.
     'direction' must be 'next' or 'previous'.
     returns a frame number, or None if none found.
     """
 
     new_frame = None
     best_delta = None
-    for sequence in bpy.context.scene.sequence_editor.sequences:
-        edges = [sequence.frame_final_start, sequence.frame_final_end]
+    for strip in bpy.context.scene.sequence_editor.strips:
+        edges = [strip.frame_final_start, strip.frame_final_end]
         for edge in edges:
             if direction == 'next':
                 if edge > frame:
@@ -88,7 +88,7 @@ def find_edge(frame, direction):
 
 class VSEQFQuickShortcutsNudge(bpy.types.Operator):
     bl_idname = 'vseqf.nudge_selected'
-    bl_label = 'Move the selected sequences'
+    bl_label = 'Move the selected strips'
 
     direction: bpy.props.EnumProperty(name='Direction', items=[("UP", "Up", "", 1), ("DOWN", "Down", "", 2), ("LEFT", "Left", "", 3), ("RIGHT", "Right", "", 4), ("LEFT-M", "Left Medium", "", 5), ("RIGHT-M", "Right Medium", "", 6), ("LEFT-L", "Left Large", "", 7), ("RIGHT-L", "Right Large", "", 8)])
 

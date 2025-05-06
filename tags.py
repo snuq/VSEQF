@@ -5,27 +5,27 @@ from . import timeline
 
 def populate_selected_tags():
     scene = bpy.context.scene
-    selected_sequences = timeline.current_selected(bpy.context)
-    populate_tags(sequences=selected_sequences, tags=scene.vseqf.selected_tags)
+    selected_strips = timeline.current_selected(bpy.context)
+    populate_tags(strips=selected_strips, tags=scene.vseqf.selected_tags)
 
 
 def auto_populate_tags(self, context):
     populate_tags()
 
 
-def populate_tags(sequences=False, tags=False):
-    """Iterates through all sequences and stores all tags to the 'tags' property group
-    If no sequences are given, default to all sequences in context.
+def populate_tags(strips=False, tags=False):
+    """Iterates through all strips and stores all tags to the 'tags' property group
+    If no strips are given, default to all strips in context.
     If no tags group is given, default to scene.vseqf.tags"""
 
-    if sequences is False:
-        sequences = timeline.current_sequences(bpy.context)
+    if strips is False:
+        strips = timeline.current_strips(bpy.context)
     if tags is False:
         tags = bpy.context.scene.vseqf.tags
 
     temp_tags = set()
-    for sequence in sequences:
-        for tag in sequence.tags:
+    for strip in strips:
+        for tag in strip.tags:
             temp_tags.add(tag.text)
     try:
         tags.clear()
@@ -45,9 +45,9 @@ class VSEQFQuickTagsStripMarkerMenu(bpy.types.Menu):
     def poll(cls, context):
         prefs = vseqf.get_prefs()
 
-        if not context.sequences or not context.scene.sequence_editor:
+        if not context.strips or not context.scene.sequence_editor:
             return False
-        if len(context.sequences) > 0 and timeline.current_active(context):
+        if len(context.strips) > 0 and timeline.current_active(context):
             return prefs.tags
         else:
             return False
@@ -106,9 +106,9 @@ class VSEQFQuickTagsMenu(bpy.types.Menu):
     def poll(cls, context):
         prefs = vseqf.get_prefs()
 
-        if not context.sequences or not context.scene.sequence_editor:
+        if not context.strips or not context.scene.sequence_editor:
             return False
-        if len(context.sequences) > 0 and timeline.current_active(context):
+        if len(context.strips) > 0 and timeline.current_active(context):
             return prefs.tags
         else:
             return False
@@ -135,16 +135,16 @@ class VSEQF_PT_QuickTagsPanel(bpy.types.Panel):
     def poll(cls, context):
         prefs = vseqf.get_prefs()
 
-        if not context.sequences or not context.scene.sequence_editor:
+        if not context.strips or not context.scene.sequence_editor:
             return False
-        if len(context.sequences) > 0 and context.scene.sequence_editor.active_strip:
+        if len(context.strips) > 0 and context.scene.sequence_editor.active_strip:
             return prefs.tags
         else:
             return False
 
     def draw(self, context):
         scene = context.scene
-        sequence = timeline.current_active(context)
+        strip = timeline.current_active(context)
         selected = timeline.current_selected(context)
         layout = self.layout
         row = layout.row()
@@ -168,10 +168,10 @@ class VSEQF_PT_QuickTagsPanel(bpy.types.Panel):
         row.separator()
 
         tag_index = context.scene.vseqf.strip_tag_index
-        if len(sequence.tags) > 0:
-            if tag_index >= len(sequence.tags):
-                tag_index = len(sequence.tags) - 1
-            current_tag = sequence.tags[tag_index]
+        if len(strip.tags) > 0:
+            if tag_index >= len(strip.tags):
+                tag_index = len(strip.tags) - 1
+            current_tag = strip.tags[tag_index]
 
         else:
             current_tag = None
@@ -179,7 +179,7 @@ class VSEQF_PT_QuickTagsPanel(bpy.types.Panel):
         row.label(text='Active Tags:')
         row.operator('vseqf.quicktags_clear', text='Clear All Tags').mode = 'active'
         split = layout.split(factor=.9)
-        split.template_list("VSEQF_UL_QuickTagList", "", sequence, 'tags', scene.vseqf, 'strip_tag_index', rows=3)
+        split.template_list("VSEQF_UL_QuickTagList", "", strip, 'tags', scene.vseqf, 'strip_tag_index', rows=3)
         col = split.column()
         col.operator('vseqf.quicktags_add_active', text='+').text = 'Tag'
         if current_tag is not None:
@@ -227,42 +227,42 @@ class VSEQF_UL_QuickTagList(bpy.types.UIList):
 
 
 class VSEQFQuickTagsClear(bpy.types.Operator):
-    """Clears all tags on the selected and active sequences"""
+    """Clears all tags on the selected and active strips"""
 
     bl_idname = 'vseqf.quicktags_clear'
     bl_label = 'VSEQF Quick Tags Clear'
-    bl_description = 'Clear all tags on all selected sequences'
+    bl_description = 'Clear all tags on all selected strips'
 
     mode: bpy.props.StringProperty('selected')
 
     def execute(self, context):
         if self.mode == 'selected':
-            sequences = timeline.current_selected(context)
-            if not sequences:
+            strips = timeline.current_selected(context)
+            if not strips:
                 return {'FINISHED'}
             bpy.ops.ed.undo_push()
-            for sequence in sequences:
-                sequence.tags.clear()
+            for strip in strips:
+                strip.tags.clear()
             populate_selected_tags()
             populate_tags()
         else:
-            sequence = timeline.current_active(context)
-            if not sequence:
+            strip = timeline.current_active(context)
+            if not strip:
                 return {'FINISHED'}
             bpy.ops.ed.undo_push()
-            sequence.tags.clear()
+            strip.tags.clear()
             populate_tags()
         return{'FINISHED'}
 
 
 class VSEQFQuickTagsSelect(bpy.types.Operator):
-    """Selects sequences with the given tag name
+    """Selects strips with the given tag name
     Argument:
-        text: String, the name of the tag to find sequences with"""
+        text: String, the name of the tag to find strips with"""
 
     bl_idname = 'vseqf.quicktags_select'
     bl_label = 'VSEQF Quick Tags Select'
-    bl_description = 'Select all sequences with this tag'
+    bl_description = 'Select all strips with this tag'
 
     text: bpy.props.StringProperty()
 
@@ -270,13 +270,13 @@ class VSEQFQuickTagsSelect(bpy.types.Operator):
         bpy.ops.ed.undo_push()
         text = self.text
         new_active = None
-        sequences = timeline.current_sequences(context)
-        for sequence in sequences:
-            sequence.select = False
-            for tag in sequence.tags:
+        strips = timeline.current_strips(context)
+        for strip in strips:
+            strip.select = False
+            for tag in strip.tags:
                 if tag.text == text:
-                    sequence.select = True
-                    new_active = sequence
+                    strip.select = True
+                    new_active = strip
                     break
         active = timeline.current_active(context)
         if not active and not active.select and new_active:
@@ -287,33 +287,33 @@ class VSEQFQuickTagsSelect(bpy.types.Operator):
 
 
 class VSEQFQuickTagsRemoveFrom(bpy.types.Operator):
-    """Removes a tag from a specified sequence
+    """Removes a tag from a specified strip
     Argument:
-        tag: String, a tag and sequence name separated by a next line"""
+        tag: String, a tag and strip name separated by a next line"""
     bl_idname = 'vseqf.quicktags_remove_from'
     bl_label = 'VSEQF Quick Tags Remove From'
-    bl_description = 'Remove this tag from this sequence'
+    bl_description = 'Remove this tag from this strip'
 
     tag: bpy.props.StringProperty()
 
     def execute(self, context):
         if '\n' in self.tag:
-            text, sequence_name = self.tag.split('\n')
-            if text and sequence_name:
+            text, strip_name = self.tag.split('\n')
+            if text and strip_name:
                 bpy.ops.ed.undo_push()
-                sequences = timeline.current_sequences(context)
-                for sequence in sequences:
-                    if sequence.name == sequence_name:
-                        for index, tag in reversed(list(enumerate(sequence.tags))):
+                strips = timeline.current_strips(context)
+                for strip in strips:
+                    if strip.name == strip_name:
+                        for index, tag in reversed(list(enumerate(strip.tags))):
                             if tag.text == text:
-                                sequence.tags.remove(index)
+                                strip.tags.remove(index)
 
         populate_tags()
         return{'FINISHED'}
 
 
 class VSEQFQuickTagsRemoveMarker(bpy.types.Operator):
-    """Remove specific tag marker from active sequence
+    """Remove specific tag marker from active strip
     Argument:
         index: Integer, tag index to remove"""
     bl_idname = 'vseqf.quicktags_remove_marker'
@@ -334,25 +334,25 @@ class VSEQFQuickTagsRemoveMarker(bpy.types.Operator):
 
 
 class VSEQFQuickTagsRemove(bpy.types.Operator):
-    """Remove tags with a specific name from all selected sequences
+    """Remove tags with a specific name from all selected strips
     Argument:
         text: String, tag text to remove"""
     bl_idname = 'vseqf.quicktags_remove'
     bl_label = 'VSEQF Quick Tags Remove'
-    bl_description = 'Remove the selected tag from all selected sequences'
+    bl_description = 'Remove the selected tag from all selected strips'
 
     text: bpy.props.StringProperty()
 
     def execute(self, context):
-        sequences = timeline.current_selected(context)
+        strips = timeline.current_selected(context)
         active = timeline.current_active(context)
         if active:
-            sequences.append(active)
+            strips.append(active)
         bpy.ops.ed.undo_push()
-        for sequence in sequences:
-            for index, tag in reversed(list(enumerate(sequence.tags))):
+        for strip in strips:
+            for index, tag in reversed(list(enumerate(strip.tags))):
                 if tag.text == self.text:
-                    sequence.tags.remove(index)
+                    strip.tags.remove(index)
         context.scene.frame_current = context.scene.frame_current  #hacky way to force update scene, but it works.
         populate_selected_tags()
         populate_tags()
@@ -360,12 +360,12 @@ class VSEQFQuickTagsRemove(bpy.types.Operator):
 
 
 class VSEQFQuickTagsAdd(bpy.types.Operator):
-    """Adds a tag with the given text to the selected sequences
+    """Adds a tag with the given text to the selected strips
     Argument:
         text: String, tag to add"""
     bl_idname = 'vseqf.quicktags_add'
     bl_label = 'VSEQF Quick Tags Add'
-    bl_description = 'Add this tag to all selected sequences'
+    bl_description = 'Add this tag to all selected strips'
 
     text: bpy.props.StringProperty()
 
@@ -373,23 +373,23 @@ class VSEQFQuickTagsAdd(bpy.types.Operator):
         text = self.text.replace("\n", '')
         if text:
             bpy.ops.ed.undo_push()
-            sequences = timeline.current_selected(context)
-            for sequence in sequences:
+            strips = timeline.current_selected(context)
+            for strip in strips:
                 tag_found = False
-                for tag in sequence.tags:
+                for tag in strip.tags:
                     if tag.text == text:
                         tag_found = True
                 if not tag_found:
-                    tag = sequence.tags.add()
+                    tag = strip.tags.add()
                     tag.text = text
         return{'FINISHED'}
 
 
 class VSEQFQuickTagsAddMarker(bpy.types.Operator):
-    """Adds a marker tag to the active sequence at the current frame"""
+    """Adds a marker tag to the active strip at the current frame"""
     bl_idname = 'vseqf.quicktags_add_marker'
     bl_label = 'VSEQF Quick Tag Marker Add'
-    bl_description = 'Add a tag marker to the active sequence at the current frame'
+    bl_description = 'Add a tag marker to the active strip at the current frame'
 
     text: bpy.props.StringProperty()
 
@@ -397,15 +397,15 @@ class VSEQFQuickTagsAddMarker(bpy.types.Operator):
         text = self.text.replace("\n", '')
         if text:
             bpy.ops.ed.undo_push()
-            sequence = timeline.current_active(context)
-            if sequence:
+            strip = timeline.current_active(context)
+            if strip:
                 cursor_position = context.scene.frame_current
-                if cursor_position < sequence.frame_final_start:
-                    cursor_position = sequence.frame_final_start
-                if cursor_position >= sequence.frame_final_end:
-                    cursor_position = sequence.frame_final_end - 1
-                offset = cursor_position - sequence.frame_start + 1
-                tag = sequence.tags.add()
+                if cursor_position < strip.frame_final_start:
+                    cursor_position = strip.frame_final_start
+                if cursor_position >= strip.frame_final_end:
+                    cursor_position = strip.frame_final_end - 1
+                offset = cursor_position - strip.frame_start + 1
+                tag = strip.tags.add()
                 tag.text = text
                 tag.use_offset = True
                 tag.offset = int(offset)
@@ -413,12 +413,12 @@ class VSEQFQuickTagsAddMarker(bpy.types.Operator):
 
 
 class VSEQFQuickTagsAddActive(bpy.types.Operator):
-    """Adds a tag with the given text to the active sequence
+    """Adds a tag with the given text to the active strip
     Argument:
         text: String, tag to add"""
     bl_idname = 'vseqf.quicktags_add_active'
     bl_label = 'VSEQF Quick Tags Add'
-    bl_description = 'Add a new tag to the active sequence'
+    bl_description = 'Add a new tag to the active strip'
 
     text: bpy.props.StringProperty()
 
@@ -426,15 +426,15 @@ class VSEQFQuickTagsAddActive(bpy.types.Operator):
         text = self.text.replace("\n", '')
         if text:
             bpy.ops.ed.undo_push()
-            sequence = timeline.current_active(context)
+            strip = timeline.current_active(context)
             tag_found = False
-            for tag in sequence.tags:
+            for tag in strip.tags:
                 if tag.text == text:
                     tag_found = True
             if not tag_found:
-                tag = sequence.tags.add()
+                tag = strip.tags.add()
                 tag.text = text
-                for index, tag in enumerate(sequence.tags):
+                for index, tag in enumerate(strip.tags):
                     if tag.text == text:
                         context.scene.vseqf.strip_tag_index = index
                         break
@@ -455,7 +455,7 @@ class VSEQFTags(bpy.types.PropertyGroup):
         name="Frame Offset",
         min=0,
         default=0,
-        description="Marker tag position, starting at sequence beginning")
+        description="Marker tag position, starting at strip beginning")
     length: bpy.props.IntProperty(
         name="Frame Length",
         min=1,

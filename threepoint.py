@@ -304,9 +304,9 @@ class VSEQF_PT_ThreePointPanel(bpy.types.Panel):
         prop.type = 'cursor'
         prop.tooltip = "Import this video into the VSE at frame "+str(scene.frame_current)
         row = layout.row()
-        prop = row.operator('vseqf.threepoint_import', text='Replace Active Sequence')
+        prop = row.operator('vseqf.threepoint_import', text='Replace Active Strip')
         prop.type = 'replace'
-        prop.tooltip = "Import this video into the VSE and replace the active sequence"
+        prop.tooltip = "Import this video into the VSE and replace the active strip"
         row = layout.row()
         prop = row.operator('vseqf.threepoint_import', text='Insert At Cursor')
         prop.type = 'insert'
@@ -314,19 +314,19 @@ class VSEQF_PT_ThreePointPanel(bpy.types.Panel):
         row = layout.row()
         prop = row.operator('vseqf.threepoint_import', text='Cut Insert At Cursor')
         prop.type = 'cut_insert'
-        prop.tooltip = "Cut all sequences at frame "+str(scene.frame_current)+" and insert this videoe"
+        prop.tooltip = "Cut all strips at frame "+str(scene.frame_current)+" and insert this videoe"
         row = layout.row()
         prop = row.operator('vseqf.threepoint_import', text='Import At End')
         prop.type = 'end'
-        prop.tooltip = "Import this video into the VSE at the end of all sequences"
+        prop.tooltip = "Import this video into the VSE at the end of all strips"
 
 
 class VSEQFThreePointImport(bpy.types.Operator):
     bl_idname = "vseqf.threepoint_import"
-    bl_label = "Imports a movie clip into the VSE as a movie sequence"
+    bl_label = "Imports a movie clip into the VSE as a movie strip"
 
     type: bpy.props.StringProperty()
-    tooltip: bpy.props.StringProperty("Import a movie clip into the VSE s a movie sequence")
+    tooltip: bpy.props.StringProperty("Import a movie clip into the VSE s a movie strip")
 
     @classmethod
     def description(cls, context, properties):
@@ -345,34 +345,34 @@ class VSEQFThreePointImport(bpy.types.Operator):
             sequencer = context.scene.sequence_editor
             if not sequencer:
                 context.scene.sequence_editor_create()
-            sequences = context.scene.sequence_editor.sequences_all
-            for seq in sequences:
-                seq.select = False
-                seq.select_left_handle = False
-                seq.select_right_handle = False
+            strips = context.scene.sequence_editor.strips_all
+            for strip in strips:
+                strip.select = False
+                strip.select_left_handle = False
+                strip.select_right_handle = False
             clip = context.space_data.clip
             filepath = bpy.path.abspath(clip.filepath)
-            frame_start = timeline.find_sequences_start(sequences) - clip.frame_duration - 1
+            frame_start = timeline.find_strips_start(strips) - clip.frame_duration - 1
             with context.temp_override(area=override_area):
                 bpy.ops.sequencer.movie_strip_add(filepath=filepath, frame_start=frame_start, replace_sel=True, use_framerate=False)
-            sound_sequence = False
-            movie_sequence = False
-            sequences = context.scene.sequence_editor.sequences_all
+            sound_strip = False
+            movie_strip = False
+            strips = context.scene.sequence_editor.strips_all
             selected = timeline.current_selected(context)
-            for seq in selected:
-                if seq.type == 'MOVIE':
-                    movie_sequence = seq
-                if seq.type == 'SOUND':
-                    sound_sequence = seq
-            if not movie_sequence:
+            for strip in selected:
+                if strip.type == 'MOVIE':
+                    movie_strip = strip
+                if strip.type == 'SOUND':
+                    sound_strip = strip
+            if not movie_strip:
                 return {'CANCELLED'}
-            if movie_sequence and sound_sequence:
+            if movie_strip and sound_strip:
                 #Attempt to fix a blender bug where it puts the audio strip too low - https://developer.blender.org/T64964
-                frame_start_backup = movie_sequence.frame_start
-                sound_channel = movie_sequence.channel
-                movie_sequence.channel = movie_sequence.channel + 1
-                movie_sequence.frame_start = frame_start_backup
-                sound_sequence.channel = sound_channel
+                frame_start_backup = movie_strip.frame_start
+                sound_channel = movie_strip.channel
+                movie_strip.channel = movie_strip.channel + 1
+                movie_strip.frame_start = frame_start_backup
+                sound_strip.channel = sound_channel
 
             if clip.import_settings.import_frame_in == -1:
                 frame_in = 0
@@ -387,9 +387,9 @@ class VSEQFThreePointImport(bpy.types.Operator):
             if self.type == 'replace':
                 if not active_strip:
                     return {'CANCELLED'}
-                if sound_sequence:
-                    sound_sequence.channel = active_strip.channel + 1
-                movie_sequence.channel = active_strip.channel
+                if sound_strip:
+                    sound_strip.channel = active_strip.channel + 1
+                movie_strip.channel = active_strip.channel
                 frame_start = active_strip.frame_final_start - frame_in
                 move_forward = offset - active_strip.frame_final_duration
                 if move_forward > 0:
@@ -408,7 +408,7 @@ class VSEQFThreePointImport(bpy.types.Operator):
                     bpy.ops.vseqf.cut(type='INSERT_ONLY', use_insert=True, insert=move_forward, use_all=True, all=True)
                     context.scene.frame_current = old_current
             elif self.type == 'end':
-                import_pos = timeline.find_sequences_end(sequences)
+                import_pos = timeline.find_strips_end(strips)
                 frame_start = import_pos - frame_in
             elif self.type == 'insert':
                 bpy.ops.vseqf.cut(type='INSERT_ONLY', use_insert=True, insert=offset, use_all=True, all=True)
@@ -418,24 +418,24 @@ class VSEQFThreePointImport(bpy.types.Operator):
                 frame_start = import_pos - frame_in
             else:
                 frame_start = import_pos - frame_in
-            context.scene.sequence_editor.active_strip = movie_sequence
-            movie_sequence.frame_offset_start = frame_in  #crashing blender in replace mode???
-            movie_sequence.frame_final_duration = frame_length
-            movie_sequence.frame_start = frame_start
+            context.scene.sequence_editor.active_strip = movie_strip
+            movie_strip.frame_offset_start = frame_in  #crashing blender in replace mode???
+            movie_strip.frame_final_duration = frame_length
+            movie_strip.frame_start = frame_start
             with context.temp_override(area=override_area):
                 bpy.ops.sequencer.select_all(action='DESELECT')
-            movie_sequence.select = True
-            if sound_sequence:
-                sound_sequence.select = True
-                channel = sound_sequence.channel
-                sound_sequence.frame_offset_start = frame_in
-                #sound_sequence.frame_offset_end = frame_length
-                sound_sequence.channel = channel
-                sound_sequence.frame_start = frame_start
-                if sound_sequence.frame_final_end > movie_sequence.frame_final_end:
-                    sound_sequence.frame_final_end = movie_sequence.frame_final_end
+            movie_strip.select = True
+            if sound_strip:
+                sound_strip.select = True
+                channel = sound_strip.channel
+                sound_strip.frame_offset_start = frame_in
+                #sound_strip.frame_offset_end = frame_length
+                sound_strip.channel = channel
+                sound_strip.frame_start = frame_start
+                if sound_strip.frame_final_end > movie_strip.frame_final_end:
+                    sound_strip.frame_final_end = movie_strip.frame_final_end
             if context.scene.vseqf.snap_new_end:
-                context.scene.frame_current = movie_sequence.frame_final_end
+                context.scene.frame_current = movie_strip.frame_final_end
 
             return {'FINISHED'}
         else:
@@ -611,8 +611,8 @@ class VSEQFThreePointOperator(bpy.types.Operator):
             clip = context.space_data.clip
             filepath = bpy.path.abspath(clip.filepath)
             context.scene.sequence_editor_create()
-            context.scene.sequence_editor.sequences.new_movie(name='ThreePoint Temp', filepath=filepath, channel=1, frame_start=1)
-            context.scene.sequence_editor.sequences.new_sound(name='ThreePoint Temp Sound', filepath=filepath, channel=2, frame_start=1)
+            context.scene.sequence_editor.strips.new_movie(name='ThreePoint Temp', filepath=filepath, channel=1, frame_start=1)
+            context.scene.sequence_editor.strips.new_sound(name='ThreePoint Temp Sound', filepath=filepath, channel=2, frame_start=1)
             context.scene.frame_start = self.in_frame
             context.scene.frame_end = self.out_frame
             context.scene.frame_current = self.in_frame + 1

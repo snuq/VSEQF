@@ -3,14 +3,14 @@ from . import vseqf
 
 
 #Effect manipulation and cleanup
-def effect_children(sequence, to_check):
+def effect_children(strip, to_check):
     effects = []
     for seq in to_check:
         if hasattr(seq, 'input_1'):
-            if seq.input_1 == sequence:
+            if seq.input_1 == strip:
                 effects.append(seq)
         if hasattr(seq, 'input_2'):
-            if seq.input_2 == sequence:
+            if seq.input_2 == strip:
                 effects.append(seq)
     return effects
 
@@ -19,7 +19,7 @@ def fix_effect(effect, apply_from, apply_to, to_check):
     #do whatever is needed to 'fix' the given effect and make it apply to the new strip
     sub_effects = effect_children(effect, to_check)
     if not hasattr(effect, 'input_2'):
-        #just a one-input effect, just copy it to the new sequence and check its children
+        #just a one-input effect, just copy it to the new strip and check its children
         new_effect = copy_effect(effect, apply_to)
         for sub_effect in sub_effects:
             fix_effect(sub_effect, effect, new_effect, to_check)
@@ -38,13 +38,13 @@ def fix_effect(effect, apply_from, apply_to, to_check):
 
 
 def copy_effect(effect, copy_to):
-    #copies a given single-input effect to the given sequence
+    #copies a given single-input effect to the given strip
     old_selects = []
-    sequences = current_sequences(bpy.context)
-    for sequence in sequences:
-        if sequence.select:
-            old_selects.append(sequence)
-            sequence.select = False
+    strips = current_strips(bpy.context)
+    for strip in strips:
+        if strip.select:
+            old_selects.append(strip)
+            strip.select = False
     effect.select = True
     bpy.ops.sequencer.duplicate()
     new_effect = current_selected(bpy.context)[0]
@@ -55,16 +55,16 @@ def copy_effect(effect, copy_to):
     new_effect.select = False
     effect.select = False
     copy_to.select = False
-    for sequence in old_selects:
-        sequence.select = True
+    for strip in old_selects:
+        strip.select = True
     return new_effect
 
 
-def fix_effects(cut_pairs, sequences):
+def fix_effects(cut_pairs, strips):
     effects = []
-    for sequence in sequences:
-        if hasattr(sequence, 'input_1'):
-            effects.append(sequence)
+    for strip in strips:
+        if hasattr(strip, 'input_1'):
+            effects.append(strip)
     for cut_pair in cut_pairs:
         left, right = cut_pair
         if left and right:
@@ -108,104 +108,64 @@ def current_active(context):
 
 
 def current_selected(context):
-    selected = context.selected_sequences
+    selected = context.selected_strips
     if selected:
         return selected
     else:
         return []
 
 
-def current_sequences(context):
-    sequences = context.sequences
-    if sequences:
-        return sequences
+def current_strips(context):
+    strips = context.strips
+    if strips:
+        return strips
     else:
         return []
 
 
-def find_sequences_end(sequences):
+def find_strips_end(strips):
     end = 1
-    for sequence in sequences:
-        if sequence.frame_final_end > end:
-            end = sequence.frame_final_end
+    for strip in strips:
+        if strip.frame_final_end > end:
+            end = strip.frame_final_end
     return end
 
 
-def find_sequences_start(sequences):
-    if not sequences:
+def find_strips_start(strips):
+    if not strips:
         return 1
-    start = sequences[0].frame_final_start
-    for sequence in sequences:
-        if sequence.frame_final_start < start:
-            start = sequence.frame_final_start
+    start = strips[0].frame_final_start
+    for strip in strips:
+        if strip.frame_final_start < start:
+            start = strip.frame_final_start
     return start
 
 
-def find_timeline_height(sequences):
+def find_timeline_height(strips):
     height = 1
-    for sequence in sequences:
-        if sequence.channel > height:
-            height = sequence.channel
+    for strip in strips:
+        if strip.channel > height:
+            height = strip.channel
     return height
 
 
-def sequences_after_frame(sequences, frame, add_locked=True, add_effect=True):
-    """Finds sequences after a given frame
+def find_close_strip(strips, selected_strip, direction, mode='overlap', sounds=False, effects=True):
+    """Finds the closest strip in one direction to the given strip
     Arguments:
-        sequences: List containing the VSE Sequence objects that will be searched
-        frame: Integer, the frame to check for sequences following
-        add_locked: Boolean, if false, locked sequences will be ignored
-        add_effect: Boolean, if false, sequences of the effect type will be ignored
-
-    Returns: A list of VSE Sequence objects"""
-    update_sequences = []
-    for seq in sequences:
-        if seq.frame_final_start >= frame:
-            #sequence starts after frame
-            if (not seq.lock) or add_locked:
-                #always adding locked, or sequence is not locked
-                if add_effect or (not hasattr(seq, 'input_1')):
-                    update_sequences.append(seq)
-    return update_sequences
-
-
-def sequences_between_frames(sequences, start_frame, end_frame, add_locked=True, add_effect=True):
-    """Finds sequences that are visible between two given frames
-    Arguments:
-        sequences: List containing the VSE Sequence objects that will be searched
-        start_frame: Integer, beginning frame number to search at
-        end_frame: Integer, ending frame to search at
-        add_locked: Boolean, if false, locked sequences will be ignored
-        add_effect: Boolean, if false, sequences of the effect type will be ignored
-
-    Returns: A list of VSE Sequence objects"""
-    update_sequences = []
-    for seq in sequences:
-        if seq.frame_final_start >= start_frame and seq.frame_final_end <= end_frame:
-            if (not seq.lock) or add_locked:
-                #always adding locked, or sequence is not locked
-                if add_effect or (not hasattr(seq, 'input_1')):
-                    update_sequences.append(seq)
-    return update_sequences
-
-
-def find_close_sequence(sequences, selected_sequence, direction, mode='overlap', sounds=False, effects=True):
-    """Finds the closest sequence in one direction to the given sequence
-    Arguments:
-        sequences: List of sequences to search through
-        selected_sequence: VSE Sequence object that will be used as the basis for the search
+        strips: List of strips to search through
+        selected_strip: VSE Strip object that will be used as the basis for the search
         direction: String, must be 'next' or 'previous', determines the direction to search in
-        mode: String, determines how the sequences are searched
-            'overlap': Only returns sequences that overlap selected_sequence
-            'channel': Only returns sequences that are in the same channel as selected_sequence
+        mode: String, determines how the strips are searched
+            'overlap': Only returns strips that overlap selected_strip
+            'channel': Only returns strips that are in the same channel as selected_strip
             'simple': Just looks for the previous or next frame_final_start
-            'nooverlap': Returns the previous sequence, ignoring any that are overlapping
-            <any other string>: All sequences are returned
-        sounds: Boolean, if False, 'SOUND' sequence types are ignored
+            'nooverlap': Returns the previous strip, ignoring any that are overlapping
+            <any other string>: All strips are returned
+        sounds: Boolean, if False, 'SOUND' strip types are ignored
         effects: Boolean, if False, effect strips that are applied to another strip are ignored
 
-    Returns: VSE Sequence object, or Boolean False if no matching sequence is found
-    :rtype: bpy.types.Sequence"""
+    Returns: VSE Strip object, or Boolean False if no matching strip is found
+    :rtype: bpy.types.Strip"""
 
     overlap_nexts = []
     overlap_previous = []
@@ -216,81 +176,81 @@ def find_close_sequence(sequences, selected_sequence, direction, mode='overlap',
     if mode == 'simple':
         nexts = []
         previous = []
-        for current_sequence in sequences:
-            #don't bother with sound or effect type sequences
-            if (current_sequence.type != 'SOUND') or sounds:
-                #check if the sequence is an effect of the selected sequence, ignore if so
-                if hasattr(current_sequence, 'input_1'):
-                    if current_sequence.input_1 == selected_sequence or not effects:
+        for strip in strips:
+            #don't bother with sound or effect type strips
+            if (strip.type != 'SOUND') or sounds:
+                #check if the strip is an effect of the selected strip, ignore if so
+                if hasattr(strip, 'input_1'):
+                    if strip.input_1 == selected_strip or not effects:
                         continue
-                if current_sequence.frame_final_start <= selected_sequence.frame_final_start and current_sequence != selected_sequence:
-                    previous.append(current_sequence)
-                elif current_sequence.frame_final_start >= selected_sequence.frame_final_start and current_sequence != selected_sequence:
-                    nexts.append(current_sequence)
+                if strip.frame_final_start <= selected_strip.frame_final_start and strip != selected_strip:
+                    previous.append(strip)
+                elif strip.frame_final_start >= selected_strip.frame_final_start and strip != selected_strip:
+                    nexts.append(strip)
         if direction == 'next':
             if len(nexts) > 0:
-                found = min(nexts, key=lambda seq: (seq.frame_final_start - selected_sequence.frame_final_start))
+                found = min(nexts, key=lambda seq: (seq.frame_final_start - selected_strip.frame_final_start))
         else:
             if len(previous) > 0:
-                found = min(previous, key=lambda seq: (selected_sequence.frame_final_start - seq.frame_final_start))
+                found = min(previous, key=lambda seq: (selected_strip.frame_final_start - seq.frame_final_start))
     else:
-        #iterate through sequences to find all sequences to one side of the selected sequence
-        for current_sequence in sequences:
-            #don't bother with sound or effect type sequences
-            if (current_sequence.type != 'SOUND') or sounds:
-                #check if the sequence is an effect of the selected sequence, ignore if so
-                if hasattr(current_sequence, 'input_1'):
-                    if current_sequence.input_1 == selected_sequence or not effects:
+        #iterate through strips to find all strips to one side of the selected strip
+        for strip in strips:
+            #don't bother with sound or effect type strips
+            if (strip.type != 'SOUND') or sounds:
+                #check if the strip is an effect of the selected strip, ignore if so
+                if hasattr(strip, 'input_1'):
+                    if strip.input_1 == selected_strip or not effects:
                         continue
-                if current_sequence.frame_final_start >= selected_sequence.frame_final_end:
-                    #current sequence is after selected sequence
-                    if not (mode == 'channel' and selected_sequence.channel != current_sequence.channel):
-                        #dont append if channel mode and sequences are not on same channel
-                        nexts.append(current_sequence)
-                elif current_sequence.frame_final_end <= selected_sequence.frame_final_start:
-                    #current sequence is before selected sequence
-                    if not (mode == 'channel' and selected_sequence.channel != current_sequence.channel):
-                        #dont append if channel mode and sequences are not on same channel
-                        previous.append(current_sequence)
-                if (current_sequence.frame_final_start > selected_sequence.frame_final_start) & (current_sequence.frame_final_start < selected_sequence.frame_final_end) & (current_sequence.frame_final_end > selected_sequence.frame_final_end):
-                    #current sequence startpoint is overlapping selected sequence
-                    overlap_nexts.append(current_sequence)
-                if (current_sequence.frame_final_end > selected_sequence.frame_final_start) & (current_sequence.frame_final_end < selected_sequence.frame_final_end) & (current_sequence.frame_final_start < selected_sequence.frame_final_start):
-                    #current sequence endpoint is overlapping selected sequence
-                    overlap_previous.append(current_sequence)
+                if strip.frame_final_start >= selected_strip.frame_final_end:
+                    #current strip is after selected strip
+                    if not (mode == 'channel' and selected_strip.channel != strip.channel):
+                        #dont append if channel mode and strips are not on same channel
+                        nexts.append(strip)
+                elif strip.frame_final_end <= selected_strip.frame_final_start:
+                    #current strip is before selected strip
+                    if not (mode == 'channel' and selected_strip.channel != strip.channel):
+                        #dont append if channel mode and strips are not on same channel
+                        previous.append(strip)
+                if (strip.frame_final_start > selected_strip.frame_final_start) & (strip.frame_final_start < selected_strip.frame_final_end) & (strip.frame_final_end > selected_strip.frame_final_end):
+                    #current strip startpoint is overlapping selected strip
+                    overlap_nexts.append(strip)
+                if (strip.frame_final_end > selected_strip.frame_final_start) & (strip.frame_final_end < selected_strip.frame_final_end) & (strip.frame_final_start < selected_strip.frame_final_start):
+                    #current strip endpoint is overlapping selected strip
+                    overlap_previous.append(strip)
 
         nexts_all = nexts + overlap_nexts
         previous_all = previous + overlap_previous
         if direction == 'next':
             if mode == 'overlap':
                 if len(overlap_nexts) > 0:
-                    found = min(overlap_nexts, key=lambda overlap: abs(overlap.channel - selected_sequence.channel))
+                    found = min(overlap_nexts, key=lambda overlap: abs(overlap.channel - selected_strip.channel))
             elif mode == 'channel' or mode == 'nooverlap':
                 if len(nexts) > 0:
-                    found = min(nexts, key=lambda next_seq: (next_seq.frame_final_start - selected_sequence.frame_final_end))
+                    found = min(nexts, key=lambda next_seq: (next_seq.frame_final_start - selected_strip.frame_final_end))
             else:
                 if len(nexts_all) > 0:
-                    found = min(nexts_all, key=lambda next_seq: (next_seq.frame_final_start - selected_sequence.frame_final_end))
+                    found = min(nexts_all, key=lambda next_seq: (next_seq.frame_final_start - selected_strip.frame_final_end))
         else:
             if mode == 'overlap':
                 if len(overlap_previous) > 0:
-                    found = min(overlap_previous, key=lambda overlap: abs(overlap.channel - selected_sequence.channel))
+                    found = min(overlap_previous, key=lambda overlap: abs(overlap.channel - selected_strip.channel))
             elif mode == 'channel' or mode == 'nooverlap':
                 if len(previous) > 0:
-                    found = min(previous, key=lambda prev: (selected_sequence.frame_final_start - prev.frame_final_end))
+                    found = min(previous, key=lambda prev: (selected_strip.frame_final_start - prev.frame_final_end))
             else:
                 if len(previous_all) > 0:
-                    found = min(previous_all, key=lambda prev: (selected_sequence.frame_final_start - prev.frame_final_end))
+                    found = min(previous_all, key=lambda prev: (selected_strip.frame_final_start - prev.frame_final_end))
     return found
 
 
-def sequencer_used_height(left, right, sequences=None):
+def sequencer_used_height(left, right, strips=None):
     #determines the highest and lowest used channel in the sequencer in the given frame range.
     top = 0
     bottom = 0
-    if not sequences:
-        sequences = current_sequences(bpy.context)
-    for seq in sequences:
+    if not strips:
+        strips = current_strips(bpy.context)
+    for seq in strips:
         start = seq.frame_final_start
         end = seq.frame_final_end
         if (start > left and start < right) or (end > left and end < right) or (start < left and end > right):
@@ -303,31 +263,31 @@ def sequencer_used_height(left, right, sequences=None):
     return [bottom, top]
 
 
-def sequencer_area_clear(sequences, left, right, bottom, top):
+def sequencer_area_clear(strips, left, right, bottom, top):
     del bottom
     del top
     #checks if strips ahead of the given area can fit in the given area
     width = right - left
-    max_bottom, max_top = sequencer_used_height(right, right+1+width, sequences=sequences)
-    if not sequencer_area_filled(left, right, max_bottom, max_top, [], sequences=sequences):
+    max_bottom, max_top = sequencer_used_height(right, right+1+width, strips=strips)
+    if not sequencer_area_filled(left, right, max_bottom, max_top, [], strips=strips):
         return True
     return False
 
 
-def sequencer_area_filled(left, right, bottom, top, omit, sequences=False, quick=True):
-    """Iterates through sequences and checks if any are partially or fully in the given area
+def sequencer_area_filled(left, right, bottom, top, omit, strips=False, quick=True):
+    """Iterates through strips and checks if any are partially or fully in the given area
     Arguments:
         left: Starting frame of the area to check
         right: Ending frame of the area to check
         bottom: Lowest channel of the area to check
         top: Highest channel of the area to check, set to -1 for infinite range
-        omit: List of sequences to ignore
-        sequences: List of sequences to check, if not given, bpy.context.scene.sequence_editor.sequences will be used
+        omit: List of strips to ignore
+        strips: List of strips to check, if not given, bpy.context.scene.sequence_editor.strips will be used
         quick: If True, the function will stop iterating and return True on the first match, otherwise returns list of
             all matches
 
-    Returns: If quick=True, returns True if a sequence is in the area, False if none are in the area.
-        If quick==False, returns a list of all matching sequences if any are in the given area."""
+    Returns: If quick=True, returns True if a strip is in the area, False if none are in the area.
+        If quick==False, returns a list of all matching strips if any are in the given area."""
 
     right = right
     if top != -1:
@@ -336,63 +296,63 @@ def sequencer_area_filled(left, right, bottom, top, omit, sequences=False, quick
             top = bottom
             bottom = old_top
     matches = []
-    if not sequences:
-        sequences = current_sequences(bpy.context)
-    for sequence in sequences:
-        if sequence not in omit:
-            if sequence.channel >= bottom and (sequence.channel <= top or top == -1):
-                start = sequence.frame_final_start
-                end = sequence.frame_final_end
+    if not strips:
+        strips = current_strips(bpy.context)
+    for strip in strips:
+        if strip not in omit:
+            if strip.channel >= bottom and (strip.channel <= top or top == -1):
+                start = strip.frame_final_start
+                end = strip.frame_final_end
                 #strip start is inside area             strip end is inside area         entire strip is covering area
                 if (start >= left and start < right) or (end > left and end <= right) or (start <= left and end >= right):
                     if quick:
                         return True
                     else:
-                        matches.append(sequence)
+                        matches.append(strip)
     if matches and not quick:
         return matches
     return False
 
 
-def under_cursor(sequence, frame):
-    """Check if a sequence is visible on a frame
+def under_cursor(strip, frame):
+    """Check if a strip is visible on a frame
     Arguments:
-        sequence: VSE sequence object to check
+        strip: VSE strip object to check
         frame: Integer, the frame number
 
     Returns: True or False"""
-    if sequence.frame_final_start < frame and sequence.frame_final_end > frame:
+    if strip.frame_final_start < frame and strip.frame_final_end > frame:
         return True
     else:
         return False
 
 
-def in_muted_channel(sequence_editor, sequence):
-    """Check if a sequence is in a muted channel
+def in_muted_channel(sequence_editor, strip):
+    """Check if a strip is in a muted channel
     Arguments:
         sequence_editor: current sequencer
-        sequence: VSE sequence object to check
+        strip: VSE strip object to check
 
     Returns: True or False"""
-    return sequence_editor.channels[sequence.channel].mute
+    return sequence_editor.channels[strip.channel].mute
 
 
-def in_locked_channel(sequence_editor, sequence):
-    """Check if a sequence is in a locked channel
+def in_locked_channel(sequence_editor, strip):
+    """Check if a strip is in a locked channel
     Arguments:
         sequence_editor: current sequencer
-        sequence: VSE sequence object to check
+        strip: VSE strip object to check
 
     Returns: True or False"""
-    return sequence_editor.channels[sequence.channel].lock
+    return sequence_editor.channels[strip.channel].lock
 
 
-def is_muted(sequence_editor, sequence):
-    return sequence.mute or in_muted_channel(sequence_editor, sequence)
+def is_muted(sequence_editor, strip):
+    return strip.mute or in_muted_channel(sequence_editor, strip)
 
 
-def is_locked(sequence_editor, sequence):
-    return sequence.lock or in_locked_channel(sequence_editor, sequence)
+def is_locked(sequence_editor, strip):
+    return strip.lock or in_locked_channel(sequence_editor, strip)
 
 
 def get_vse_position(context):
@@ -412,13 +372,13 @@ class VSEQFQuickTimeline(bpy.types.Operator):
 
     Argument:
         operation: String, the operation to be performed.
-            'sequences': Trims the timeline to all sequences in the VSE.  If no sequences are loaded, timeline is not changed.
-            'selected': Trims the timeline to the selected sequence(s) in the VSE.  If no sequences are selected, timeline is not changed.
-            'sequences_start': Like 'sequences', but only trims the start frame.
-            'sequences_end': Like 'sequences, but only trims the end frame.
+            'strips': Trims the timeline to all strips in the VSE.  If no strips are loaded, timeline is not changed.
+            'selected': Trims the timeline to the selected strip(s) in the VSE.  If no strips are selected, timeline is not changed.
+            'strips_start': Like 'strips', but only trims the start frame.
+            'strips_end': Like 'strips, but only trims the end frame.
             'selected_start': Like 'selected', but only trims the start frame.
             'selected_end': Like 'selected', but only trims the end frame.
-            'full_auto': moves sequences and markers back or up to match with frame 1, then sets start and end to encompass all sequences."""
+            'full_auto': moves strips and markers back or up to match with frame 1, then sets start and end to encompass all sequences."""
 
     bl_idname = 'vseqf.quicktimeline'
     bl_label = 'VSEQF Quick Timeline'
@@ -433,34 +393,34 @@ class VSEQFQuickTimeline(bpy.types.Operator):
     def execute(self, context):
         operation = self.operation
         if 'selected' in operation:
-            sequences = current_selected(context)
+            strips = current_selected(context)
         else:
-            sequences = current_sequences(context)
-        if sequences:
+            strips = current_strips(context)
+        if strips:
             bpy.ops.ed.undo_push()
             if operation == 'full_auto':
-                start_frame = find_sequences_start(sequences)
-                end_frame = find_sequences_end(sequences)
+                start_frame = find_strips_start(strips)
+                end_frame = find_strips_end(strips)
                 if start_frame != 1:
-                    #move all sequences forward then back
+                    #move all strips forward then back
                     offset_1 = end_frame - start_frame + 1
                     offset_2 = -offset_1 - start_frame + 1
 
                     for marker in context.scene.timeline_markers:
                         marker.frame = int(marker.frame - start_frame + 1)
 
-                    for sequence in sequences:
-                        if not hasattr(sequence, 'input_1'):
-                            sequence.frame_start = sequence.frame_start + offset_1
-                    for sequence in sequences:
-                        if not hasattr(sequence, 'input_1'):
-                            sequence.frame_start = sequence.frame_start + offset_2
-                    sequences = current_sequences(context)
+                    for strip in strips:
+                        if not hasattr(strip, 'input_1'):
+                            strip.frame_start = strip.frame_start + offset_1
+                    for strip in strips:
+                        if not hasattr(strip, 'input_1'):
+                            strip.frame_start = strip.frame_start + offset_2
+                    strips = current_strips(context)
             starts = []
             ends = []
-            for sequence in sequences:
-                starts.append(sequence.frame_final_start)
-                ends.append(sequence.frame_final_end)
+            for strip in strips:
+                starts.append(strip.frame_final_start)
+                ends.append(strip.frame_final_end)
             starts.sort()
             ends.sort()
             newstart = starts[0]
@@ -496,26 +456,26 @@ class VSEQFQuickTimelineMenu(bpy.types.Menu):
         layout.operator('vseqf.check_clipping')
         layout.separator()
         props = layout.operator('vseqf.quicktimeline', text='Timeline To All')
-        props.operation = 'sequences'
-        props.tooltip = 'Trims the timeline to all sequences'
+        props.operation = 'strips'
+        props.tooltip = 'Trims the timeline to all strips'
         props = layout.operator('vseqf.quicktimeline', text='Timeline To Selected')
         props.operation = 'selected'
-        props.tooltip = 'Trims the timeline to selected sequence(s)'
+        props.tooltip = 'Trims the timeline to selected strip(s)'
         layout.separator()
         props = layout.operator('vseqf.quicktimeline', text='Timeline Start To All')
-        props.operation = 'sequences_start'
-        props.tooltip = 'Sets the timeline start to the start of the first sequence'
+        props.operation = 'strips_start'
+        props.tooltip = 'Sets the timeline start to the start of the first strip'
         props = layout.operator('vseqf.quicktimeline', text='Timeline End To All')
-        props.operation = 'sequences_end'
-        props.tooltip = 'Sets the timeline end to the end of the last sequence'
+        props.operation = 'strips_end'
+        props.tooltip = 'Sets the timeline end to the end of the last strip'
         props = layout.operator('vseqf.quicktimeline', text='Timeline Start To Selected')
         props.operation = 'selected_start'
-        props.tooltip = 'Sets the timeline start to the start of the first selected sequence'
+        props.tooltip = 'Sets the timeline start to the start of the first selected strip'
         props = layout.operator('vseqf.quicktimeline', text='Timeline End To Selected')
         props.operation = 'selected_end'
-        props.tooltip = 'Sets the timeline end to the end of the last selected sequence'
+        props.tooltip = 'Sets the timeline end to the end of the last selected strip'
         row = layout.row()
         props = row.operator('vseqf.quicktimeline', text='Full Timeline Setup')
         props.operation = 'full_auto'
-        props.tooltip = 'Moves sequences and markers back up to frame 1, then sets start and end to encompass all sequences'
+        props.tooltip = 'Moves strips and markers back up to frame 1, then sets start and end to encompass all strips'
         row.enabled = not inside_meta_strip()

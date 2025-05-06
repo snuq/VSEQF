@@ -4,29 +4,29 @@ from . import grabs
 from . import vseqf
 
 
-def vseqf_cut(sequence, frame=0, cut_type="SOFT"):
+def vseqf_cut(strip, frame=0, cut_type="SOFT"):
     bpy.ops.sequencer.select_all(action='DESELECT')
-    left_sequence = False
-    right_sequence = False
-    if frame > sequence.frame_final_start and frame < sequence.frame_final_end:
-        sequence.select = True
+    left_strip = False
+    right_strip = False
+    if frame > strip.frame_final_start and frame < strip.frame_final_end:
+        strip.select = True
         try:
             bpy.ops.sequencer.split(frame=frame, type=cut_type, side="BOTH")  #Changed in 2.83
         except AttributeError:
             bpy.ops.sequencer.cut(frame=frame, type=cut_type, side="BOTH")
-        sequences = timeline.current_selected(bpy.context)
-        for seq in sequences:
+        strips = timeline.current_selected(bpy.context)
+        for seq in strips:
             seq.select = False
             if seq.frame_final_start < frame:
-                left_sequence = seq
+                left_strip = seq
             else:
-                right_sequence = seq
+                right_strip = seq
     else:
-        if sequence.frame_final_end <= frame:
-            left_sequence = sequence
+        if strip.frame_final_end <= frame:
+            left_strip = strip
         else:
-            right_sequence = sequence
-    return left_sequence, right_sequence
+            right_strip = strip
+    return left_strip, right_strip
 
 
 class VSEQFCut(bpy.types.Operator):
@@ -53,7 +53,7 @@ class VSEQFCut(bpy.types.Operator):
             UNCUT_RIGHT: Uncut, to the right"""
 
     bl_idname = "vseqf.cut"
-    bl_label = "Wrapper for the built in sequence cut operator that provides extra cut operations."
+    bl_label = "Wrapper for the built in strip cut operator that provides extra cut operations."
     bl_options = {"UNDO"}
 
     tooltip: bpy.props.StringProperty("Cut the selected strips")
@@ -66,9 +66,10 @@ class VSEQFCut(bpy.types.Operator):
     insert: bpy.props.IntProperty(0)
     use_insert: bpy.props.BoolProperty(default=False)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         if not self.use_frame:
             self.frame = bpy.context.scene.frame_current
+        super().__init__(*args, **kwargs)
 
     @classmethod
     def description(cls, context, properties):
@@ -85,51 +86,51 @@ class VSEQFCut(bpy.types.Operator):
         self.use_insert = False
         self.use_frame = False
 
-    def delete_sequence(self, sequence):
-        """Deletes a sequence while maintaining previous selected and active sequences
+    def delete_strip(self, strip):
+        """Deletes a strip while maintaining previous selected and active strips
         Argument:
-            sequence: VSE Sequence object to delete"""
+            strip: VSE strip object to delete"""
 
         active = timeline.current_active(bpy.context)
         selected = []
-        for seq in bpy.context.scene.sequence_editor.sequences:
+        for seq in bpy.context.scene.sequence_editor.strips:
             if seq.select:
                 selected.append(seq)
                 seq.select = False
-        sequence.select = True
+        strip.select = True
         bpy.ops.sequencer.delete()
         for seq in selected:
             seq.select = True
         if active:
             bpy.context.scene.sequence_editor.active_strip = active
 
-    def check_source(self, sequence, next_sequence):
-        """Used by UnCut, checks the source and position of two sequences to see if they can be merged
+    def check_source(self, strip, next_strip):
+        """Used by UnCut, checks the source and position of two strips to see if they can be merged
 
         Arguments:
-            sequence: VSE Sequence object to be compared
-            next_sequence: VSE Sequence object to be compared
+            strip: VSE Strip object to be compared
+            next_strip: VSE Strip object to be compared
 
         Returns: Boolean"""
 
-        if sequence.type == next_sequence.type:
-            if sequence.type == 'IMAGE':
-                if sequence.directory == next_sequence.directory and sequence.elements[0].filename == next_sequence.elements[0].filename:
-                    if len(sequence.elements) == 1 and len(next_sequence.elements) == 1:
+        if strip.type == next_strip.type:
+            if strip.type == 'IMAGE':
+                if strip.directory == next_strip.directory and strip.elements[0].filename == next_strip.elements[0].filename:
+                    if len(strip.elements) == 1 and len(next_strip.elements) == 1:
                         return True
-                    elif sequence.frame_start == next_sequence.frame_start:
+                    elif strip.frame_start == next_strip.frame_start:
                         return True
-            elif sequence.frame_start == next_sequence.frame_start:
-                if sequence.type == 'SOUND':
-                    if sequence.sound.filepath == next_sequence.sound.filepath:
+            elif strip.frame_start == next_strip.frame_start:
+                if strip.type == 'SOUND':
+                    if strip.sound.filepath == next_strip.sound.filepath:
                         return True
-                if sequence.type == 'MOVIE':
-                    if sequence.filepath == next_sequence.filepath:
+                if strip.type == 'MOVIE':
+                    if strip.filepath == next_strip.filepath:
                         return True
-                if sequence.type == 'SCENE':
-                    if sequence.scene == next_sequence.scene:
+                if strip.type == 'SCENE':
+                    if strip.scene == next_strip.scene:
                         return True
-                if sequence.type == 'MOVIECLIP':
+                if strip.type == 'MOVIECLIP':
 
                     #no way of checking source file :\
                     pass
@@ -151,7 +152,7 @@ class VSEQFCut(bpy.types.Operator):
         return self.start_cut(context, side)
 
     def uncut(self, context, side="BOTH"):
-        #merges a sequence to the one on the left or right if they share the same source and position
+        #merges a strip to the one on the left or right if they share the same source and position
         if side == 'BOTH':
             self.reset()
             return{"CANCELLED"}
@@ -159,28 +160,28 @@ class VSEQFCut(bpy.types.Operator):
         sequencer = context.scene.sequence_editor
         selected = timeline.current_selected(context)
         to_uncut = []
-        for sequence in selected:
-            if not timeline.is_locked(sequencer, sequence) and not hasattr(sequence, 'input_1'):
-                to_uncut.append(sequence)
-        for sequence in to_uncut:
+        for strip in selected:
+            if not timeline.is_locked(sequencer, strip) and not hasattr(strip, 'input_1'):
+                to_uncut.append(strip)
+        for strip in to_uncut:
             if side == 'LEFT':
                 direction = 'previous'
             else:
                 direction = 'next'
-            sequences = timeline.current_sequences(context)
-            merge_to = timeline.find_close_sequence(sequences, sequence, direction=direction, mode='channel', sounds=True)
+            strips = timeline.current_strips(context)
+            merge_to = timeline.find_close_strip(strips, strip, direction=direction, mode='channel', sounds=True)
             if merge_to:
                 if not timeline.is_locked(sequencer, merge_to):
-                    source_matches = self.check_source(sequence, merge_to)
+                    source_matches = self.check_source(strip, merge_to)
                     if source_matches:
                         if direction == 'next':
                             newend = merge_to.frame_final_end
-                            self.delete_sequence(merge_to)
-                            sequence.frame_final_end = newend
+                            self.delete_strip(merge_to)
+                            strip.frame_final_end = newend
                         else:
                             newstart = merge_to.frame_final_start
-                            self.delete_sequence(merge_to)
-                            sequence.frame_final_start = newstart
+                            self.delete_strip(merge_to)
+                            strip.frame_final_start = newstart
         self.reset()
         return{'FINISHED'}
 
@@ -214,32 +215,32 @@ class VSEQFCut(bpy.types.Operator):
         if self.type == 'RIPPLE_RIGHT':
             self.type = 'RIPPLE'
             side = 'RIGHT'
-        sequences = timeline.current_sequences(context)
+        strips = timeline.current_strips(context)
         active = timeline.current_active(context)
         to_cut = []
         to_select = []
         to_active = None
         cut_pairs = []
 
-        #determine all sequences available to cut
+        #determine all strips available to cut
         to_cut_temp = []
-        for sequence in sequences:
-            if not timeline.is_locked(sequencer, sequence) and timeline.under_cursor(sequence, self.frame) and not hasattr(sequence, 'input_1'):
+        for strip in strips:
+            if not timeline.is_locked(sequencer, strip) and timeline.under_cursor(strip, self.frame) and not hasattr(strip, 'input_1'):
                 if self.all:
-                    to_cut.append(sequence)
-                    to_cut_temp.append(sequence)
-                elif sequence.select:
-                    to_cut.append(sequence)
-                    to_cut_temp.append(sequence)
+                    to_cut.append(strip)
+                    to_cut_temp.append(strip)
+                elif strip.select:
+                    to_cut.append(strip)
+                    to_cut_temp.append(strip)
 
         #find the ripple amount
         ripple_amount = 0
-        for sequence in to_cut_temp:
+        for strip in to_cut_temp:
             if side == 'LEFT':
-                cut_amount = self.frame - sequence.frame_final_start
+                cut_amount = self.frame - strip.frame_final_start
             else:
-                cut_amount = sequence.frame_final_end - self.frame
-            #to_cut.append(sequence)
+                cut_amount = strip.frame_final_end - self.frame
+            #to_cut.append(strip)
             if cut_amount > ripple_amount:
                 ripple_amount = cut_amount
 
@@ -250,24 +251,24 @@ class VSEQFCut(bpy.types.Operator):
 
         bpy.ops.sequencer.select_all(action='DESELECT')
         to_cut.sort(key=lambda x: x.frame_final_start)
-        for sequence in to_cut:
-            cutable = timeline.under_cursor(sequence, self.frame)
+        for strip in to_cut:
+            cutable = timeline.under_cursor(strip, self.frame)
             left = False
             right = False
             if self.type in ['TRIM', 'SLIDE', 'RIPPLE']:
                 if side != 'BOTH':
                     if side == 'LEFT':
                         if cutable:
-                            sequence.frame_final_start = self.frame
-                        to_select.append(sequence)
+                            strip.frame_final_start = self.frame
+                        to_select.append(strip)
                         if self.type == 'SLIDE':
-                            sequence.frame_start = sequence.frame_start - ripple_amount
+                            strip.frame_start = strip.frame_start - ripple_amount
                     else:
                         if cutable:
-                            sequence.frame_final_end = self.frame
-                        to_select.append(sequence)
+                            strip.frame_final_end = self.frame
+                        to_select.append(strip)
                         if self.type == 'SLIDE':
-                            sequence.frame_start = sequence.frame_start + ripple_amount
+                            strip.frame_start = strip.frame_start + ripple_amount
                 else:
                     ripple_amount = 0
 
@@ -277,10 +278,10 @@ class VSEQFCut(bpy.types.Operator):
                 else:
                     cut_type = self.type
                 if cutable:
-                    left, right = vseqf_cut(sequence=sequence, frame=self.frame, cut_type=cut_type)
+                    left, right = vseqf_cut(strip=strip, frame=self.frame, cut_type=cut_type)
                     cut_pairs.append([left, right])
             else:
-                to_select.append(sequence)
+                to_select.append(strip)
             if (side == 'LEFT' or side == 'BOTH') and left:
                 to_select.append(left)
                 if active and left == active:
@@ -289,7 +290,7 @@ class VSEQFCut(bpy.types.Operator):
                 to_select.append(right)
                 if active and left == active and side != 'BOTH':
                     to_active = right
-        timeline.fix_effects(cut_pairs, sequences)
+        timeline.fix_effects(cut_pairs, strips)
 
         #ripple/insert
         if self.type == 'INSERT' or self.type == 'RIPPLE' or self.type == 'INSERT_ONLY':
@@ -300,16 +301,16 @@ class VSEQFCut(bpy.types.Operator):
                     insert = self.insert
                 else:
                     insert = context.scene.vseqf.quickcuts_insert
-            sequences = timeline.current_sequences(context)
+            strips = timeline.current_strips(context)
             if context.scene.vseqf.ripple_markers:
                 markers = context.scene.timeline_markers
             else:
                 markers = []
-            grabs.ripple_timeline(sequencer, sequences, ripple_frame - 1, insert, markers=markers)
+            grabs.ripple_timeline(sequencer, strips, ripple_frame - 1, insert, markers=markers)
         else:
-            for sequence in to_select:
-                if sequence:
-                    sequence.select = True
+            for strip in to_select:
+                if strip:
+                    strip.select = True
         if to_active:
             context.scene.sequence_editor.active_strip = to_active
         if side == 'LEFT':
@@ -332,9 +333,9 @@ class VSEQFQuickCutsMenu(bpy.types.Menu):
     def poll(cls, context):
         prefs = vseqf.get_prefs()
 
-        if not context.sequences or not context.scene.sequence_editor:
+        if not context.strips or not context.scene.sequence_editor:
             return False
-        if len(context.sequences) > 0:
+        if len(context.strips) > 0:
             return prefs.cuts
         else:
             return False
@@ -348,41 +349,41 @@ class VSEQFQuickCutsMenu(bpy.types.Menu):
         layout = self.layout
         props = layout.operator('vseqf.cut', text='Cut')
         props.type = 'SOFT'
-        props.tooltip = 'Cut '+cut_strips+' sequences under the cursor'
+        props.tooltip = 'Cut '+cut_strips+' strips under the cursor'
         props = layout.operator('vseqf.cut', text='Cut Insert')
         props.type = 'INSERT'
-        props.tooltip = 'Cut '+cut_strips+' sequences under the cursor and insert '+str(context.scene.vseqf.quickcuts_insert)+' frames'
+        props.tooltip = 'Cut '+cut_strips+' strips under the cursor and insert '+str(context.scene.vseqf.quickcuts_insert)+' frames'
         props = layout.operator('vseqf.delete', text='Delete', icon='X')
-        props.tooltip = 'Delete selected sequences'
+        props.tooltip = 'Delete selected strips'
         props = layout.operator('vseqf.delete', text='Ripple Delete', icon='X')
         props.ripple = True
-        props.tooltip = 'Delete selected sequences, and slide following sequences back to close the gap'
+        props.tooltip = 'Delete selected strips, and slide following strips back to close the gap'
         layout.separator()
         props = layout.operator('vseqf.cut', text='Trim Left')
         props.type = 'TRIM_LEFT'
-        props.tooltip = 'Cut off the left side of '+cut_strips+' sequences under the cursor'
+        props.tooltip = 'Cut off the left side of '+cut_strips+' strips under the cursor'
         props = layout.operator('vseqf.cut', text='Slide Trim Left', icon='BACK')
         props.type = 'SLIDE_LEFT'
-        props.tooltip = 'Cut off the left side of '+cut_strips+' sequences under the cursor, and slide cut sequences back to close the gap'
+        props.tooltip = 'Cut off the left side of '+cut_strips+' strips under the cursor, and slide cut strips back to close the gap'
         props = layout.operator('vseqf.cut', text='Ripple Trim Left', icon='BACK')
         props.type = 'RIPPLE_LEFT'
-        props.tooltip = 'Cut off the left side of '+cut_strips+' sequences under the cursor, and slide all sequences back to close the gap'
+        props.tooltip = 'Cut off the left side of '+cut_strips+' strips under the cursor, and slide all strips back to close the gap'
         props = layout.operator('vseqf.cut', text='UnCut Left', icon='LOOP_BACK')
         props.type = 'UNCUT_LEFT'
-        props.tooltip = 'Merge selected sequences to those on left if they match source and position'
+        props.tooltip = 'Merge selected strips to those on left if they match source and position'
         layout.separator()
         props = layout.operator('vseqf.cut', text='Trim Right')
         props.type = 'TRIM_RIGHT'
-        props.tooltip = 'Cut off the right side of '+cut_strips+' sequences under the cursor'
+        props.tooltip = 'Cut off the right side of '+cut_strips+' strips under the cursor'
         props = layout.operator('vseqf.cut', text='Slide Trim Right', icon='FORWARD')
         props.type = 'SLIDE_RIGHT'
-        props.tooltip = 'Cut off the right side of '+cut_strips+' sequences under the cursor, and slide cut sequences forward to close the gap'
+        props.tooltip = 'Cut off the right side of '+cut_strips+' strips under the cursor, and slide cut strips forward to close the gap'
         props = layout.operator('vseqf.cut', text='Ripple Trim Right', icon='FORWARD')
         props.type = 'RIPPLE_RIGHT'
-        props.tooltip = 'Cut off the right side of '+cut_strips+' sequences under the cursor, and slide all sequences back to close the gap'
+        props.tooltip = 'Cut off the right side of '+cut_strips+' strips under the cursor, and slide all strips back to close the gap'
         props = layout.operator('vseqf.cut', text='UnCut Right', icon='LOOP_FORWARDS')
         props.type = 'UNCUT_RIGHT'
-        props.tooltip = 'Merge selected sequences to those on right if they match source and position'
+        props.tooltip = 'Merge selected strips to those on right if they match source and position'
         layout.separator()
         layout.prop(context.scene.vseqf, 'quickcuts_all', toggle=True)
         layout.prop(context.scene.vseqf, 'quickcuts_insert')
@@ -401,9 +402,9 @@ class VSEQF_PT_QuickCutsPanel(bpy.types.Panel):
     def poll(cls, context):
         prefs = vseqf.get_prefs()
 
-        if not context.sequences or not context.scene.sequence_editor:
+        if not context.strips or not context.scene.sequence_editor:
             return False
-        if len(context.sequences) > 0:
+        if len(context.strips) > 0:
             return prefs.cuts
         else:
             return False
@@ -422,17 +423,17 @@ class VSEQF_PT_QuickCutsPanel(bpy.types.Panel):
         row = box.row()
         props = row.operator('vseqf.cut', text='Cut')
         props.type = 'SOFT'
-        props.tooltip = 'Cut '+cut_strips+' sequences under the cursor'
+        props.tooltip = 'Cut '+cut_strips+' strips under the cursor'
         props = row.operator('vseqf.cut', text='Cut Insert')
         props.type = 'INSERT'
-        props.tooltip = 'Cut '+cut_strips+' sequences under the cursor and insert '+str(context.scene.vseqf.quickcuts_insert)+' frames'
+        props.tooltip = 'Cut '+cut_strips+' strips under the cursor and insert '+str(context.scene.vseqf.quickcuts_insert)+' frames'
 
         row = box.row()
         props = row.operator('vseqf.delete', text='Delete', icon='X')
-        props.tooltip = 'Delete selected sequences'
+        props.tooltip = 'Delete selected strips'
         props = row.operator('vseqf.delete', text='Ripple Delete', icon='X')
         props.ripple = True
-        props.tooltip = 'Delete selected sequences, and slide following sequences back to close the gap'
+        props.tooltip = 'Delete selected strips, and slide following strips back to close the gap'
 
         box = layout.box()
         row = box.row()
@@ -440,30 +441,30 @@ class VSEQF_PT_QuickCutsPanel(bpy.types.Panel):
         column = split.column(align=True)
         props = column.operator('vseqf.cut', text='Trim Left', icon='BACK')
         props.type = 'TRIM_LEFT'
-        props.tooltip = 'Cut off the left side of '+cut_strips+' sequences under the cursor'
+        props.tooltip = 'Cut off the left side of '+cut_strips+' strips under the cursor'
         props = column.operator('vseqf.cut', text='Slide Trim Left', icon='BACK')
         props.type = 'SLIDE_LEFT'
-        props.tooltip = 'Cut off the left side of '+cut_strips+' sequences under the cursor, and slide cut sequences back to close the gap'
+        props.tooltip = 'Cut off the left side of '+cut_strips+' strips under the cursor, and slide cut strips back to close the gap'
         props = column.operator('vseqf.cut', text='Ripple Trim Left', icon='BACK')
         props.type = 'RIPPLE_LEFT'
-        props.tooltip = 'Cut off the left side of '+cut_strips+' sequences under the cursor, and slide all sequences back to close the gap'
+        props.tooltip = 'Cut off the left side of '+cut_strips+' strips under the cursor, and slide all sequences back to close the gap'
         props = column.operator('vseqf.cut', text='UnCut Left', icon='LOOP_BACK')
         props.type = 'UNCUT_LEFT'
-        props.tooltip = 'Merge selected sequences to those on left if they match source and position'
+        props.tooltip = 'Merge selected strips to those on left if they match source and position'
 
         column = split.column(align=True)
         props = column.operator('vseqf.cut', text='Trim Right', icon='FORWARD')
         props.type = 'TRIM_RIGHT'
-        props.tooltip = 'Cut off the right side of '+cut_strips+' sequences under the cursor'
+        props.tooltip = 'Cut off the right side of '+cut_strips+' strips under the cursor'
         props = column.operator('vseqf.cut', text='Slide Trim Right', icon='FORWARD')
         props.type = 'SLIDE_RIGHT'
-        props.tooltip = 'Cut off the right side of '+cut_strips+' sequences under the cursor, and slide cut sequences forward to close the gap'
+        props.tooltip = 'Cut off the right side of '+cut_strips+' strips under the cursor, and slide cut strips forward to close the gap'
         props = column.operator('vseqf.cut', text='Ripple Trim Right', icon='FORWARD')
         props.type = 'RIPPLE_RIGHT'
-        props.tooltip = 'Cut off the right side of '+cut_strips+' sequences under the cursor, and slide all sequences back to close the gap'
+        props.tooltip = 'Cut off the right side of '+cut_strips+' strips under the cursor, and slide all strips back to close the gap'
         props = column.operator('vseqf.cut', text='UnCut Right', icon='LOOP_FORWARDS')
         props.type = 'UNCUT_RIGHT'
-        props.tooltip = 'Merge selected sequences to those on right if they match source and position'
+        props.tooltip = 'Merge selected strips to those on right if they match source and position'
 
 
 class VSEQFDelete(bpy.types.Operator):
@@ -500,8 +501,8 @@ class VSEQFDelete(bpy.types.Operator):
         bpy.ops.sequencer.delete()
 
         if self.ripple:
-            #Ripple remaining sequences
-            sequences = timeline.current_sequences(context)
+            #Ripple remaining strips
+            strips = timeline.current_strips(context)
             ripple_frames = list(ripple_frames)
             ripple_frames.sort()
             start_frame = ripple_frames[0]
@@ -515,7 +516,7 @@ class VSEQFDelete(bpy.types.Operator):
                         markers = context.scene.timeline_markers
                     else:
                         markers = []
-                    grabs.ripple_timeline(context.scene.sequence_editor, sequences, start_frame, -ripple_length, markers=markers)
+                    grabs.ripple_timeline(context.scene.sequence_editor, strips, start_frame, -ripple_length, markers=markers)
                     start_frame = frame
                 end_frame = frame
             context.scene.frame_current = ripple_frames[0]

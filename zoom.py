@@ -5,7 +5,7 @@ from . import vseqf
 
 def zoom_custom(begin, end, bottom=None, top=None, preroll=True):
     """Zooms to an area on the sequencer timeline by adding a temporary strip, zooming to it, then deleting that strip.
-    Note that this function will retain selected and active sequences.
+    Note that this function will retain selected and active strips.
     Arguments:
         begin: The starting frame of the zoom area
         end: The ending frame of the zoom area
@@ -20,16 +20,16 @@ def zoom_custom(begin, end, bottom=None, top=None, preroll=True):
 
     #Find sequence editor, or create if not found
     try:
-        sequences = bpy.context.sequences
+        strips = bpy.context.strips
     except:
         scene.sequence_editor_create()
-        sequences = bpy.context.sequences
+        strips = bpy.context.strips
 
-    #Save selected sequences and active strip because they will be overwritten
-    for sequence in sequences:
-        if sequence.select:
-            selected.append(sequence)
-            sequence.select = False
+    #Save selected strips and active strip because they will be overwritten
+    for strip in strips:
+        if strip.select:
+            selected.append(strip)
+            strip.select = False
     active = timeline.current_active(bpy.context)
 
     begin = int(begin)
@@ -42,8 +42,8 @@ def zoom_custom(begin, end, bottom=None, top=None, preroll=True):
     else:
         preroll = 0
 
-    #Create a temporary sequence, zoom in on it, then delete it
-    zoom_clip = scene.sequence_editor.sequences.new_effect(name='----vseqf-temp-zoom----', type='ADJUSTMENT', channel=1, frame_start=begin - preroll, frame_end=end)
+    #Create a temporary strip, zoom in on it, then delete it
+    zoom_clip = scene.sequence_editor.strips.new_effect(name='----vseqf-temp-zoom----', type='ADJUSTMENT', channel=1, frame_start=begin - preroll, frame_end=end)
     scene.sequence_editor.active_strip = zoom_clip
     for region in bpy.context.area.regions:
         if region.type == 'WINDOW':
@@ -51,9 +51,9 @@ def zoom_custom(begin, end, bottom=None, top=None, preroll=True):
                 bpy.ops.sequencer.view_selected()
     bpy.ops.sequencer.delete()
 
-    #Reset selected sequences and active strip
-    for sequence in selected:
-        sequence.select = True
+    #Reset selected strips and active strip
+    for strip in selected:
+        strip.select = True
     if active:
         bpy.context.scene.sequence_editor.active_strip = active
 
@@ -75,18 +75,18 @@ class VSEQFQuickZoomsMenu(bpy.types.Menu):
         scene = context.scene
         layout = self.layout
 
-        prop = layout.operator('vseqf.quickzooms', text='Zoom All Sequences')
+        prop = layout.operator('vseqf.quickzooms', text='Zoom All Strips')
         prop.area = 'all'
-        prop.tooltip = 'Zoom the timeline to all sequences'
+        prop.tooltip = 'Zoom the timeline to all strips'
         prop = layout.operator('vseqf.quickzooms', text='Zoom To Timeline')
         prop.area = 'timeline'
         prop.tooltip = 'Zoom the timeline to the current playback range'
-        selected_sequences = timeline.current_selected(bpy.context)
-        if len(selected_sequences) > 0:
-            #Only show if a sequence is selected
+        selected_strips = timeline.current_selected(bpy.context)
+        if len(selected_strips) > 0:
+            #Only show if a strip is selected
             prop = layout.operator('vseqf.quickzooms', text='Zoom Selected')
             prop.area = 'selected'
-            prop.tooltip = 'Zoom the timeline to the selected sequences'
+            prop.tooltip = 'Zoom the timeline to the selected strips'
 
         prop = layout.operator('vseqf.quickzooms', text='Zoom Cursor')
         prop.area = 'cursor'

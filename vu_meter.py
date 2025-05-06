@@ -26,7 +26,7 @@ def get_volume_unit(frame=None):
     if bpy.context.scene.sequence_editor is None:
         return 0
     sequence_editor = bpy.context.scene.sequence_editor
-    sequences = sequence_editor.sequences_all
+    strips = sequence_editor.strips_all
     depsgraph = bpy.context.evaluated_depsgraph_get()
     if frame is None:
         frame = bpy.context.scene.frame_current
@@ -34,15 +34,15 @@ def get_volume_unit(frame=None):
     else:
         evaluate_volume = True
     fps = vseqf.get_fps()
-    for sequence in sequences:
-        if sequence.type == 'SOUND' and timeline.under_cursor(sequence, frame) and not timeline.is_muted(sequence_editor, sequence):
-            time_from = (frame - 1 - sequence.frame_start) / fps
-            time_to = (frame - sequence.frame_start) / fps
-            audio = sequence.sound.evaluated_get(depsgraph).factory
+    for strip in strips:
+        if strip.type == 'SOUND' and timeline.under_cursor(strip, frame) and not timeline.is_muted(sequence_editor, strip):
+            time_from = (frame - 1 - strip.frame_start) / fps
+            time_to = (frame - strip.frame_start) / fps
+            audio = strip.sound.evaluated_get(depsgraph).factory
             chunk = audio.limit(time_from, time_to).data()
             if len(chunk) == 0:
                 #sometimes the chunks cannot be read properly, try to read 2 frames instead
-                time_from_temp = (frame - 2 - sequence.frame_start) / fps
+                time_from_temp = (frame - 2 - strip.frame_start) / fps
                 chunk = audio.limit(time_from_temp, time_to).data()
             if len(chunk) == 0:
                 #chunk still couldnt be read... just give up :\
@@ -55,13 +55,13 @@ def get_volume_unit(frame=None):
                 else:
                     average = min
             if evaluate_volume:
-                fcurve = fades.get_fade_curve(bpy.context, sequence, create=False)
+                fcurve = fades.get_fade_curve(bpy.context, strip, create=False)
                 if fcurve:
                     volume = fcurve.evaluate(frame)
                 else:
-                    volume = sequence.volume
+                    volume = strip.volume
             else:
-                volume = sequence.volume
+                volume = strip.volume
             total = total + (average * volume)
     return total
 

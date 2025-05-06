@@ -66,8 +66,8 @@ classes = classes + [fades.VSEQFModalFades, fades.VSEQF_PT_QuickFadesPanel, fade
                      fades.VSEQFQuickFadesSet, fades.VSEQFQuickFadesClear, fades.VSEQFQuickFadesCross,
                      fades.VSEQFModalVolumeDraw, fades.VSEQF_PT_QuickFadesStripPanel]
 classes = classes + [grabs.VSEQFContextMenu, grabs.VSEQFContextCursor, grabs.VSEQFContextMarker, grabs.VSEQFContextNone,
-                     grabs.VSEQFContextSequence, grabs.VSEQFDoubleUndo, grabs.VSEQFContextSequenceLeft,
-                     grabs.VSEQFContextSequenceRight, grabs.VSEQFGrab, grabs.VSEQFGrabAdd, grabs.VSEQFSelectGrab]
+                     grabs.VSEQFContextStrip, grabs.VSEQFDoubleUndo, grabs.VSEQFContextStripLeft,
+                     grabs.VSEQFContextStripRight, grabs.VSEQFGrab, grabs.VSEQFGrabAdd, grabs.VSEQFSelectGrab]
 classes = classes + [markers.VSEQF_PT_QuickMarkersPanel, markers.VSEQF_UL_QuickMarkerPresetList,
                      markers.VSEQF_UL_QuickMarkerList, markers.VSEQFQuickMarkerDelete, markers.VSEQFQuickMarkerMove,
                      markers.VSEQFQuickMarkerRename, markers.VSEQFQuickMarkerJump, markers.VSEQFQuickMarkersMenu,
@@ -124,7 +124,7 @@ def draw_follow_header(self, context):
 
 def draw_timeline_menu(self, context):
     layout = self.layout
-    if context.sequences and context.scene.sequence_editor and len(context.sequences) > 0:
+    if context.strips and context.scene.sequence_editor and len(context.strips) > 0:
         layout.menu('VSEQF_MT_quicktimeline_menu', text='Timeline')
 
 
@@ -261,7 +261,7 @@ class VSEQF_PT_CompactEdit(bpy.types.Panel):
         row.prop(strip, "frame_offset_end", text="Out Offset: ("+vseqf.timecode_from_frames(strip.frame_offset_end, fps)+")")
 
         if prefs.fades:
-            #display info about the fade in and out of the current sequence
+            #display info about the fade in and out of the current strip
             fade_curve = fades.get_fade_curve(context, strip, create=False)
             if fade_curve:
                 fadein = fades.fades(fade_curve, strip, 'detect', 'in')
@@ -281,18 +281,18 @@ class VSEQF_PT_CompactEdit(bpy.types.Panel):
                 row.label(text="No Fadeout Detected")
 
         #display info about parenting relationships
-        sequence = timeline.current_active(context)
-        selected = context.selected_sequences
+        strip = timeline.current_active(context)
+        selected = context.selected_strips
         if len(scene.sequence_editor.meta_stack) > 0:
             #inside a meta strip
             sequencer = scene.sequence_editor.meta_stack[-1]
         else:
             #not inside a meta strip
             sequencer = scene.sequence_editor
-        if hasattr(sequencer, 'sequences'):
-            sequences = sequencer.sequences
+        if hasattr(sequencer, 'strips'):
+            strips = sequencer.strips
         else:
-            sequences = []
+            strips = []
 
 
 class VSEQFImport(bpy.types.Operator, ImportHelper):
@@ -405,11 +405,11 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
-    def find_end_frame(self, sequences):
+    def find_end_frame(self, strips):
         frame = 1
-        for sequence in sequences:
-            if sequence.frame_final_end > frame:
-                frame = sequence.frame_final_end
+        for strip in strips:
+            if strip.frame_final_end > frame:
+                frame = strip.frame_final_end
         return frame
 
     def execute(self, context):
@@ -421,7 +421,7 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
         context.scene.vseqf.snap_new_end = False  #disable this so the continuous function doesnt do weird stuff while importing this
         selected = timeline.current_selected(context)
         active = timeline.current_active(context)
-        end_frame = self.find_end_frame(timeline.current_sequences(context))
+        end_frame = self.find_end_frame(timeline.current_strips(context))
         dirname = os.path.dirname(bpy.path.abspath(self.filepath))
         bpy.ops.sequencer.select_all(action='DESELECT')
         if self.import_location in ['END', 'INSERT_FRAME', 'CUT_INSERT']:
@@ -450,7 +450,7 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
             imported = timeline.current_selected(context)
             self.all_imported.extend(imported)
         if self.import_location == 'INSERT_FRAME' or self.import_location == 'CUT_INSERT':
-            new_end_frame = self.find_end_frame(timeline.current_sequences(context))
+            new_end_frame = self.find_end_frame(timeline.current_strips(context))
             move_forward = new_end_frame - end_frame
             move_back = end_frame - self.start_frame + move_forward
             if self.import_location == 'INSERT_FRAME':
@@ -458,18 +458,18 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
             else:
                 cut_type = 'INSERT'
             bpy.ops.vseqf.cut(type=cut_type, use_insert=True, insert=move_forward, use_all=True, all=True)
-            for sequence in self.all_imported:
-                sequence.frame_start = sequence.frame_start - move_back
+            for strip in self.all_imported:
+                strip.frame_start = strip.frame_start - move_back
         if not self.replace_selection:
             bpy.ops.sequencer.select_all(action='DESELECT')
-            for sequence in selected:
-                sequence.select = True
+            for strip in selected:
+                strip.select = True
             if active:
                 context.scene.sequence_editor.active_strip = active
         else:
             bpy.ops.sequencer.select_all(action='DESELECT')
-            for sequence in self.all_imported:
-                sequence.select = True
+            for strip in self.all_imported:
+                strip.select = True
         for file in self.all_imported:
             if file.frame_final_end > last_frame:
                 last_frame = file.frame_final_end
@@ -521,20 +521,20 @@ def vseqf_continuous(scene):
         #something in the scene was changed by the user, figure out what
         try:
             sequencer = scene.sequence_editor
-            sequences = sequencer.sequences
+            strips = sequencer.strips
         except:
             return
-        new_sequences = []
+        new_strips = []
         new_end = scene.frame_current
-        for sequence in sequences:
-            if sequence.new:
-                if not (sequence.type == 'META' or hasattr(sequence, 'input_1')):
-                    new_sequences.append(sequence)
-                sequence.new = False
-        if new_sequences:
-            for sequence in new_sequences:
-                if sequence.type not in ['ADJUSTMENT', 'TEXT', 'COLOR', 'MULTICAM'] and sequence.frame_final_end > new_end:
-                    new_end = sequence.frame_final_end
+        for strip in strips:
+            if strip.new:
+                if not (strip.type == 'META' or hasattr(strip, 'input_1')):
+                    new_strips.append(strip)
+                strip.new = False
+        if new_strips:
+            for strip in new_strips:
+                if strip.type not in ['ADJUSTMENT', 'TEXT', 'COLOR', 'MULTICAM'] and strip.frame_final_end > new_end:
+                    new_end = strip.frame_final_end
             if scene.vseqf.snap_new_end:
                 scene.frame_current = new_end
 
@@ -788,7 +788,7 @@ class VSEQFSetting(bpy.types.PropertyGroup):
     quickcuts_all: bpy.props.BoolProperty(
         name='Cut All Sequences',
         default=False,
-        description='Cut all sequences, regardless of selection (not including locked sequences)')
+        description='Cut all strips, regardless of selection (not including locked strips)')
     snap_new_end: bpy.props.BoolProperty(
         name='Snap Cursor To End Of New Sequences',
         default=False)
@@ -892,8 +892,8 @@ class SEQUENCER_MT_strip_transform(Menu):
         layout.separator()
         layout.operator('vseqf.quicksnaps', text='Snap Beginning To Cursor').type = 'begin_to_cursor'
         layout.operator('vseqf.quicksnaps', text='Snap End To Cursor').type = 'end_to_cursor'
-        layout.operator('vseqf.quicksnaps', text='Snap To Previous Strip').type = 'sequence_to_previous'
-        layout.operator('vseqf.quicksnaps', text='Snap To Next Strip').type = 'sequence_to_next'
+        layout.operator('vseqf.quicksnaps', text='Snap To Previous Strip').type = 'strip_to_previous'
+        layout.operator('vseqf.quicksnaps', text='Snap To Next Strip').type = 'strip_to_next'
 
 
 class SEQUENCER_MT_strip(Menu):
@@ -930,7 +930,7 @@ class SEQUENCER_MT_strip(Menu):
         layout.separator()
         layout.operator("sequencer.delete", text="Delete")
 
-        strip = context.active_sequence_strip
+        strip = context.active_strip
 
         if strip and strip.type == 'SCENE':
             layout.operator("sequencer.delete", text="Delete Strip & Data").delete_data = True
@@ -982,9 +982,9 @@ class SEQUENCER_MT_strip(Menu):
             layout.menu("SEQUENCER_MT_strip_input")
 
 
-def selected_sequences_len(context):
+def selected_strips_len(context):
     try:
-        return len(context.selected_sequences) if context.selected_sequences else 0
+        return len(context.selected_strips) if context.selected_strips else 0
     except AttributeError:
         return 0
 
@@ -1043,11 +1043,11 @@ class SEQUENCER_MT_add(Menu):
 
         col = layout.column()
         col.menu("SEQUENCER_MT_add_transitions", icon='ARROW_LEFTRIGHT')
-        col.enabled = selected_sequences_len(context) >= 2
+        col.enabled = selected_strips_len(context) >= 2
 
         col = layout.column()
         col.operator_menu_enum("sequencer.fades_add", "type", text="Fade", icon='IPO_EASE_IN_OUT')
-        col.enabled = selected_sequences_len(context) >= 1
+        col.enabled = selected_strips_len(context) >= 1
 
 
 def remove_vu_draw_handler(add=False):
