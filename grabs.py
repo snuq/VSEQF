@@ -236,11 +236,13 @@ def ripple_timeline(sequencer, strips, start_frame, ripple_amount, select_ripple
                 marker.frame = marker.frame + ripple_amount
 
 
-def near_marker(context, frame):
+def near_marker(context, frame, distance=None):
+    if distance is None:
+        distance = marker_grab_distance
     if context.scene.timeline_markers:
         markers = sorted(context.scene.timeline_markers, key=lambda x: abs(x.frame - frame))
         marker = markers[0]
-        if abs(marker.frame - frame) <= marker_grab_distance:
+        if abs(marker.frame - frame) <= distance:
             return marker
     return None
 
@@ -294,7 +296,10 @@ class VSEQFSelectGrab(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return not context.scene.sequence_editor.selected_retiming_keys
+        sequencer = context.scene.sequence_editor
+        if not sequencer:
+            return False
+        return not sequencer.selected_retiming_keys
 
     def modal(self, context, event):
         region = context.region
@@ -354,16 +359,16 @@ class VSEQFSelectGrab(bpy.types.Operator):
         original_selected_strips = timeline.current_selected(context)
         for strip in original_selected_strips:
             self.selected.append([strip, strip.select_left_handle, strip.select_right_handle])
-        if event.mouse_region_y > marker_area_height:
-            if event.ctrl and event.alt:
-                return {'FINISHED'}
-            elif event.ctrl:
-                bpy.ops.sequencer.select('INVOKE_DEFAULT', deselect_all=False, linked_time=True)
-                return {'FINISHED'}
-            elif event.alt:
-                bpy.ops.sequencer.select('INVOKE_DEFAULT', deselect_all=True, linked_handle=True)
-            else:
-                bpy.ops.sequencer.select('INVOKE_DEFAULT', deselect_all=True)
+        #if event.mouse_region_y > marker_area_height:
+        if event.ctrl and event.alt:
+            return {'FINISHED'}
+        elif event.ctrl:
+            bpy.ops.sequencer.select('INVOKE_DEFAULT', deselect_all=False, linked_time=True)
+            return {'FINISHED'}
+        elif event.alt:
+            bpy.ops.sequencer.select('INVOKE_DEFAULT', deselect_all=True, linked_handle=True)
+        else:
+            bpy.ops.sequencer.select('INVOKE_DEFAULT', deselect_all=True)
         selected_strips = timeline.current_selected(context)
         if not selected_strips:
             bpy.ops.sequencer.select_box('INVOKE_DEFAULT')
@@ -800,12 +805,6 @@ class VSEQFContextMenu(bpy.types.Operator):
         if abs(click_frame - context.scene.frame_current) <= distance:
             #clicked on cursor
             bpy.ops.wm.call_menu(name='VSEQF_MT_context_cursor')
-        elif event.mouse_region_y <= marker_area_height:
-            is_near_marker = near_marker(context, click_frame)
-            if is_near_marker:
-                #clicked on marker
-                context.scene.vseqf.current_marker_frame = is_near_marker.frame
-                bpy.ops.wm.call_menu(name='VSEQF_MT_context_marker')
         elif active and on_strip(click_frame, click_channel, active):
             #clicked on strip
             active_size = active.frame_final_duration * frame_px
@@ -816,8 +815,14 @@ class VSEQFContextMenu(bpy.types.Operator):
             else:
                 bpy.ops.wm.call_menu(name="VSEQF_MT_context_strip")
         else:
-            #clicked on empty area
-            bpy.ops.wm.call_menu(name='VSEQF_MT_context_none')
+            is_near_marker = near_marker(context, click_frame, distance)
+            if is_near_marker:
+                #clicked on marker
+                context.scene.vseqf.current_marker_frame = is_near_marker.frame
+                bpy.ops.wm.call_menu(name='VSEQF_MT_context_marker')
+            else:
+                #clicked on empty area
+                bpy.ops.wm.call_menu(name='VSEQF_MT_context_none')
 
 
 class VSEQFDoubleUndo(bpy.types.Operator):
