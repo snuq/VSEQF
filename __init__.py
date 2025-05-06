@@ -20,7 +20,6 @@
 """
 Todo:
 uncut will break parenting
-volume curve drawing not continuous
 right handle ripple grab is hard to control
 parenting breaks when cutting (blender bug?)
 markers context menu not opening

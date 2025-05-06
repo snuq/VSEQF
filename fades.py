@@ -385,57 +385,57 @@ class VSEQFModalVolumeDraw(bpy.types.Operator):
         status_text = "Click and drag on or above the sound strip to add keyframe points.  Press 'V' or MiddleMouse to toggle add/remove mode.  Clear the curve with Backspace or Delete.  Confirm with Return."
         context.workspace.status_text_set(status_text)
 
-        if event.type in ['LEFTMOUSE', 'MOUSEMOVE']:
-            if event.value == 'PRESS' and self.last_press == 'LEFTMOUSE':
-                mouse_frame, mouse_channel = context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y)
-                clipped_pos_x, clipped_pos_y = context.region.view2d.view_to_region(mouse_frame, mouse_channel)
-                if clipped_pos_x == 12000 or clipped_pos_y == 12000:
-                    #if the user clicks outside of the area, close the function
-                    self.remove_draw_handler(context)
-                    return {'FINISHED'}
-                mouse_frame = round(mouse_frame)
-                if self.mode == 'ADD':
-                    if mouse_frame > self.active_strip.frame_final_end:
-                        mouse_frame = self.active_strip.frame_final_end
-                    if mouse_frame < self.active_strip.frame_final_start:
-                        mouse_frame = self.active_strip.frame_final_start
-                    if self.last_added is not None and self.last_added != mouse_frame:
-                        #Delete points between last_added and current point to prevent spikes in graph
-                        low_point = min(self.last_added, mouse_frame)
-                        high_point = max(self.last_added, mouse_frame)
-                        for frame in range(low_point + 1, high_point):
-                            self.active_strip.keyframe_delete('volume', frame=frame)
+        if event.type in ['LEFTMOUSE', 'MOUSEMOVE'] and (event.value == 'PRESS' or self.last_press == 'LEFTMOUSE'):
+            mouse_frame, mouse_channel = context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y)
+            clipped_pos_x, clipped_pos_y = context.region.view2d.view_to_region(mouse_frame, mouse_channel)
+            mouse_frame = round(mouse_frame)
+            if (clipped_pos_x == 12000 or clipped_pos_y == 12000) or  (event.value == 'PRESS' and (mouse_frame < self.active_strip.frame_final_start or mouse_frame > self.active_strip.frame_final_end)):
+                #User clicked outside of clip, end drawing
+                self.remove_draw_handler(context)
+                return {'FINISHED'}
+            if self.mode == 'ADD':
+                if mouse_frame > self.active_strip.frame_final_end:
+                    mouse_frame = self.active_strip.frame_final_end
+                if mouse_frame < self.active_strip.frame_final_start:
+                    mouse_frame = self.active_strip.frame_final_start
+                if self.last_added is not None and self.last_added != mouse_frame:
+                    #Delete points between last_added and current point to reduce spikes in graph
+                    low_point = min(self.last_added, mouse_frame)
+                    high_point = max(self.last_added, mouse_frame)
+                    for frame in range(low_point + 1, high_point):
+                        self.active_strip.keyframe_delete('volume', frame=frame)
 
-                    volume = mouse_channel - self.active_strip.channel
-                    if volume < 0:
-                        volume = 0
-                    self.active_strip.keyframe_insert('volume', frame=mouse_frame)
-                    for point in self.curve.keyframe_points:
-                        if point.co[0] == mouse_frame:
-                            point.co[1] = volume
-                            point.handle_left[1] = volume
-                            point.handle_right[1] = volume
-                            self.last_added = mouse_frame
-                            break
-                else:
-                    try:
-                        self.active_strip.keyframe_delete('volume', frame=mouse_frame)
-                    except:
-                        pass
-                    context.evaluated_depsgraph_get().update()
+                volume = mouse_channel - self.active_strip.channel
+                if volume < 0:
+                    volume = 0
+                self.active_strip.keyframe_insert('volume', frame=mouse_frame)
+                for point in self.curve.keyframe_points:
+                    if point.co[0] == mouse_frame:
+                        point.co[1] = volume
+                        point.handle_left[1] = volume
+                        point.handle_right[1] = volume
+                        self.last_added = mouse_frame
+                        break
+            else:
+                try:
+                    self.active_strip.keyframe_delete('volume', frame=mouse_frame)
+                except:
+                    pass
+                context.evaluated_depsgraph_get().update()
             #context.area.tag_redraw()
             self.update_areas(context)
 
-        if event.type == 'LEFTMOUSE':
+        if event.type == 'LEFTMOUSE' and event.value == 'PRESS':
+            #Left button clicked down
             self.last_press = 'LEFTMOUSE'
             self.last_added = None
+        elif event.value == 'RELEASE':
+            #Button was relased
+            self.last_press = ''
         elif event.type in ['BACK_SPACE', 'DEL']:
             self.last_press = ''
             self.last_added = None
             self.reset_curve()
-        elif event.type not in ['MOUSEMOVE', 'INBETWEEN_MOUSEMOVE', 'TIMER', 'TIMER0', 'TIMER1', 'TIMER2', 'TIMER_JOBS', 'TIMERREGION']:
-            self.last_press = ''
-            self.last_added = None
 
         if event.type in {'RET'}:
             self.remove_draw_handler(context)
