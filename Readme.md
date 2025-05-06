@@ -1,4 +1,4 @@
-# VSE Quick Functions Addon For Blender 4.0
+# VSE Quick Functions Addon For Blender 4.4
 
 VSEQF is an overhaul for Blender's VSE that can completely change your workflow.  Designed for quick, mouse and keyboard balanced editing with a focus on real-time feedback.
 
@@ -90,21 +90,16 @@ The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' o
    A new Edit Strip panel for the sequence editor properties area, providing more information in a smaller space than the default panel.  
    This can be enabled or disabled in the addon preferences when the addon is enabled.
 
-* __Sequence Parenting__
-
-   Child sequences will follow parents.
-   Child edges that match the parent's edge will move along with the parent.
-
 * __Ripple Editing__
 
    While in grab mode, press the alt key to toggle between ripple, ripple-pop, and normal mode.  
-   Ripple mode will move all sequences after the grabbed sequence the same amount.
-   Ripple-Pop will allow you to move a sequence above and out of a line, automatically closing the gap left behind.  This will only operate when one sequence is grabbed.
+   Ripple mode will move all strips after the grabbed strip the same amount.
+   Ripple-Pop will allow you to move a strip above and out of a line, automatically closing the gap left behind.  This will only operate when one strip is grabbed.
    Enable the 'Ripple Edit Markers' option to cause markers to behave by ripple rules as well.
 
 * __Edge Grab Improvements__
 
-   When an edge is moved into another sequence, the selected sequence will be moved up a channel to allow the edge to be moved.  
+   When an edge is moved into another strip, the selected strip will be moved up a channel to allow the edge to be moved.  
    The cursor can be automatically snapped to a dragged edge for better adjustment.  
 
 * __Right-Click Context Menus__
@@ -113,46 +108,37 @@ The built-in 'grab', 'select', 'cut', 'delete', 'make meta strip' and 'import' o
    Right-click and hold will open context menus when blender is in right-click to select mode.  
    See the QuickContext section for more information.
 
-* __Making Meta Strip Additions__
+* __Cut Strip Additions__
 
-   If Cut/Move Children is on, child sequences will be added to a meta strip when a parent is added.  
-   Effect sequences with a single input will be automatically added to meta strips when their input sequence is added.
-
-* __Cut Sequence Additions__
-
-   Child sequences of a parent will be automatically cut as well as the parent.  
-   Ripple cuts enabled, press Alt-K to trim and slide one side of the selected sequences.  
+   Ripple cuts enabled, press Alt-K to trim and slide one side of the selected strips.  
    Effect strips are now duplicated to both sides of a cut strip, this includes an entire effect stack.  
    Crossfades and other two-input effect strips are handled properly now. If the effect is applied to the right side of a cut, it will be applied correctly. (See https://developer.blender.org/T50877 )  
-   The active strip after a cut is correctly handled now, if the mouse is on the right side of a cut, the right sequence will be active as well as selected.
+   The active strip after a cut is correctly handled now, if the mouse is on the right side of a cut, the right strip will be active as well as selected.
 
-* __Delete Sequence Additions__
+* __Delete Strip Additions__
 
-   Deleting a sequence can also delete child sequences if enabled.  
-   Ripple delete enabled, press Alt-X or Alt-Delete to delete the sequence, and move all following sequences back to fill the gap.
+   Ripple delete enabled, press Alt-X or Alt-Delete to delete the strip, and move all following strips back to fill the gap.
 
 * __Import Additions__
 
-   Allows the cursor to automatically move to the end of the imported sequence, allowing multiple files to be added in sequence very easily. This must be enabled in the Quick Functions Settings menu.  
-   Allows setting the length of a single imported image in frames.  
-   When a movie sequence with sound is imported, the sound may be automatically parented to the video.  
-   Provides additional options for placing an imported sequence on the timeline:  
+   Allows setting the length of a single imported image in frames.
+   Provides additional options for placing an imported strip on the timeline:  
 
    * Import At Frame
 
-      Standard import behavior, places new sequences at the current frame.
+      Standard import behavior, places new strips at the current frame.
 
    * Insert At Frame
 
-      Following sequence will be moved forward by the length of the imported sequence.
+      Following strip will be moved forward by the length of the imported strip.
 
    * Cut And Insert At Frame
 
-      All sequences at the current frame will be cut and all following sequences will be moved forward by the length of the imported sequence.
+      All strips at the current frame will be cut and all following strips will be moved forward by the length of the imported strip.
 
    * Import At End
 
-      Places the imported sequences at the end of the timeline.
+      Places the imported strips at the end of the timeline.
 
 * __Follow Cursor__
 
@@ -177,7 +163,7 @@ Enables quick navigation of the timeline using the number pad.
 | :---: | :---: | :---: |
 | <br> | __/__<br>Cut menu | __*__<br> |
 | __7__<br>Previous marker | __8__<br> | __9__<br>Next marker |
-| __4__<br>Previous sequence edge | __5__<br> | __6__<br>Next sequence edge |
+| __4__<br>Previous strip edge | __5__<br> | __6__<br>Next strip edge |
 | __1__<br>Previous keyframe | __2__<br> | __3__<br>Next keyframe |
 
 * __Alt+Numpad: Move Selected Strips__
@@ -211,13 +197,13 @@ Note that all menus start with the undo operator.
 
 The different menu types are:
 
-* __Sequences__
+* __Strips__
 
-   Click on the center of a sequence to show a menu providing some settings for the active sequence, and selected sequences.  
+   Click on the center of a strip to show a menu providing some settings for the active strip, and selected strips.  
 
-* __Sequence Left/Right Handles__
+* __Strip Left/Right Handles__
 
-   Click on or near the edge of a sequence to pop up a menu allowing for the changing and clearing of the fade in or out.
+   Click on or near the edge of a strip to pop up a menu allowing for the changing and clearing of the fade in or out.
 
 * __Cursor__
 
@@ -229,7 +215,7 @@ The different menu types are:
 
 * __Empty Area__
 
-   Click in an empty area of the sequencer to show a menu providing options to add sequences, and to zoom the sequencer.
+   Click in an empty area of the sequencer to show a menu providing options to add strips, and to zoom the sequencer.
 
 
 
@@ -237,7 +223,7 @@ The different menu types are:
 __Warning: This is very much alpha, it will likely change quite a bit in future versions, and may even be removed and put into another addon.__  
 To use this properly, your screen layout should have a file browser area, a movie clip editor area, and at least one sequencer area.  __This function may not work correctly if all these areas are not present.__  
 
-If sequence that shares the same source as a loaded clip is active, that clip will be displayed in the clip editor.  
+If strip that shares the same source as a loaded clip is active, that clip will be displayed in the clip editor.  
 
 When a video file is selected in the file browser, a new panel is added to the tools panel, '3 Point Edit'. The 'Import To Clip Editor' button will load the selected video file into the clip editor area.  
 
@@ -266,26 +252,24 @@ To use the following options, the clip does not need to have been loaded via the
 * __Import At Cursor__
 
    Basic import into the sequencer timeline at the current cursor location.  
-   No other sequences will be moved.  
+   No other strips will be moved.  
 
-* __Replace Active Sequence__
+* __Replace Active Strip__
 
-   If an active sequence is in the VSE, it will be deleted and replaced by the imported sequence.  
-   Sequences after the replaced one will be moved forward or back to accommodate the length of the new sequence.  
-   If the active sequence is a movie with a child sound sequence that is the same length and origin file, it will be replaced as well.  
-   All parent data will be changed to reflect the new sequence.  
+   If an active strip is in the VSE, it will be deleted and replaced by the imported strip.  
+   strips after the replaced one will be moved forward or back to accommodate the length of the new strip.  
 
 * __Insert At Cursor__
 
-   The new sequence will be placed at the cursor location, and all trailing sequences will be moved forward by the length of the new sequence.  
+   The new strip will be placed at the cursor location, and all trailing strips will be moved forward by the length of the new strip.  
 
 * __Cut Insert At Cursor__
 
-   Similar to Insert At Cursor, but all sequences will be cut before inserting, ensuring that nothing overlaps the new sequence.  
+   Similar to Insert At Cursor, but all strips will be cut before inserting, ensuring that nothing overlaps the new strip.  
 
 * __Import At End__
 
-   Places the new sequence at the end of the timeline.  
+   Places the new strip at the end of the timeline.  
 
 
 
@@ -307,8 +291,8 @@ If context menus are enabled, fades can be set by right clicking on the edges of
 
 * __Set Fadein/Set Fadeout__
 
-   Allows easy adding and changing of fade in/out.  The script will check the curve for any fades already applied to the sequence (either manually or by the script), and edit them if found.  
-   These buttons can apply the same fade to multiple selected sequences at once.
+   Allows easy adding and changing of fade in/out.  The script will check the curve for any fades already applied to the strip (either manually or by the script), and edit them if found.  
+   These buttons can apply the same fade to multiple selected strips at once.
 
 * __Clear Fades__
 
@@ -318,14 +302,14 @@ If context menus are enabled, fades can be set by right clicking on the edges of
 
    Selects the type of transition for adding with the following buttons.
 
-* __Crossfade Prev/Next Sequence__
+* __Crossfade Prev/Next Strip__
 
-   Allows easy adding of transitions between sequences.  This will simply find the closest sequence to the active sequence, and add a transition between them.
+   Allows easy adding of transitions between strips.  This will simply find the closest strip to the active strip, and add a transition between them.
 
 * __Smart Cross to Prev/Next__
 
-   Adjust the length of the active sequence and the next sequence to create a transition of the target fade length.  
-   This will also attempt to avoid extending the sequences past their end points if possible.
+   Adjust the length of the active strip and the next strip to create a transition of the target fade length.  
+   This will also attempt to avoid extending the strips past their end points if possible.
 
 #### Fades Modal Operator
 The Modal Fades Operator can be activated by pressing the 'f' key over the sequencer.  
@@ -353,13 +337,13 @@ If context menu is enabled, some snaps will be found on right clicking the curso
 
    Will round the cursor position to the nearest second, based on framerate.
 
-* __Jump To Previous/Next Sequence__
+* __Jump To Previous/Next Strip__
 
-   Snap the cursor to the previous or next sequence in the timeline.
+   Snap the cursor to the previous or next strip in the timeline.
 
 * __Cursor To Beginning/End Of Active__
 
-   Will move the cursor to the beginning or end of the active sequence.
+   Will move the cursor to the beginning or end of the active strip.
 
 * __Selected To Cursor__
 
@@ -367,11 +351,11 @@ If context menu is enabled, some snaps will be found on right clicking the curso
 
 * __Selected Beginning/End To Cursor__
 
-   Moves all selected sequences so their beginning/end is at the cursor.
+   Moves all selected strips so their beginning/end is at the cursor.
 
-* __Selected To Previous/Next Sequence__
+* __Selected To Previous/Next Strip__
 
-   Detects the previous or next sequence in the timeline from the active sequence, and moves the active sequence so it's beginning or end matches the other sequence's end or beginning.
+   Detects the previous or next strip in the timeline from the active strip, and moves the active strip so it's beginning or end matches the other strip's end or beginning.
 
 * __Jump To Closest/Previous/Next Marker__
 
@@ -387,7 +371,7 @@ If context menus are enabled, can be found by right clicking in an open area.
 
 * __Zoom All Strips__
 
-   Zooms the sequencer out to show all sequences.
+   Zooms the sequencer out to show all strips.
 
 * __Zoom To Timeline__
 
@@ -395,7 +379,7 @@ If context menus are enabled, can be found by right clicking in an open area.
 
 * __Zoom Selected__
 
-   Zooms the sequencer to show the currently selected sequence(s).
+   Zooms the sequencer to show the currently selected strip(s).
 
 * __Zoom Cursor__
 
@@ -450,25 +434,25 @@ Can be found in the sequence editor properties panel under 'QuickMarkers', also 
 
 
 ## QuickTags
-Create tags, text snippets that can describe sequences, and apply them to any sequences in the timeline.  All sequences with a specific tag can be easily selected with one click.
+Create tags, text snippets that can describe strips, and apply them to any strips in the timeline.  All strips with a specific tag can be easily selected with one click.
 
 * __All Tags__
 
-   This list shows all tags on all sequences in the timeline.  
-   Click a tag to select all sequences with that tag.  
-   Click the '+' button to add that tag to all selected sequences.
+   This list shows all tags on all strips in the timeline.  
+   Click a tag to select all strips with that tag.  
+   Click the '+' button to add that tag to all selected strips.
 
 * __Active Strip__
 
-   Shows a list of tags for the active sequence.
-   Click a tag to select all sequences with this tag.
-   Click the 'X' button to remove the tag from the active sequence.
+   Shows a list of tags for the active strip.
+   Click a tag to select all strips with this tag.
+   Click the 'X' button to remove the tag from the active strip.
 
 * __Selected Strips__
 
-   Shows a list of tags for all selected sequence.
-   Click a tag to select all sequences with this tag.
-   Click the 'X' button to remove the tag from all selected sequences.
+   Shows a list of tags for all selected strip.
+   Click a tag to select all strips with this tag.
+   Click the 'X' button to remove the tag from all selected strips.
 
 * __New Tag__
 
@@ -476,17 +460,17 @@ Create tags, text snippets that can describe sequences, and apply them to any se
 
 * __Clear Active/Selected Strip Tags__
 
-   Removes all tags from the active or selected sequences.
+   Removes all tags from the active or selected strips.
 
 
 
 ## QuickCuts
 Provides a quick interface for basic and advanced cutting and trimming functions.
 
-* __Cut All Sequences__
+* __Cut All Strips__
 
-   If enabled, all sequences under the cursor (besides locked sequences) will be affected by any button in this panel.  
-   If disabled, only selected sequences will be affected.
+   If enabled, all strips under the cursor (aside from locked strips) will be affected by any button in this panel.  
+   If disabled, only selected strips will be affected.
 
 * __Frames To Insert__
 
@@ -498,52 +482,52 @@ Provides a quick interface for basic and advanced cutting and trimming functions
 
 * __Cut Insert__
 
-   Performs a soft cut, then slides all sequences following the cut down the timeline by the amount of frames defined in the 'Frames To Insert' variable.
+   Performs a soft cut, then slides all strips following the cut down the timeline by the amount of frames defined in the 'Frames To Insert' variable.
 
 * __UnCut Left/UnCut Right__
 
-   Merges a selected sequence with the one to the left or right if they are from the same source file, and have not been slid on the timeline.  
+   Merges a selected strip with the one to the left or right if they are from the same source file, and have not been slid on the timeline.  
    Useful for 'undoing' an accidental cut.
 
 * __Delete__
 
-   Removes selected sequences from the timeline.
+   Removes selected strips from the timeline.
 
 * __Ripple Delete__
 
-   Removes selected sequences from the timeline, and attempts to remove any empty space left behind.
+   Removes selected strips from the timeline, and attempts to remove any empty space left behind.
 
 * __Trim Left/Right__
 
-   Removes any part of the selected sequences to the left or right of the cursor.
+   Removes any part of the selected strips to the left or right of the cursor.
 
 * __Slide Trim Left/Right__
 
-   Removes any part of the selected sequences to the left of the cursor, then slides the remaining sequence back or forward to where the original edge was.
+   Removes any part of the selected strips to the left of the cursor, then slides the remaining strip back or forward to where the original edge was.
 
 * __Ripple Trim Left/Right__
 
-   Trims one side of the selected sequences, then slides the sequence, and all following sequences back to attempt to fill the empty space
+   Trims one side of the selected strips, then slides the strip, and all following strips back to attempt to fill the empty space
 
 * __Timeline To All__
 
-   Sets the start and end points of the VSE timeline to fit all sequences loaded in.
+   Sets the start and end points of the VSE timeline to fit all strips loaded in.
 
 * __Timeline To Selected__
 
-   Sets the start and end points of the VSE timeline to fit the currently selected sequences. 
+   Sets the start and end points of the VSE timeline to fit the currently selected strips. 
 
 * __Start To All/End To All__
 
-   Sets only the start or end of the VSE timeline to fit all sequences.
+   Sets only the start or end of the VSE timeline to fit all strips.
 
 * __Start To Selected/End To Selected__
 
-   Sets only the start or end of the VSE timeline to fit the selected sequences.
+   Sets only the start or end of the VSE timeline to fit the selected strips.
 
 * __Full Timeline Setup__
 
-   Moves all sequences back so they start on frame 1, then sets the start and endpoints of the timeline so they encompass all sequences.
+   Moves all strips back so they start on frame 1, then sets the start and endpoints of the timeline so they encompass all strips.
 
 
 
@@ -552,13 +536,11 @@ I welcome any help with these problems, if you have an idea on how to fix them, 
 
 * Sometimes undo pushing breaks, it may add extra undo steps.  Not sure whats going on here...
 
-* Uncut does not work on movieclip type sequences, this seems to be a limitation in Blender - there appears to be no way to get the sequence's source file.
+* Uncut does not work on movieclip type strips, this seems to be a limitation in Blender - there appears to be no way to get the strip's source file.
 
 * Right now the script cannot apply a vertical zoom level, as far as I can tell this is missing functionality in Blenders python api.
 
 * Quick 3point causes recursion errors sometimes when adjusting in/out.
-
-* Snapping a strip can try to snap to its own child, which causes weirdness when both are a bit offset.
 
 
 
@@ -567,13 +549,6 @@ These are things I want to add, but I don't yet know how to, or have not yet had
 
 * Ripple insert (opposite of ripple pop).  Not entirely sure how to code this yet, but I want it!
 
-* Copy/paste wrapper that will copy sequence animation data.
-
-* Add grab mode options for strip marker moving
-
-* Ability to ripple cut beyond the edge of the selected strips to ADD to the clip
-
-* Showing a visual offset on the active audio sequence, showing how far out of sync it is from it's video parent 
+* Copy/paste wrapper that will copy strip animation data.
 
 * Add maximize volume option for strip, maybe add a compressor via animations?
-

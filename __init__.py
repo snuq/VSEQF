@@ -735,7 +735,7 @@ class VSEQFSetting(bpy.types.PropertyGroup):
     tags: bpy.props.CollectionProperty(type=tags.VSEQFTags)
     selected_tags: bpy.props.CollectionProperty(type=tags.VSEQFTags)
     show_selected_tags: bpy.props.BoolProperty(
-        name="Show Tags For All Selected Sequences",
+        name="Show Tags For All Selected Strips",
         default=False)
     tag_index: bpy.props.IntProperty(
         name="Tag Display Index",
@@ -750,7 +750,7 @@ class VSEQFSetting(bpy.types.PropertyGroup):
         min=0,
         description='Number of frames to insert when performing an insert cut')
     quickcuts_all: bpy.props.BoolProperty(
-        name='Cut All Sequences',
+        name='Cut All Strips',
         default=False,
         description='Cut all strips, regardless of selection (not including locked strips)')
     snap_cursor_to_edge: bpy.props.BoolProperty(
@@ -986,8 +986,8 @@ class SEQUENCER_MT_add(Menu):
         #layout.operator("sequencer.movie_strip_add", text="Movie", icon='FILE_MOVIE')
         layout.operator("vseqf.import_strip", text="Movie", icon="FILE_MOVIE").type = 'MOVIE'
         layout.operator("sequencer.sound_strip_add", text="Sound", icon='FILE_SOUND')
-        #layout.operator("sequencer.image_strip_add", text="Image/Sequence", icon='FILE_IMAGE')
-        layout.operator("vseqf.import_strip", text="Image/Sequence", icon="FILE_IMAGE").type = 'IMAGE'
+        #layout.operator("sequencer.image_strip_add", text="Image/Strip", icon='FILE_IMAGE')
+        layout.operator("vseqf.import_strip", text="Image/Strip", icon="FILE_IMAGE").type = 'IMAGE'
 
         layout.separator()
 
