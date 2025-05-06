@@ -417,8 +417,6 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
         if not sequencer:
             context.scene.sequence_editor_create()
         bpy.ops.ed.undo_push()
-        old_snap_new_end = context.scene.vseqf.snap_new_end
-        context.scene.vseqf.snap_new_end = False  #disable this so the continuous function doesnt do weird stuff while importing this
         selected = timeline.current_selected(context)
         active = timeline.current_active(context)
         end_frame = self.find_end_frame(timeline.current_strips(context))
@@ -473,9 +471,6 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
         for file in self.all_imported:
             if file.frame_final_end > last_frame:
                 last_frame = file.frame_final_end
-        if old_snap_new_end:
-            context.scene.frame_current = last_frame
-        context.scene.vseqf.snap_new_end = old_snap_new_end
         return {'FINISHED'}
 
     def import_movie(self, context, filename):
@@ -509,36 +504,6 @@ class VSEQFImport(bpy.types.Operator, ImportHelper):
 
 
 #Functions related to continuous update
-@persistent
-def vseqf_continuous(scene):
-    if not bpy.context.scene or bpy.context.scene != scene:
-        return
-    if scene.vseqf.last_frame != scene.frame_current:
-        #scene frame was changed, assume nothing else happened
-        pass
-        #scene.vseqf.last_frame = scene.frame_current
-    else:
-        #something in the scene was changed by the user, figure out what
-        try:
-            sequencer = scene.sequence_editor
-            strips = sequencer.strips
-        except:
-            return
-        new_strips = []
-        new_end = scene.frame_current
-        for strip in strips:
-            if strip.new:
-                if not (strip.type == 'META' or hasattr(strip, 'input_1')):
-                    new_strips.append(strip)
-                strip.new = False
-        if new_strips:
-            for strip in new_strips:
-                if strip.type not in ['ADJUSTMENT', 'TEXT', 'COLOR', 'MULTICAM'] and strip.frame_final_end > new_end:
-                    new_end = strip.frame_final_end
-            if scene.vseqf.snap_new_end:
-                scene.frame_current = new_end
-
-
 def vseqf_draw():
     context = bpy.context
     prefs = vseqf.get_prefs()
@@ -662,7 +627,6 @@ class VSEQFSettingsMenu(Menu):
         scene = context.scene
         layout.prop(scene.vseqf, 'vu_show', text='Show VU Meter')
         layout.prop(scene.vseqf, 'snap_cursor_to_edge')
-        layout.prop(scene.vseqf, 'snap_new_end')
         layout.prop(scene.vseqf, 'shortcut_skip')
         layout.prop(scene.vseqf, 'ripple_markers')
         layout.prop(scene.vseqf, 'delete_confirm')
@@ -789,9 +753,6 @@ class VSEQFSetting(bpy.types.PropertyGroup):
         name='Cut All Sequences',
         default=False,
         description='Cut all strips, regardless of selection (not including locked strips)')
-    snap_new_end: bpy.props.BoolProperty(
-        name='Snap Cursor To End Of New Sequences',
-        default=False)
     snap_cursor_to_edge: bpy.props.BoolProperty(
         name='Snap Cursor When Dragging Edges',
         default=False)
@@ -1075,19 +1036,6 @@ def remove_frame_step_handler(add=False):
         frame_step_handler = handlers.append(frame_step)
 
 
-def remove_continuous_handler(add=False):
-    global continuous_handler
-    handlers = bpy.app.handlers.depsgraph_update_post
-    if continuous_handler:
-        try:
-            handlers.remove(continuous_handler)
-            continuous_handler = None
-        except:
-            pass
-    if add:
-        continuous_handler = handlers.append(vseqf_continuous)
-
-
 #Register properties, operators, menus and shortcuts
 classes = classes + [VSEQFSettingsMenu, VSEQFSetting, VSEQFFollow, VSEQFImport, VSEQF_PT_CompactEdit]
 #originals found in C:\Program Files\Blender Foundation\Blender x.x\x.x\scripts\startup\bl_ui\space_sequencer.py
@@ -1276,7 +1224,6 @@ def register():
     bpy.types.Scene.vseqf = bpy.props.PointerProperty(type=VSEQFSetting)
     bpy.types.Strip.parent = bpy.props.StringProperty()
     bpy.types.Strip.tags = bpy.props.CollectionProperty(type=tags.VSEQFTags)
-    bpy.types.Strip.new = bpy.props.BoolProperty(default=True)
     bpy.types.MovieClip.import_settings = bpy.props.PointerProperty(type=threepoint.VSEQFQuick3PointValues)
 
     #Register shortcuts
@@ -1285,7 +1232,6 @@ def register():
 
     #Register handlers
     remove_frame_step_handler(add=True)
-    remove_continuous_handler(add=True)
     remove_vu_draw_handler(add=True)
 
 
@@ -1313,7 +1259,6 @@ def unregister():
     #Remove handlers
     remove_vu_draw_handler()
     remove_frame_step_handler()
-    remove_continuous_handler()
 
     try:
         bpy.utils.unregister_class(VSEQuickFunctionSettings)

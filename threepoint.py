@@ -434,8 +434,6 @@ class VSEQFThreePointImport(bpy.types.Operator):
                 sound_strip.frame_start = frame_start
                 if sound_strip.frame_final_end > movie_strip.frame_final_end:
                     sound_strip.frame_final_end = movie_strip.frame_final_end
-            if context.scene.vseqf.snap_new_end:
-                context.scene.frame_current = movie_strip.frame_final_end
 
             return {'FINISHED'}
         else:
