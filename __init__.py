@@ -17,6 +17,16 @@
 # ##### END GPL LICENSE BLOCK #####
 
 
+"""
+Todo:
+uncut will break parenting
+volume curve drawing not continuous
+right handle ripple grab is hard to control
+parenting breaks when cutting (blender bug?)
+markers context menu not opening
+negative speed steps not working
+"""
+
 import os
 import bpy
 import gpu

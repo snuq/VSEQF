@@ -573,7 +573,8 @@ class VSEQFGrabAdd(bpy.types.Operator):
                 self.remove_draw_handler()
             return {'CANCELLED'}
 
-        if event.type in ['LEFTMOUSE', 'RET'] or (release_confirm and event.value == 'RELEASE'):
+        #when in 'release confirms' mode, blender sometimes sends a 'NONE' event or sometimes just lets the user start moving the mouse ('MOUSEMOVE')... this check might be broken.
+        if event.type in ['LEFTMOUSE', 'RET'] or (release_confirm and event.value == 'RELEASE') or (release_confirm and event.type in ['NONE', 'MOUSEMOVE']):
             vu_meter.vu_meter_calculate(context.scene)
             self.remove_draw_handler()
             vseqf.redraw_sequencers()
