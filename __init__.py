@@ -20,7 +20,7 @@
 """
 Todo:
 uncut will break parenting
-parenting on right strip breaks when cutting
+parenting breaks when cutting
 """
 
 import os

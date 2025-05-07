@@ -4,28 +4,6 @@ from . import grabs
 from . import vseqf
 
 
-def vseqf_cut(strip, frame=0, cut_type="SOFT"):
-    bpy.ops.sequencer.select_all(action='DESELECT')
-    left_strip = False
-    right_strip = False
-    if frame > strip.frame_final_start and frame < strip.frame_final_end:
-        strip.select = True
-        bpy.ops.sequencer.split(frame=frame, type=cut_type, side="BOTH")
-        strips = timeline.current_selected(bpy.context)
-        for seq in strips:
-            seq.select = False
-            if seq.frame_final_start < frame:
-                left_strip = seq
-            else:
-                right_strip = seq
-    else:
-        if strip.frame_final_end <= frame:
-            left_strip = strip
-        else:
-            right_strip = strip
-    return left_strip, right_strip
-
-
 class VSEQFCut(bpy.types.Operator):
     """Advanced cut operator with many extra operations.
     Operator variables:
@@ -54,19 +32,14 @@ class VSEQFCut(bpy.types.Operator):
     bl_options = {"UNDO"}
 
     tooltip: bpy.props.StringProperty("Cut the selected strips")
-    use_frame: bpy.props.BoolProperty(default=False)
+    use_frame: bpy.props.BoolProperty(default=False)  #when true, use the passed-in frame value, use current scene frame otherwise
     frame = bpy.props.IntProperty(0)
     type: bpy.props.EnumProperty(name='Type', items=[("SOFT", "Soft", "", 1), ("HARD", "Hard", "", 2), ("INSERT", "Insert Cut", "", 3), ("INSERT_ONLY", "Insert Only", "", 4), ("TRIM", "Trim", "", 5), ("TRIM_LEFT", "Trim Left", "", 6), ("TRIM_RIGHT", "Trim Right", "", 7), ("SLIDE", "Slide", "", 8), ("SLIDE_LEFT", "Slide Left", "", 9), ("SLIDE_RIGHT", "Slide Right", "", 10), ("RIPPLE", "Ripple", "", 11), ("RIPPLE_LEFT", "Ripple Left", "", 12), ("RIPPLE_RIGHT", "Ripple Right", "", 13), ("UNCUT", "UnCut", "", 14), ("UNCUT_LEFT", "UnCut Left", "", 15), ("UNCUT_RIGHT", "UnCut Right", "", 16)], default='SOFT')
     side: bpy.props.EnumProperty(name='Side', items=[("BOTH", "Both", "", 1), ("RIGHT", "Right", "", 2), ("LEFT", "Left", "", 3)], default='BOTH')
     all: bpy.props.BoolProperty(name='Cut All', default=False)
-    use_all: bpy.props.BoolProperty(default=False)
+    use_all: bpy.props.BoolProperty(default=False)  #when true, use passed-in all option, ignore the vseqf default
     insert: bpy.props.IntProperty(0)
-    use_insert: bpy.props.BoolProperty(default=False)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if not self.use_frame:
-            self.frame = bpy.context.scene.frame_current
+    use_insert: bpy.props.BoolProperty(default=False)  #when true, use the passed-in insert option, ignore the vseqf default
 
     @classmethod
     def description(cls, context, properties):
@@ -134,11 +107,20 @@ class VSEQFCut(bpy.types.Operator):
         return False
 
     def execute(self, context):
-        return self.start_cut(context)
+        if self.use_frame:
+            cut_frame = self.frame
+        else:
+            cut_frame = context.scene.frame_current
+        status = self.start_cut(context, cut_frame)
+        self.reset()
+        return status
 
     def invoke(self, context, event):
+        if self.use_frame:
+            cut_frame = self.frame
+        else:
+            cut_frame = context.scene.frame_current
         mouse_x = event.mouse_region_x
-        cut_frame = self.frame
         region = context.region
         view = region.view2d
         cursor, bottom = view.view_to_region(cut_frame, 0, clip=False)
@@ -146,12 +128,13 @@ class VSEQFCut(bpy.types.Operator):
             side = 'LEFT'
         else:
             side = 'RIGHT'
-        return self.start_cut(context, side)
+        status = self.start_cut(context, cut_frame, side)
+        self.reset()
+        return status
 
     def uncut(self, context, side="BOTH"):
         #merges a strip to the one on the left or right if they share the same source and position
         if side == 'BOTH':
-            self.reset()
             return{"CANCELLED"}
 
         sequencer = context.scene.sequence_editor
@@ -179,49 +162,76 @@ class VSEQFCut(bpy.types.Operator):
                             newstart = merge_to.frame_final_start
                             self.delete_strip(merge_to)
                             strip.frame_final_start = newstart
-        self.reset()
         return{'FINISHED'}
 
-    def start_cut(self, context, side="BOTH"):
+    def do_insert(self, context, cut_frame):
+        if self.use_insert:
+            insert = self.insert
+        else:
+            insert = context.scene.vseqf.quickcuts_insert
+        strips = timeline.current_strips(context)
+        if context.scene.vseqf.ripple_markers:
+            markers = context.scene.timeline_markers
+        else:
+            markers = []
+        grabs.ripple_timeline(context.scene.sequence_editor, strips, cut_frame - 1, insert, markers=markers)
+
+    def start_cut(self, context, cut_frame, side="BOTH"):
         sequencer = context.scene.sequence_editor
         if not sequencer:
-            self.reset()
             return{'CANCELLED'}
         #bpy.ops.ed.undo_push()
-        if not self.use_all:
-            self.all = context.scene.vseqf.quickcuts_all
+        if self.use_all:
+            cut_all = self.all
+        else:
+            cut_all = context.scene.vseqf.quickcuts_all
+
+        #Uncuts
+        if self.type == 'UNCUT':
+            return self.uncut(context, side=side)
         if self.type == 'UNCUT_LEFT':
             return self.uncut(context, side='LEFT')
         if self.type == 'UNCUT_RIGHT':
             return self.uncut(context, side='RIGHT')
-        if self.type == 'TRIM_LEFT':
-            self.type = 'TRIM'
-            side = 'LEFT'
-        if self.type == 'TRIM_RIGHT':
-            self.type = 'TRIM'
-            side = 'RIGHT'
-        if self.type == 'SLIDE_LEFT':
-            self.type = 'SLIDE'
-            side = 'LEFT'
-        if self.type == 'SLIDE_RIGHT':
-            self.type = 'SLIDE'
-            side = 'RIGHT'
-        if self.type == 'RIPPLE_LEFT':
-            self.type = 'RIPPLE'
-            side = 'LEFT'
-        if self.type == 'RIPPLE_RIGHT':
-            self.type = 'RIPPLE'
-            side = 'RIGHT'
+
+        #Insert only
+        if self.type == 'INSERT_ONLY':
+            self.do_insert(context, cut_frame)
+            return{'FINISHED'}
+
+        #Basic cuts
+        if self.type in ['HARD', 'SOFT', 'INSERT']:
+            if self.type == 'INSERT':
+                cut_type = 'SOFT'
+            else:
+                cut_type = self.type
+            if cut_all:
+                old_selected = timeline.current_selected(context)
+                bpy.ops.sequencer.select_all()
+            bpy.ops.sequencer.split(frame=cut_frame, side=side, type=cut_type)
+            if cut_all:
+                bpy.ops.sequencer.select_all(action='DESELECT')
+                for strip in old_selected:
+                    strip.select = True
+            if self.type == 'INSERT':
+                self.do_insert(context, cut_frame)
+            return{'FINISHED'}
+
+        #trims, slides and ripples
+        if self.type in ['TRIM', 'SLIDE', 'RIPPLE'] and side == 'BOTH':
+            return{'CANCELLED'}
+        if self.type in ['TRIM_LEFT', 'TRIM_RIGHT', 'SLIDE_LEFT', 'SLIDE_RIGHT', 'RIPPLE_LEFT', 'RIPPLE_RIGHT']:
+            action, side = self.type.split('_')
+        else:
+            action = self.type
+
         strips = timeline.current_strips(context)
-        active = timeline.current_active(context)
-        to_cut = []
-        to_select = []
-        to_active = None
 
         #determine all strips available to cut
+        to_cut = []
         to_cut_temp = []
         for strip in strips:
-            if not timeline.is_locked(sequencer, strip) and timeline.under_cursor(strip, self.frame) and not hasattr(strip, 'input_1'):
+            if not timeline.is_locked(sequencer, strip) and timeline.under_cursor(strip, cut_frame) and not hasattr(strip, 'input_1'):
                 if self.all:
                     to_cut.append(strip)
                     to_cut_temp.append(strip)
@@ -233,87 +243,46 @@ class VSEQFCut(bpy.types.Operator):
         ripple_amount = 0
         for strip in to_cut_temp:
             if side == 'LEFT':
-                cut_amount = self.frame - strip.frame_final_start
+                cut_amount = cut_frame - strip.frame_final_start
             else:
-                cut_amount = strip.frame_final_end - self.frame
-            #to_cut.append(strip)
+                cut_amount = strip.frame_final_end - cut_frame
             if cut_amount > ripple_amount:
                 ripple_amount = cut_amount
 
-        if side == 'LEFT':
-            ripple_frame = self.frame - ripple_amount
-        else:
-            ripple_frame = self.frame
-
-        bpy.ops.sequencer.select_all(action='DESELECT')
+        #perform adjustments
         to_cut.sort(key=lambda x: x.frame_final_start)
         for strip in to_cut:
-            cutable = timeline.under_cursor(strip, self.frame)
-            left = False
-            right = False
-            if self.type in ['TRIM', 'SLIDE', 'RIPPLE']:
-                if side != 'BOTH':
-                    if side == 'LEFT':
-                        if cutable:
-                            strip.frame_final_start = self.frame
-                        to_select.append(strip)
-                        if self.type == 'SLIDE':
-                            strip.frame_start = strip.frame_start - ripple_amount
-                    else:
-                        if cutable:
-                            strip.frame_final_end = self.frame
-                        to_select.append(strip)
-                        if self.type == 'SLIDE':
-                            strip.frame_start = strip.frame_start + ripple_amount
-                else:
-                    ripple_amount = 0
-
-            if self.type in ['SOFT', 'HARD', 'INSERT']:
-                if self.type == 'INSERT':
-                    cut_type = 'SOFT'
-                else:
-                    cut_type = self.type
+            cutable = timeline.under_cursor(strip, cut_frame)
+            if side == 'LEFT':
                 if cutable:
-                    left, right = vseqf_cut(strip=strip, frame=self.frame, cut_type=cut_type)
+                    strip.frame_final_start = cut_frame
+                if action == 'SLIDE':
+                    strip.frame_start = strip.frame_start - ripple_amount
             else:
-                to_select.append(strip)
-            if (side == 'LEFT' or side == 'BOTH') and left:
-                to_select.append(left)
-                if active and left == active:
-                    to_active = left
-            if (side == 'RIGHT' or side == 'BOTH') and right:
-                to_select.append(right)
-                if active and left == active and side != 'BOTH':
-                    to_active = right
+                if cutable:
+                    strip.frame_final_end = cut_frame
+                if action == 'SLIDE':
+                    strip.frame_start = strip.frame_start + ripple_amount
 
-        #ripple/insert
-        if self.type == 'INSERT' or self.type == 'RIPPLE' or self.type == 'INSERT_ONLY':
-            if self.type == 'RIPPLE':
-                insert = 0 - ripple_amount
+        #ripple
+        if action == 'RIPPLE':
+            if side == 'LEFT':
+                ripple_frame = cut_frame - ripple_amount
             else:
-                if self.use_insert:
-                    insert = self.insert
-                else:
-                    insert = context.scene.vseqf.quickcuts_insert
-            strips = timeline.current_strips(context)
+                ripple_frame = cut_frame
+            insert = 0 - ripple_amount
             if context.scene.vseqf.ripple_markers:
                 markers = context.scene.timeline_markers
             else:
                 markers = []
             grabs.ripple_timeline(sequencer, strips, ripple_frame - 1, insert, markers=markers)
-        else:
-            for strip in to_select:
-                if strip:
-                    strip.select = True
-        if to_active:
-            context.scene.sequence_editor.active_strip = to_active
+
         if side == 'LEFT':
-            if self.type in ['RIPPLE', 'SLIDE']:
+            if action in ['RIPPLE', 'SLIDE']:
                 context.scene.frame_current = context.scene.frame_current - ripple_amount
         else:
-            if self.type in ['SLIDE']:
+            if action in ['SLIDE']:
                 context.scene.frame_current = context.scene.frame_current + ripple_amount
-        self.reset()
         return{'FINISHED'}
 
 
