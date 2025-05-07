@@ -20,6 +20,7 @@
 """
 Todo:
 need to allow audio clips edges to be dragged beyond end of sound to match blender's new default behavior
+add option to put vu meter on right side
 """
 
 import os

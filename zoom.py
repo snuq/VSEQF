@@ -3,7 +3,7 @@ from . import timeline
 from . import vseqf
 
 
-def zoom_custom(begin, end, bottom=None, top=None, preroll=True):
+def zoom_custom(begin, end, bottom=None, top=None, preroll=True, buffer=0.0):
     """Zooms to an area on the sequencer timeline by adding a temporary strip, zooming to it, then deleting that strip.
     Note that this function will retain selected and active strips.
     Arguments:
@@ -11,12 +11,16 @@ def zoom_custom(begin, end, bottom=None, top=None, preroll=True):
         end: The ending frame of the zoom area
         bottom: The lowest visible channel
         top: The topmost visible channel
-        preroll: If true, add a buffer before the beginning"""
+        preroll: If true, add a buffer before the beginning
+        buffer: Float value multiple to add to beginning and end of range"""
 
     del bottom  #Add in someday...
     del top     #Add in someday...
     scene = bpy.context.scene
     selected = []
+
+    total_length = end - begin
+    buffer_amount = int(round(total_length * buffer))
 
     #Find sequence editor, or create if not found
     try:
@@ -32,8 +36,8 @@ def zoom_custom(begin, end, bottom=None, top=None, preroll=True):
             strip.select = False
     active = timeline.current_active(bpy.context)
 
-    begin = int(begin)
-    end = int(end)
+    begin = int(begin) - buffer_amount
+    end = int(end) + buffer_amount
 
     #Determine preroll for the zoom
     zoomlength = end - begin
@@ -244,9 +248,12 @@ class VSEQFQuickZooms(bpy.types.Operator):
             zoom_custom(cursor, (cursor + (vseqf.get_fps(scene) * int(self.area))))
         elif self.area == 'timeline':
             scene = context.scene
-            zoom_custom(scene.frame_start, scene.frame_end)
+            zoom_custom(scene.frame_start, scene.frame_end, preroll=False, buffer=0.05)
         elif self.area == 'all':
-            bpy.ops.sequencer.view_all()
+            #bpy.ops.sequencer.view_all()
+            scene = context.scene
+            strips = scene.sequence_editor.strips
+            zoom_custom(timeline.find_strips_start(strips), timeline.find_strips_end(strips), preroll=False, buffer=0.05)
         elif self.area == 'selected':
             bpy.ops.sequencer.view_selected()
         elif self.area == 'cursor':
