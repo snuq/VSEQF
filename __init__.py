@@ -19,7 +19,7 @@
 
 """
 Todo:
-issues with shortcuts
+need to allow audio clips edges to be dragged beyond end of sound to match blender's new default behavior
 """
 
 import os
@@ -870,19 +870,18 @@ def register_keymaps():
 def disable_tweak_default_keymaps(enable=False):
     #disable sequencer tweak tool keymaps
     keymaps = bpy.context.window_manager.keyconfigs['Blender'].keymaps
-    if 'Sequencer Tool: Tweak (fallback)' in keymaps:
-        keymap = keymaps['Sequencer Tool: Tweak (fallback)']
-        for item in keymap.keymap_items:
-            if 'Select' in item.name:
-                item.active = enable
-    if 'Sequencer Tool: Tweak' in keymaps:
-        keymap = keymaps['Sequencer Tool: Tweak']
-        for item in keymap.keymap_items:
-            if 'Select' in item.name:
-                item.active = enable
-    else:
+    to_try = [['Sequencer Tool: Tweak (fallback)', 'Select'], ['Sequencer Tool: Tweak', 'Select'], ['Sequencer Timeline Tool: Select Box', 'Sequence Slide'], ['Sequencer Timeline Tool: Select Box (fallback)', 'Sequence Slide']]
+    found = False
+    for data in to_try:
+        keymap_name, item_name = data
+        if keymap_name in keymaps:
+            keymap = keymaps[keymap_name]
+            for item in keymap.keymap_items:
+                if item_name in item.name:
+                    item.active = enable
+            found = True
+    if not found:
         print('Unable to find default shortcut, VSEQF mouse shortcuts will not work properly.')
-        return
 
 
 def register():
