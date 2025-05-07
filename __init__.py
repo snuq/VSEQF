@@ -17,11 +17,6 @@
 # ##### END GPL LICENSE BLOCK #####
 
 
-"""
-Todo:
-need to allow audio clips edges to be dragged beyond end of sound to match blender's new default behavior
-"""
-
 import os
 import bpy
 import gpu

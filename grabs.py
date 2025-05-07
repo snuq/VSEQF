@@ -70,10 +70,10 @@ def move_strip_left_handle(context, strip, offset_x, start_channel, start_frame_
         if new_start >= frame_final_end + strip.frame_offset_end:
             #Prevent left handle from being moved beyond ending point of strip
             new_start = frame_final_end - 1 + strip.frame_offset_end
-        if strip.type == 'SOUND':
-            #Prevent sound strip beginning from being dragged beyond start point
-            if new_start < strip.frame_start:
-                new_start = strip.frame_start
+        #if strip.type == 'SOUND':
+        #    #Prevent sound strip beginning from being dragged beyond start point
+        #    if new_start < strip.frame_start:
+        #        new_start = strip.frame_start
         new_position = start_frame_start
         if strip.frame_final_start != new_start:
             strip.frame_final_start = int(new_start)
@@ -93,9 +93,9 @@ def move_strip_right_handle(context, strip, offset_x, start_channel, start_frame
     if new_end <= strip.frame_final_start + 1 - strip.frame_offset_start:
         #Prevent right handle from being moved beyond start point of strip
         new_end = strip.frame_final_start + 1 - strip.frame_offset_start
-    if strip.type == 'SOUND':
-        if new_end > strip.frame_start + strip.frame_duration:
-            new_end = strip.frame_start + strip.frame_duration
+    #if strip.type == 'SOUND':
+    #    if new_end > strip.frame_start + strip.frame_duration:
+    #        new_end = strip.frame_start + strip.frame_duration
     strip.frame_final_end = int(new_end)
     if fix_fades:
         fades.fix_fade_out(context, strip, start_frame_final_end)
