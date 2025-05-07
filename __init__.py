@@ -20,7 +20,6 @@
 """
 Todo:
 need to allow audio clips edges to be dragged beyond end of sound to match blender's new default behavior
-add option to put vu meter on right side
 """
 
 import os
@@ -536,6 +535,7 @@ class VSEQFSettingsMenu(Menu):
         layout = self.layout
         scene = context.scene
         layout.prop(scene.vseqf, 'vu_show', text='Show VU Meter')
+        layout.prop(scene.vseqf, 'vu_left')
         layout.prop(scene.vseqf, 'snap_cursor_to_edge')
         layout.prop(scene.vseqf, 'shortcut_skip')
         layout.prop(scene.vseqf, 'ripple_markers')
@@ -555,6 +555,9 @@ class VSEQFSetting(bpy.types.PropertyGroup):
     vu_max: bpy.props.FloatProperty(
         name="VU Meter Max Level",
         default=-60)
+    vu_left: bpy.props.BoolProperty(
+        name="Draw VU Meter On Left",
+        default=True)
 
     zoom_presets: bpy.props.CollectionProperty(type=zoom.VSEQFZoomPreset)
     last_frame: bpy.props.IntProperty(

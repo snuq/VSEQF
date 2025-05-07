@@ -117,10 +117,9 @@ def vu_meter_draw():
     context = bpy.context
     vseqf_settings = context.scene.vseqf
     if vseqf_settings.vu_show:
-        offset_x = 15
         scrollbar = 15
         bottom_section = 40
-        top_section = 20
+        top_section = 28
 
         text_color = [1, 1, 1, 1]
         warn_color = [1, .0, .0, 1]
@@ -130,6 +129,10 @@ def vu_meter_draw():
         region = context.region
         max_height = region.height - top_section
         meter_height = max_height - bottom_section
+        if not vseqf_settings.vu_left:
+            offset_x = region.width - 45 - scrollbar
+        else:
+            offset_x = 0
 
         #Draw Background
         vseqf.draw_rect(offset_x, scrollbar, 45, max_height - scrollbar, bg_color)
