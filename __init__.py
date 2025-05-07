@@ -19,8 +19,7 @@
 
 """
 Todo:
-uncut will break parenting
-parenting breaks when cutting
+issues with shortcuts
 """
 
 import os

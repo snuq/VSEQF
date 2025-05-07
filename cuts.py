@@ -207,7 +207,7 @@ class VSEQFCut(bpy.types.Operator):
                 cut_type = self.type
             if cut_all:
                 old_selected = timeline.current_selected(context)
-                bpy.ops.sequencer.select_all()
+                bpy.ops.sequencer.select_all(action='SELECT')
             bpy.ops.sequencer.split(frame=cut_frame, side=side, type=cut_type)
             if cut_all:
                 bpy.ops.sequencer.select_all(action='DESELECT')
