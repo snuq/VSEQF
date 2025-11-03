@@ -45,8 +45,8 @@ bl_info = {
     "name": "VSE Quick Functions",
     "description": "Improves functionality of the sequencer by adding new menus and functions for snapping, adding fades, zooming, ripple editing, playback speed, and more.",
     "author": "Hudson Barkley (Snu/snuq/Aritodo)",
-    "version": (4, 4, 0),
-    "blender": (4, 4, 3),
+    "version": (4, 5, 0),
+    "blender": (4, 5, 4),
     "location": "Sequencer Panels; Sequencer Menus; Sequencer S, F, Shift-F, Z, Alt-M, Alt-K Shortcuts",
     "wiki_url": "https://github.com/snuq/VSEQF",
     "tracker_url": "https://github.com/snuq/VSEQF/issues",
@@ -869,18 +869,18 @@ def register_keymaps():
 def disable_tweak_default_keymaps(enable=False):
     #disable sequencer tweak tool keymaps
     keymaps = bpy.context.window_manager.keyconfigs['Blender'].keymaps
-    to_try = [['Sequencer Tool: Tweak (fallback)', 'Select'], ['Sequencer Tool: Tweak', 'Select'], ['Sequencer Timeline Tool: Select Box', 'Sequence Slide'], ['Sequencer Timeline Tool: Select Box (fallback)', 'Sequence Slide']]
+    operators = ['transform.seq_slide', 'sequencer.select']
     found = False
-    for data in to_try:
-        keymap_name, item_name = data
-        if keymap_name in keymaps:
-            keymap = keymaps[keymap_name]
+    for keymap in keymaps:
+        if keymap.name not in ['Sequencer', 'Preview']:
             for item in keymap.keymap_items:
-                if item_name in item.name:
+                if item.map_type == 'MOUSE' and item.idname in operators and not (item.ctrl_ui or item.alt_ui or item.shift_ui):
+                    message = "VSEQF: enabling default shortcut: " if enable else "VSEQF: disabling default shortcut: "
+                    print(message+keymap.name+": "+item.name)
                     item.active = enable
-            found = True
+                    found = True
     if not found:
-        print('Unable to find default shortcut, VSEQF mouse shortcuts will not work properly.')
+        print('Unable to find default shortcut, VSEQF mouse shortcuts may not work properly.')
 
 
 def register():
