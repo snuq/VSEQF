@@ -45,7 +45,7 @@ def get_volume_unit(frame=None):
                 time_from_temp = (frame - 2 - strip.frame_start) / fps
                 chunk = audio.limit(time_from_temp, time_to).data()
             if len(chunk) == 0:
-                #chunk still couldnt be read... just give up :\
+                #chunk still couldn't be read... just give up :\
                 average = 0
             else:
                 max = abs(chunk.max())
