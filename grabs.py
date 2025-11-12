@@ -118,7 +118,7 @@ def move_strip(context, strip, offset_x, offset_y, select_left, select_right, st
         old_frame_start = strip.frame_start
         strip.channel = new_channel
         if strip.frame_start != old_frame_start:
-            #For some reason, the first time a grab is run, the channel setting doesnt work right... double check and fix if needed
+            #For some reason, the first time a grab is run, the channel setting doesn't work right... double check and fix if needed
             strip.frame_start = old_frame_start
 
     if select_left:  #Move left handle
@@ -492,7 +492,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
         if event.type == 'TIMER':
             pass
         if event.type == 'E':
-            #doesnt seem to work unfortunately... events other than timer are not being passed
+            #doesn't seem to work unfortunately... events other than timer are not being passed
             if not context.screen.is_animation_playing:
                 if self.snap_cursor_to_edge:
                     self.snap_cursor_to_edge = False

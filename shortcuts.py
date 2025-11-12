@@ -61,7 +61,7 @@ def find_marker(frame, direction):
 
 
 def find_edge(frame, direction):
-    """Attemts to find the closest strip edge in the given direction.
+    """Attempts to find the closest strip edge in the given direction.
     'direction' must be 'next' or 'previous'.
     returns a frame number, or None if none found.
     """
