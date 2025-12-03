@@ -430,7 +430,7 @@ class VSEQFModalVolumeDraw(bpy.types.Operator):
             self.last_press = 'LEFTMOUSE'
             self.last_added = None
         elif event.value == 'RELEASE':
-            #Button was relased
+            #Button was released
             self.last_press = ''
         elif event.type in ['BACK_SPACE', 'DEL']:
             self.last_press = ''
@@ -823,10 +823,10 @@ class VSEQF_PT_QuickFadesPanel(bpy.types.Panel):
         row = layout.row(align=True)
         prop = row.operator('vseqf.quickfades_cross', text='Smart Cross to Prev', icon='BACK')
         prop.type = 'previoussmart'
-        prop.tooltip = 'Add a transition from each selected strip to the previous strip, ensure trasitions are '+str(scene.vseqf.fade)+' frames long'
+        prop.tooltip = 'Add a transition from each selected strip to the previous strip, ensure transitions are '+str(scene.vseqf.fade)+' frames long'
         prop = row.operator('vseqf.quickfades_cross', text='Smart Cross to Next', icon='FORWARD')
         prop.type = 'nextsmart'
-        prop.tooltip = 'Add a transition from each selected strip to the next strip, ensure trasitions are '+str(scene.vseqf.fade)+' frames long'
+        prop.tooltip = 'Add a transition from each selected strip to the next strip, ensure transitions are '+str(scene.vseqf.fade)+' frames long'
 
 
 class VSEQF_PT_QuickFadesStripPanel(bpy.types.Panel):
@@ -935,10 +935,10 @@ class VSEQFQuickFadesMenu(bpy.types.Menu):
             prop.tooltip = 'Add a basic transition from each selected strip to the next strip'
             prop = layout.operator('vseqf.quickfades_cross', text='Smart Cross to Prev')
             prop.type = 'previoussmart'
-            prop.tooltip = 'Add a transition from each selected strip to the previous strip, ensure trasitions are '+str(scene.vseqf.fade)+' frames long'
+            prop.tooltip = 'Add a transition from each selected strip to the previous strip, ensure transitions are '+str(scene.vseqf.fade)+' frames long'
             prop = layout.operator('vseqf.quickfades_cross', text='Smart Cross to Next')
             prop.type = 'nextsmart'
-            prop.tooltip = 'Add a transition from each selected strip to the next strip, ensure trasitions are '+str(scene.vseqf.fade)+' frames long'
+            prop.tooltip = 'Add a transition from each selected strip to the next strip, ensure transitions are '+str(scene.vseqf.fade)+' frames long'
 
         else:
             layout.label(text="No Strip Selected")
