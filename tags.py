@@ -127,8 +127,8 @@ class VSEQF_PT_QuickTagsPanel(bpy.types.Panel):
     """Panel for displaying, removing and adding tags"""
 
     bl_label = "Quick Tags"
-    bl_space_type = 'SEQUENCE_EDITOR'
-    bl_region_type = 'UI'
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
     bl_category = "Strip"
 
     @classmethod
