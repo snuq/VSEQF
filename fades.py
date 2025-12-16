@@ -757,9 +757,8 @@ class VSEQFModalFades(bpy.types.Operator):
 class VSEQF_PT_QuickFadesPanel(bpy.types.Panel):
     """Panel for QuickFades operators and properties.  Placed in the VSE properties area."""
     bl_label = "Quick Fades"
-    bl_space_type = 'SEQUENCE_EDITOR'
-    bl_region_type = 'UI'
-    bl_category = "Sequencer"
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
 
     @classmethod
     def poll(cls, context):
