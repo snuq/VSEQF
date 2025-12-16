@@ -47,7 +47,9 @@ def zoom_custom(begin, end, bottom=None, top=None, preroll=True, buffer=0.0):
         preroll = 0
 
     #Create a temporary strip, zoom in on it, then delete it
-    zoom_clip = scene.sequence_editor.strips.new_effect(name='----vseqf-temp-zoom----', type='ADJUSTMENT', channel=1, frame_start=begin - preroll, frame_end=end)
+    frame_start = begin - preroll
+    length = end - frame_start
+    zoom_clip = scene.sequence_editor.strips.new_effect(name='----vseqf-temp-zoom----', type='ADJUSTMENT', channel=1, frame_start=frame_start, length=length)
     scene.sequence_editor.active_strip = zoom_clip
     for region in bpy.context.area.regions:
         if region.type == 'WINDOW':
