@@ -402,7 +402,7 @@ class VSEQFThreePointImport(bpy.types.Operator):
                 with context.temp_override(area=override_area):
                     bpy.ops.sequencer.delete()
                 if move_forward != 0:
-                    #Have to set the frame_current because for some reason the frame variable in vseqf.cut doesnt work...
+                    #Have to set the frame_current because for some reason the frame variable in vseqf.cut doesn't work...
                     old_current = context.scene.frame_current
                     context.scene.frame_current = move_frame
                     bpy.ops.vseqf.cut(type='INSERT_ONLY', use_insert=True, insert=move_forward, use_all=True, all=True)

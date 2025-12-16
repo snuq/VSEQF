@@ -13,7 +13,7 @@ Or support me by hiring Creative Life Productions if you have a need for the ser
 
 
 ## Installation
-* Download the lastest release on the right side of this page at the top - Click the release labeled 'Latest', then click 'Source code (zip)' to download.  
+* Download the latest release on the right side of this page at the top - Click the release labeled 'Latest', then click 'Source code (zip)' to download.  
 * Open Blender, and from the 'Edit' menu, select 'Preferences'.
 * In this new window, click on the "Add-ons" tab at the left.
 * Click the 'Install...' button at the top-right of this window.
@@ -61,7 +61,7 @@ Organize strips with tags, select strips based on a tag.
 ![Strip Markers](Manual/stripmarkers.gif)  
 Convert tags into strip markers to highlight a section of a strip.
 
-Found in the 'Quick Tags' panel in the sequencer sidebar, or press 'Shift-M' to add and modifiy marker tags.
+Found in the 'Quick Tags' panel in the sequencer sidebar, or press 'Shift-M' to add and modify marker tags.
 
 #### Context Menus
 ![Context Menus](Manual/context.gif)  
@@ -531,7 +531,7 @@ Provides a quick interface for basic and advanced cutting and trimming functions
 # Known Problems
 I welcome any help with these problems, if you have an idea on how to fix them, please contact me.
 
-* Sometimes undo pushing breaks, it may add extra undo steps.  Not sure whats going on here...
+* Sometimes undo pushing breaks, it may add extra undo steps.  Not sure what's going on here...
 
 * Uncut does not work on movieclip type strips, this seems to be a limitation in Blender - there appears to be no way to get the strip's source file.
 
