@@ -6,6 +6,13 @@ from . import vseqf
 from . import timeline
 
 
+def get_action_fcurves(action):
+    #no longer can just do action.fcurves in Blender 5... now need this insanity
+    if not action.layers:
+        return None
+    return action.layers[0].strips[0].channelbag(action.slots[0]).fcurves
+
+
 def fix_fades(context, strip, old_start, old_end):
     fix_fade_in(context, strip, old_start)
     fix_fade_out(context, strip, old_end)
@@ -77,17 +84,16 @@ def get_fade_curve(context, strip, create=False):
         else:
             return None
 
-    all_curves = action.fcurves
-    fade_curve = None  #curve for the fades
-    for curve in all_curves:
-        if curve.data_path == 'sequence_editor.sequences_all["'+strip.name+'"].'+fade_variable or curve.data_path == 'sequence_editor.strips_all["'+strip.name+'"].'+fade_variable:
-            #keyframes found
-            fade_curve = curve
-            break
-
-    #Create curve if needed
-    if fade_curve is None and create:
-        fade_curve = all_curves.new(data_path=strip.path_from_id(fade_variable))
+    all_curves = get_action_fcurves(action)
+    if all_curves is not None:
+        for curve in all_curves:
+            if curve.data_path == 'sequence_editor.sequences_all["'+strip.name+'"].'+fade_variable or curve.data_path == 'sequence_editor.strips_all["'+strip.name+'"].'+fade_variable:
+                #keyframes found
+                return curve
+    if create:
+        #Create curve if needed
+        data_path = strip.path_from_id(fade_variable)
+        fade_curve = action.fcurve_ensure_for_datablock(context.scene, data_path)
 
         #add a single keyframe to prevent blender from making the waveform invisible (bug)
         if strip.type == 'SOUND':
@@ -100,7 +106,8 @@ def get_fade_curve(context, strip, create=False):
         if not animation_data.action_slot:
             animation_data.action_slot = action.slots[0]
 
-    return fade_curve
+        return fade_curve
+    return None
 
 
 def fades(fade_curve, strip, mode, direction, fade_length=0, fade_low_point_frame=False):
@@ -264,7 +271,8 @@ def set_fade(fade_curve, direction, fade_low_point_frame, fade_high_point_frame,
         if len(fade_keyframes) == 0:
             #curve is empty, remove it
             try:
-                bpy.context.scene.animation_data.action.fcurves.remove(fade_curve)
+                fcurves = get_action_fcurves(bpy.context.scene.animation_data.action)
+                fcurves.remove(fade_curve)
             except:
                 pass
         return
