@@ -129,7 +129,7 @@ class VSEQF_PT_QuickTagsPanel(bpy.types.Panel):
     bl_label = "Quick Tags"
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
-    bl_category = "Strip"
+    bl_context = "strip"
 
     @classmethod
     def poll(cls, context):

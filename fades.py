@@ -759,6 +759,7 @@ class VSEQF_PT_QuickFadesPanel(bpy.types.Panel):
     bl_label = "Quick Fades"
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
+    bl_context = "strip"
 
     @classmethod
     def poll(cls, context):

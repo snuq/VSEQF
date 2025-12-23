@@ -5,9 +5,9 @@ from . import vseqf
 class VSEQF_PT_QuickMarkersPanel(bpy.types.Panel):
     """Panel for QuickMarkers operators and properties"""
     bl_label = "Quick Markers"
-    bl_space_type = 'SEQUENCE_EDITOR'
-    bl_region_type = 'UI'
-    bl_category = "Sequencer"
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "strip"
 
     @classmethod
     def poll(cls, context):
