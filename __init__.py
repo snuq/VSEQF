@@ -45,8 +45,8 @@ bl_info = {
     "name": "VSE Quick Functions",
     "description": "Improves functionality of the sequencer by adding new menus and functions for snapping, adding fades, zooming, ripple editing, playback speed, and more.",
     "author": "Hudson Barkley (Snu/snuq/Aritodo)",
-    "version": (5, 0, 2),
-    "blender": (5, 0, 0),
+    "version": (5, 1, 0),
+    "blender": (5, 1, 0),
     "location": "Sequencer Panels; Sequencer Menus; Sequencer S, F, Shift-F, Z, Alt-M, Alt-K Shortcuts",
     "wiki_url": "https://github.com/snuq/VSEQF",
     "tracker_url": "https://github.com/snuq/VSEQF/issues",
@@ -199,214 +199,6 @@ class VSEQFFollow(bpy.types.Operator):
             self.cursor_target = cursor_location
 
 
-class VSEQFImport(bpy.types.Operator, ImportHelper):
-    """Loads different types of files into the sequencer"""
-    bl_idname = 'vseqf.import_strip'
-    bl_label = 'Import Strip'
-
-    type: bpy.props.EnumProperty(
-        name="Import Type",
-        items=(('MOVIE', 'Movie', ""), ("IMAGE", "Image", "")),
-        default='MOVIE')
-
-    files: bpy.props.CollectionProperty(type=bpy.types.PropertyGroup)
-
-    relative_path: bpy.props.BoolProperty(
-        name="Relative Path",
-        description="Select the file relative to the blend file",
-        default=True)
-    start_frame: bpy.props.IntProperty(
-        name="Start Frame",
-        description="Start frame of the sequence strip",
-        default=0)
-    channel: bpy.props.IntProperty(
-        name="Channel",
-        description="Channel to place this strip into",
-        default=1)
-    replace_selection: bpy.props.BoolProperty(
-        name="Replace Selection",
-        description="Replace the current selection",
-        default=True)
-    sound: bpy.props.BoolProperty(
-        name="Sound",
-        description="Load sound with the movie",
-        default=True)
-    use_movie_framerate: bpy.props.BoolProperty(
-        name="Use Movie Framerate",
-        description="Use framerate from the movie to keep sound and video in sync",
-        default=False)
-    import_location: bpy.props.EnumProperty(
-        name="Import At",
-        description="Location to import strips at",
-        items=(("IMPORT_FRAME", "Import At Frame", ""), ("INSERT_FRAME", "Insert At Frame", ""), ("CUT_INSERT", "Cut And Insert At Frame", ""), ("END", "Import At End", "")),
-        default="IMPORT_FRAME")
-    use_placeholders: bpy.props.BoolProperty(
-        name="Use Placeholders",
-        description="Use placeholders for missing frames of the strip",
-        default=False)
-    length: bpy.props.IntProperty(
-        name="Image Length",
-        description="Length in frames to use for a single imported image",
-        default=30)
-    filename: bpy.props.StringProperty(
-        name="Filename",
-        description="File with path, used when files is not set."
-    )
-    frame = 0
-    to_parent = []
-    all_imported = []
-
-    def draw(self, context):
-        prefs = vseqf.get_prefs()
-        context.space_data.params.use_filter = True
-        context.space_data.params.use_filter_folder = True
-        if self.type == 'MOVIE':
-            context.space_data.params.use_filter_movie = True
-            layout = self.layout
-            layout.prop(self, 'relative_path')
-            layout.prop(self, 'start_frame')
-            layout.prop(self, 'channel')
-            layout.prop(self, 'import_location')
-            layout.prop(self, 'replace_selection')
-            layout.prop(self, 'sound')
-            layout.prop(self, 'use_movie_framerate')
-        elif self.type == 'IMAGE':
-            context.space_data.params.use_filter_image = True
-            layout = self.layout
-            number_of_files = len(self.files)
-            row = layout.row()
-            row.prop(self, 'relative_path')
-            row = layout.row()
-            row.prop(self, 'start_frame')
-            row = layout.row()
-            if number_of_files > 1:
-                row.label(text="Length: "+str(number_of_files))
-            else:
-                row.prop(self, 'length')
-            row = layout.row()
-            row.prop(self, 'channel')
-            row = layout.row()
-            row.prop(self, 'import_location')
-            row = layout.row()
-            row.prop(self, 'replace_selection')
-
-    def invoke(self, context, event):
-        del event
-        sequencer = context.scene.sequence_editor
-        if not sequencer:
-            context.scene.sequence_editor_create()
-        if self.type == 'MOVIE':
-            self.bl_label = 'Add Movie Strip'
-        elif self.type == 'IMAGE':
-            self.bl_label = 'Add Image'
-        scene = context.scene
-        prefs = vseqf.get_prefs()
-        fps = vseqf.get_fps(context.scene)
-        self.length = int(fps * 4)
-        self.start_frame = context.scene.frame_current
-        if len(context.scene.sequence_editor.sequences_all) == 0:
-            self.use_movie_framerate = True
-        context.window_manager.fileselect_add(self)
-        return {'RUNNING_MODAL'}
-
-    def find_end_frame(self, strips):
-        frame = 1
-        for strip in strips:
-            if strip.frame_final_end > frame:
-                frame = strip.frame_final_end
-        return frame
-
-    def execute(self, context):
-        sequencer = context.scene.sequence_editor
-        if not sequencer:
-            context.scene.sequence_editor_create()
-        bpy.ops.ed.undo_push()
-        selected = timeline.current_selected(context)
-        active = timeline.current_active(context)
-        end_frame = self.find_end_frame(timeline.current_strips(context))
-        dirname = os.path.dirname(bpy.path.abspath(self.filepath))
-        bpy.ops.sequencer.select_all(action='DESELECT')
-        if self.import_location in ['END', 'INSERT_FRAME', 'CUT_INSERT']:
-            self.frame = end_frame
-        else:
-            self.frame = self.start_frame
-        self.all_imported = []
-        self.to_parent = []
-        last_frame = context.scene.frame_current
-        if self.type == 'MOVIE':
-            if self.files:
-                #iterate through files and import them
-                for file in self.files:
-                    filename = os.path.join(dirname, file.name)
-                    self.import_movie(context, filename)
-            else:
-                self.import_movie(context, self.filename)
-        elif self.type == 'IMAGE':
-            files = [{"name": i.name} for i in self.files]
-            if len(self.files) > 1:
-                length = len(self.files)
-            else:
-                length = self.length
-            dirname = dirname + os.path.sep
-            bpy.ops.sequencer.image_strip_add(directory=dirname, files=files, relative_path=self.relative_path, frame_start=self.frame, frame_end=self.frame+length-1, channel=self.channel, replace_sel=True, use_placeholders=self.use_placeholders)
-            imported = timeline.current_selected(context)
-            self.all_imported.extend(imported)
-        if self.import_location == 'INSERT_FRAME' or self.import_location == 'CUT_INSERT':
-            new_end_frame = self.find_end_frame(timeline.current_strips(context))
-            move_forward = new_end_frame - end_frame
-            move_back = end_frame - self.start_frame + move_forward
-            if self.import_location == 'INSERT_FRAME':
-                cut_type = 'INSERT_ONLY'
-            else:
-                cut_type = 'INSERT'
-            bpy.ops.vseqf.cut(type=cut_type, use_insert=True, insert=move_forward, use_all=True, all=True)
-            for strip in self.all_imported:
-                strip.frame_start = strip.frame_start - move_back
-        if not self.replace_selection:
-            bpy.ops.sequencer.select_all(action='DESELECT')
-            for strip in selected:
-                strip.select = True
-            if active:
-                context.scene.sequence_editor.active_strip = active
-        else:
-            bpy.ops.sequencer.select_all(action='DESELECT')
-            for strip in self.all_imported:
-                strip.select = True
-        for file in self.all_imported:
-            if file.frame_final_end > last_frame:
-                last_frame = file.frame_final_end
-        return {'FINISHED'}
-
-    def import_movie(self, context, filename):
-        bpy.ops.sequencer.movie_strip_add(filepath=filename, frame_start=self.frame, relative_path=self.relative_path, channel=self.channel, replace_sel=True, sound=self.sound, use_framerate=self.use_movie_framerate)
-        imported = timeline.current_selected(context)
-        if len(imported) > 1:
-            #this included a sound strip, maybe other types?
-            moviestrip = False
-            soundstrip = False
-            otherstrips = []
-            for seq in imported:
-                if seq.type == 'MOVIE':
-                    moviestrip = seq
-                elif seq.type == 'SOUND':
-                    soundstrip = seq
-                else:
-                    otherstrips.append(seq)
-                if seq.frame_final_end > self.frame:
-                    self.frame = seq.frame_final_end
-            if moviestrip and soundstrip:
-                #Attempt to fix a blender bug where it puts the audio strip too low - https://developer.blender.org/T64964
-                frame_start = moviestrip.frame_start
-                sound_channel = moviestrip.channel
-                moviestrip.channel = moviestrip.channel + 1
-                moviestrip.frame_start = frame_start
-                soundstrip.channel = sound_channel
-                self.to_parent.append([moviestrip, soundstrip])
-        else:
-            self.frame = imported[0].frame_final_end
-        self.all_imported.extend(imported)
-
-
 #Functions related to continuous update
 def vseqf_draw():
     context = bpy.context
@@ -442,11 +234,11 @@ def vseqf_draw():
 
 
 def draw_strip_info(context, active_strip, fps, frame_px, channel_px, min_x, max_x, view, width, text_color, show_fades, show_length, show_markers):
-    length = active_strip.frame_final_duration
-    active_x = active_strip.frame_final_start + (length / 2)
+    length = active_strip.duration
+    active_x = active_strip.left_handle + (length / 2)
     active_y = active_strip.channel + 0.5
-    active_left, active_top = view.view_to_region(active_strip.frame_final_start, active_strip.channel+1, clip=False)
-    active_right, active_bottom = view.view_to_region(active_strip.frame_final_end, active_strip.channel, clip=False)
+    active_left, active_top = view.view_to_region(active_strip.left_handle, active_strip.channel+1, clip=False)
+    active_right, active_bottom = view.view_to_region(active_strip.right_handle, active_strip.channel, clip=False)
     active_pos_x, active_pos_y = view.view_to_region(active_x, active_strip.channel + 0.5, clip=False)
     active_width = length * frame_px
     fade_height = channel_px / 20
@@ -481,8 +273,8 @@ def draw_strip_info(context, active_strip, fps, frame_px, channel_px, min_x, max
     if show_markers:
         for tag in active_strip.tags:
             if tag.use_offset:
-                if active_strip.frame_offset_start < tag.offset <= active_strip.frame_final_duration + active_strip.frame_offset_start:
-                    adjusted_offset = tag.offset - 1 - active_strip.frame_offset_start
+                if active_strip.left_handle_offset < tag.offset <= active_strip.duration + active_strip.left_handle_offset:
+                    adjusted_offset = tag.offset - 1 - active_strip.left_handle_offset
                     left = active_left + (adjusted_offset * frame_px)
                     width = tag.length * frame_px
                     if left + width > active_right:
@@ -736,7 +528,7 @@ def remove_frame_step_handler(add=False):
 
 
 #Register properties, operators, menus and shortcuts
-classes = classes + [VSEQFSettingsMenu, VSEQFSetting, VSEQFFollow, VSEQFImport]
+classes = classes + [VSEQFSettingsMenu, VSEQFSetting, VSEQFFollow]
 classes = classes + [replace_menus.SEQUENCER_MT_strip, replace_menus.SEQUENCER_MT_strip_transform, replace_menus.SEQUENCER_MT_add]
 
 

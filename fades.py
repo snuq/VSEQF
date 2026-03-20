@@ -19,7 +19,7 @@ def fix_fades(context, strip, old_start, old_end):
 
 
 def fix_fade_in(context, strip, old_start):
-    if old_start != strip.frame_final_start:
+    if old_start != strip.left_handle:
         # fix fade in
         fade_curve = get_fade_curve(context, strip, create=False)
         if fade_curve:
@@ -29,7 +29,7 @@ def fix_fade_in(context, strip, old_start):
 
 
 def fix_fade_out(context, strip, old_end):
-    if old_end != strip.frame_final_end:
+    if old_end != strip.right_handle:
         # fix fade out
         fade_curve = get_fade_curve(context, strip, create=False)
         if fade_curve:
@@ -53,12 +53,13 @@ def vseqf_crossfade(first_strip, second_strip):
         second_strip: VSE Strip object being transitioned to"""
 
     transition_type = bpy.context.scene.vseqf.transition
-    frame_start = first_strip.frame_final_end
-    frame_end = second_strip.frame_final_start
+    frame_start = first_strip.right_handle
+    frame_end = second_strip.left_handle
     channel = first_strip.channel
     while timeline.sequencer_area_filled(frame_start, frame_end, channel, channel, []):
         channel = channel + 1
-    bpy.context.scene.sequence_editor.strips.new_effect(name=transition_type, type=transition_type, channel=channel,  frame_start=frame_start, frame_end=frame_end, seq1=first_strip, seq2=second_strip)
+    length = frame_end - frame_start
+    bpy.context.scene.sequence_editor.strips.new_effect(name=transition_type, type=transition_type, channel=channel,  frame_start=frame_start, length=length, input1=first_strip, input2=second_strip)
 
 
 def get_fade_curve(context, strip, create=False):
@@ -102,7 +103,7 @@ def get_fade_curve(context, strip, create=False):
             value = strip.blend_alpha
         fade_curve.keyframe_points.add(1)
         point = fade_curve.keyframe_points[0]
-        point.co = (strip.frame_final_start, value)
+        point.co = (strip.left_handle, value)
         if not animation_data.action_slot:
             animation_data.action_slot = action.slots[0]
 
@@ -135,10 +136,10 @@ def fades(fade_curve, strip, mode, direction, fade_length=0, fade_low_point_fram
     fade_high_point = False  #keyframe that the fade starts maximum value at
     if direction == 'in':
         if not fade_low_point_frame:
-            fade_low_point_frame = strip.frame_final_start
+            fade_low_point_frame = strip.left_handle
     else:
         if not fade_low_point_frame:
-            fade_low_point_frame = strip.frame_final_end
+            fade_low_point_frame = strip.right_handle
         fade_length = -fade_length
     fade_high_point_frame = fade_low_point_frame + fade_length
 
@@ -307,13 +308,13 @@ def fade_operator_draw(self, context):
         channel_bottom = strip.channel + channel_buffer
         channel_top = strip.channel + 1 - channel_buffer
         if fade_in > 0:
-            strip_left, strip_bottom = view.view_to_region(strip.frame_final_start, channel_bottom, clip=False)
-            fade_in_loc, strip_top = view.view_to_region(strip.frame_final_start + fade_in, channel_top, clip=False)
+            strip_left, strip_bottom = view.view_to_region(strip.left_handle, channel_bottom, clip=False)
+            fade_in_loc, strip_top = view.view_to_region(strip.left_handle + fade_in, channel_top, clip=False)
             vseqf.draw_line(strip_left, strip_bottom, fade_in_loc, strip_top, color=(.8, .2, .2, 1))
             vseqf.draw_text(fade_in_loc, strip_top - 12, 11, str(int(fade_in)), color=(1, 1, 1, 1))
         if fade_out > 0:
-            strip_right, strip_bottom = view.view_to_region(strip.frame_final_end, channel_bottom, clip=False)
-            fade_out_loc, strip_top = view.view_to_region(strip.frame_final_end - fade_out, channel_top, clip=False)
+            strip_right, strip_bottom = view.view_to_region(strip.right_handle, channel_bottom, clip=False)
+            fade_out_loc, strip_top = view.view_to_region(strip.right_handle - fade_out, channel_top, clip=False)
             vseqf.draw_line(strip_right, strip_bottom, fade_out_loc, strip_top, color=(.8, .2, .2, 1))
             vseqf.draw_text(fade_out_loc, strip_top - 12, 11, str(int(fade_out)), justify='right', color=(1, 1, 1, 1))
 
@@ -325,7 +326,7 @@ def volume_operator_draw(self, context):
     for keyframe in keyframes:
         point = keyframe.co
         ypos = self.active_bottom + (point[1] * self.channel_px)
-        xpos = self.active_left + ((point[0] - self.active_strip.frame_final_start) * self.frame_px)
+        xpos = self.active_left + ((point[0] - self.active_strip.left_handle) * self.frame_px)
         current_coords = (xpos, ypos)
         if point[0] < self.active_frame_start:
             last_coords = current_coords
@@ -397,15 +398,15 @@ class VSEQFModalVolumeDraw(bpy.types.Operator):
             mouse_frame, mouse_channel = context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y)
             clipped_pos_x, clipped_pos_y = context.region.view2d.view_to_region(mouse_frame, mouse_channel)
             mouse_frame = round(mouse_frame)
-            if (clipped_pos_x == 12000 or clipped_pos_y == 12000) or  (event.value == 'PRESS' and (mouse_frame < self.active_strip.frame_final_start or mouse_frame > self.active_strip.frame_final_end)):
+            if (clipped_pos_x == 12000 or clipped_pos_y == 12000) or  (event.value == 'PRESS' and (mouse_frame < self.active_strip.left_handle or mouse_frame > self.active_strip.right_handle)):
                 #User clicked outside of clip, end drawing
                 self.remove_draw_handler(context)
                 return {'FINISHED'}
             if self.mode == 'ADD':
-                if mouse_frame > self.active_strip.frame_final_end:
-                    mouse_frame = self.active_strip.frame_final_end
-                if mouse_frame < self.active_strip.frame_final_start:
-                    mouse_frame = self.active_strip.frame_final_start
+                if mouse_frame > self.active_strip.right_handle:
+                    mouse_frame = self.active_strip.right_handle
+                if mouse_frame < self.active_strip.left_handle:
+                    mouse_frame = self.active_strip.left_handle
                 if self.last_added is not None and self.last_added != mouse_frame:
                     #Delete points between last_added and current point to reduce spikes in graph
                     low_point = min(self.last_added, mouse_frame)
@@ -480,14 +481,14 @@ class VSEQFModalVolumeDraw(bpy.types.Operator):
         right, top = view.region_to_view(width, height)
         if math.isnan(left):
             return {'CANCELLED'}
-        self.active_frame_start = active_strip.frame_final_start
-        self.active_frame_end = active_strip.frame_final_end
+        self.active_frame_start = active_strip.left_handle
+        self.active_frame_end = active_strip.right_handle
         shown_width = right - left
         shown_height = top - bottom
         self.channel_px = height / shown_height
         self.frame_px = width / shown_width
-        self.active_left, self.active_top = view.view_to_region(active_strip.frame_final_start, active_strip.channel+1, clip=False)
-        self.active_right, self.active_bottom = view.view_to_region(active_strip.frame_final_end, active_strip.channel, clip=False)
+        self.active_left, self.active_top = view.view_to_region(active_strip.left_handle, active_strip.channel+1, clip=False)
+        self.active_right, self.active_bottom = view.view_to_region(active_strip.right_handle, active_strip.channel, clip=False)
 
         context.window_manager.modal_handler_add(self)
         args = (self, context)
@@ -623,13 +624,13 @@ class VSEQFModalFades(bpy.types.Operator):
                 if self.value:
                     new_fade_in = int(self.value)
                 elif snapping:
-                    new_fade_in = self.snap_to_frame - strip.frame_final_start
+                    new_fade_in = self.snap_to_frame - strip.left_handle
                 else:
                     new_fade_in = fade_in + offset_x + offset_y
                 if new_fade_in < 0:
                     new_fade_in = 0
-                if new_fade_in > strip.frame_final_duration:
-                    new_fade_in = strip.frame_final_duration
+                if new_fade_in > strip.duration:
+                    new_fade_in = strip.duration
                 data['fade_in'] = new_fade_in
 
             if fade_mode in ['RIGHT', 'BOTH']:
@@ -638,22 +639,22 @@ class VSEQFModalFades(bpy.types.Operator):
                 if self.value:
                     new_fade_out = int(self.value)
                 elif snapping:
-                    new_fade_out = strip.frame_final_end - self.snap_to_frame
+                    new_fade_out = strip.right_handle - self.snap_to_frame
                 else:
                     new_fade_out = fade_out - offset_x + offset_y
                 if new_fade_out < 0:
                     new_fade_out = 0
-                if new_fade_out > strip.frame_final_duration:
-                    new_fade_out = strip.frame_final_duration
+                if new_fade_out > strip.duration:
+                    new_fade_out = strip.duration
                 data['fade_out'] = new_fade_out
 
             if fade_mode == 'BOTH':
                 #Check if fades are too long for each other
                 fade_in = data['fade_in']
                 fade_out = data['fade_out']
-                if fade_in + fade_out >= strip.frame_final_duration:
+                if fade_in + fade_out >= strip.duration:
                     fade_overdrive = fade_in + fade_out
-                    fade_over_percent = fade_overdrive / strip.frame_final_duration
+                    fade_over_percent = fade_overdrive / strip.duration
                     data['fade_in'] = int(fade_in / fade_over_percent)
                     data['fade_out'] = int(fade_out / fade_over_percent)
 
@@ -707,7 +708,7 @@ class VSEQFModalFades(bpy.types.Operator):
         self.strip_data = []
         self.snap_edges = [context.scene.frame_current]
         for strip in context.strips:
-            self.snap_edges.extend([strip.frame_final_start, strip.frame_final_end])
+            self.snap_edges.extend([strip.left_handle, strip.right_handle])
             if strip.select:
                 fade_curve = get_fade_curve(context, strip, create=True)
 
@@ -757,9 +758,9 @@ class VSEQFModalFades(bpy.types.Operator):
 class VSEQF_PT_QuickFadesPanel(bpy.types.Panel):
     """Panel for QuickFades operators and properties.  Placed in the VSE properties area."""
     bl_label = "Quick Fades"
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context = "strip"
+    bl_space_type = 'SEQUENCE_EDITOR'
+    bl_region_type = 'UI'
+    bl_category = "Sequencer"
 
     @classmethod
     def poll(cls, context):
@@ -1083,9 +1084,9 @@ class VSEQFQuickFadesCross(bpy.types.Operator):
                     first_strip = timeline.find_close_strip(strips, second_strip, 'previous', mode='all')
                 if (second_strip is not None) & (first_strip is not None):
                     if 'smart' in self.type:
-                        #adjust start and end frames of strips based on frame_offset_end/start to overlap by amount of crossfade
+                        #adjust start and end frames of strips based on right_handle_offset/start to overlap by amount of crossfade
                         target_fade = bpy.context.scene.vseqf.fade
-                        current_fade = first_strip.frame_final_end - second_strip.frame_final_start
+                        current_fade = first_strip.right_handle - second_strip.left_handle
                         #if current_fade is negative, there is open space between clips, if positive, clips are overlapping
                         if current_fade <= 0:
                             fade_offset = abs(current_fade + target_fade)
@@ -1099,23 +1100,23 @@ class VSEQFQuickFadesCross(bpy.types.Operator):
                         if abs(current_fade) < target_fade:
                             #detected overlap is not enough, extend the ends of the strips to match the target overlap
 
-                            if ((first_strip.frame_offset_end > first_strip_offset) & (second_strip.frame_offset_start > second_strip_offset)) | ((first_strip.frame_offset_end == 0) & (first_strip.frame_offset_start == 0)):
+                            if ((first_strip.right_handle_offset > first_strip_offset) & (second_strip.left_handle_offset > second_strip_offset)) | ((first_strip.right_handle_offset == 0) & (first_strip.left_handle_offset == 0)):
                                 #both strip offsets are larger than both target offsets or neither strip has offsets
-                                first_strip.frame_final_end = first_strip.frame_final_end + first_strip_offset
-                                second_strip.frame_final_start = second_strip.frame_final_start - second_strip_offset
+                                first_strip.right_handle = first_strip.right_handle + first_strip_offset
+                                second_strip.left_handle = second_strip.left_handle - second_strip_offset
 
                             else:
                                 #strip offsets need to be adjusted individually
-                                current_offset = first_strip.frame_offset_end + second_strip.frame_offset_start
-                                first_strip_offset_percent = first_strip.frame_offset_end / current_offset
-                                second_strip_offset_percent = second_strip.frame_offset_start / current_offset
-                                first_strip.frame_final_end = int(first_strip.frame_final_end + (round(first_strip_offset_percent * fade_offset)))
-                                second_strip.frame_final_start = int(second_strip.frame_final_start - (round(second_strip_offset_percent * fade_offset)))
+                                current_offset = first_strip.right_handle_offset + second_strip.left_handle_offset
+                                first_strip_offset_percent = first_strip.right_handle_offset / current_offset
+                                second_strip_offset_percent = second_strip.left_handle_offset / current_offset
+                                first_strip.right_handle = int(first_strip.right_handle + (round(first_strip_offset_percent * fade_offset)))
+                                second_strip.left_handle = int(second_strip.left_handle - (round(second_strip_offset_percent * fade_offset)))
 
                         elif abs(current_fade) > target_fade:
                             #detected overlap is larger than target fade, subtract equal amounts from each strip
-                            first_strip.frame_final_end = first_strip.frame_final_end - first_strip_offset
-                            second_strip.frame_final_start = second_strip.frame_final_start + second_strip_offset
+                            first_strip.right_handle = first_strip.right_handle - first_strip_offset
+                            second_strip.left_handle = second_strip.left_handle + second_strip_offset
                     fade_exists = find_crossfade(strips, first_strip, second_strip)
                     if not fade_exists:
                         vseqf_crossfade(first_strip, second_strip)

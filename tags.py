@@ -60,7 +60,7 @@ class VSEQFQuickTagsStripMarkerMenu(bpy.types.Menu):
         marker_tags = []
         for index, tag in enumerate(active.tags):
             if tag.use_offset:
-                tag_start = active.frame_start + tag.offset - 1
+                tag_start = active.content_start + tag.offset - 1
                 tag_end = tag_start + tag.length
                 if tag_start <= context.scene.frame_current <= tag_end:
                     marker_tags.append([index, tag])
@@ -400,11 +400,11 @@ class VSEQFQuickTagsAddMarker(bpy.types.Operator):
             strip = timeline.current_active(context)
             if strip:
                 cursor_position = context.scene.frame_current
-                if cursor_position < strip.frame_final_start:
-                    cursor_position = strip.frame_final_start
-                if cursor_position >= strip.frame_final_end:
-                    cursor_position = strip.frame_final_end - 1
-                offset = cursor_position - strip.frame_start + 1
+                if cursor_position < strip.left_handle:
+                    cursor_position = strip.left_handle
+                if cursor_position >= strip.right_handle:
+                    cursor_position = strip.right_handle - 1
+                offset = cursor_position - strip.content_start + 1
                 tag = strip.tags.add()
                 tag.text = text
                 tag.use_offset = True

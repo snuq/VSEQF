@@ -55,18 +55,18 @@ def current_strips(context):
 def find_strips_end(strips):
     end = 1
     for strip in strips:
-        if strip.frame_final_end > end:
-            end = strip.frame_final_end
+        if strip.right_handle > end:
+            end = strip.right_handle
     return end
 
 
 def find_strips_start(strips):
     if not strips:
         return 1
-    start = strips[0].frame_final_start
+    start = strips[0].left_handle
     for strip in strips:
-        if strip.frame_final_start < start:
-            start = strip.frame_final_start
+        if strip.left_handle < start:
+            start = strip.left_handle
     return start
 
 
@@ -87,7 +87,7 @@ def find_close_strip(strips, selected_strip, direction, mode='overlap', sounds=F
         mode: String, determines how the strips are searched
             'overlap': Only returns strips that overlap selected_strip
             'channel': Only returns strips that are in the same channel as selected_strip
-            'simple': Just looks for the previous or next frame_final_start
+            'simple': Just looks for the previous or next left_handle
             'nooverlap': Returns the previous strip, ignoring any that are overlapping
             <any other string>: All strips are returned
         sounds: Boolean, if False, 'SOUND' strip types are ignored
@@ -112,16 +112,16 @@ def find_close_strip(strips, selected_strip, direction, mode='overlap', sounds=F
                 if hasattr(strip, 'input_1'):
                     if strip.input_1 == selected_strip or not effects:
                         continue
-                if strip.frame_final_start <= selected_strip.frame_final_start and strip != selected_strip:
+                if strip.left_handle <= selected_strip.left_handle and strip != selected_strip:
                     previous.append(strip)
-                elif strip.frame_final_start >= selected_strip.frame_final_start and strip != selected_strip:
+                elif strip.left_handle >= selected_strip.left_handle and strip != selected_strip:
                     nexts.append(strip)
         if direction == 'next':
             if len(nexts) > 0:
-                found = min(nexts, key=lambda seq: (seq.frame_final_start - selected_strip.frame_final_start))
+                found = min(nexts, key=lambda seq: (seq.left_handle - selected_strip.left_handle))
         else:
             if len(previous) > 0:
-                found = min(previous, key=lambda seq: (selected_strip.frame_final_start - seq.frame_final_start))
+                found = min(previous, key=lambda seq: (selected_strip.left_handle - seq.left_handle))
     else:
         #iterate through strips to find all strips to one side of the selected strip
         for strip in strips:
@@ -131,20 +131,20 @@ def find_close_strip(strips, selected_strip, direction, mode='overlap', sounds=F
                 if hasattr(strip, 'input_1'):
                     if strip.input_1 == selected_strip or not effects:
                         continue
-                if strip.frame_final_start >= selected_strip.frame_final_end:
+                if strip.left_handle >= selected_strip.right_handle:
                     #current strip is after selected strip
                     if not (mode == 'channel' and selected_strip.channel != strip.channel):
                         #dont append if channel mode and strips are not on same channel
                         nexts.append(strip)
-                elif strip.frame_final_end <= selected_strip.frame_final_start:
+                elif strip.right_handle <= selected_strip.left_handle:
                     #current strip is before selected strip
                     if not (mode == 'channel' and selected_strip.channel != strip.channel):
                         #dont append if channel mode and strips are not on same channel
                         previous.append(strip)
-                if (strip.frame_final_start > selected_strip.frame_final_start) & (strip.frame_final_start < selected_strip.frame_final_end) & (strip.frame_final_end > selected_strip.frame_final_end):
+                if (strip.left_handle > selected_strip.left_handle) & (strip.left_handle < selected_strip.right_handle) & (strip.right_handle > selected_strip.right_handle):
                     #current strip startpoint is overlapping selected strip
                     overlap_nexts.append(strip)
-                if (strip.frame_final_end > selected_strip.frame_final_start) & (strip.frame_final_end < selected_strip.frame_final_end) & (strip.frame_final_start < selected_strip.frame_final_start):
+                if (strip.right_handle > selected_strip.left_handle) & (strip.right_handle < selected_strip.right_handle) & (strip.left_handle < selected_strip.left_handle):
                     #current strip endpoint is overlapping selected strip
                     overlap_previous.append(strip)
 
@@ -156,20 +156,20 @@ def find_close_strip(strips, selected_strip, direction, mode='overlap', sounds=F
                     found = min(overlap_nexts, key=lambda overlap: abs(overlap.channel - selected_strip.channel))
             elif mode == 'channel' or mode == 'nooverlap':
                 if len(nexts) > 0:
-                    found = min(nexts, key=lambda next_seq: (next_seq.frame_final_start - selected_strip.frame_final_end))
+                    found = min(nexts, key=lambda next_seq: (next_seq.left_handle - selected_strip.right_handle))
             else:
                 if len(nexts_all) > 0:
-                    found = min(nexts_all, key=lambda next_seq: (next_seq.frame_final_start - selected_strip.frame_final_end))
+                    found = min(nexts_all, key=lambda next_seq: (next_seq.left_handle - selected_strip.right_handle))
         else:
             if mode == 'overlap':
                 if len(overlap_previous) > 0:
                     found = min(overlap_previous, key=lambda overlap: abs(overlap.channel - selected_strip.channel))
             elif mode == 'channel' or mode == 'nooverlap':
                 if len(previous) > 0:
-                    found = min(previous, key=lambda prev: (selected_strip.frame_final_start - prev.frame_final_end))
+                    found = min(previous, key=lambda prev: (selected_strip.left_handle - prev.right_handle))
             else:
                 if len(previous_all) > 0:
-                    found = min(previous_all, key=lambda prev: (selected_strip.frame_final_start - prev.frame_final_end))
+                    found = min(previous_all, key=lambda prev: (selected_strip.left_handle - prev.right_handle))
     return found
 
 
@@ -180,8 +180,8 @@ def sequencer_used_height(left, right, strips=None):
     if not strips:
         strips = current_strips(bpy.context)
     for seq in strips:
-        start = seq.frame_final_start
-        end = seq.frame_final_end
+        start = seq.left_handle
+        end = seq.right_handle
         if (start > left and start < right) or (end > left and end < right) or (start < left and end > right):
             if bottom == 0:
                 bottom = seq.channel
@@ -230,8 +230,8 @@ def sequencer_area_filled(left, right, bottom, top, omit, strips=False, quick=Tr
     for strip in strips:
         if strip not in omit:
             if strip.channel >= bottom and (strip.channel <= top or top == -1):
-                start = strip.frame_final_start
-                end = strip.frame_final_end
+                start = strip.left_handle
+                end = strip.right_handle
                 #strip start is inside area             strip end is inside area         entire strip is covering area
                 if (start >= left and start < right) or (end > left and end <= right) or (start <= left and end >= right):
                     if quick:
@@ -250,7 +250,7 @@ def under_cursor(strip, frame):
         frame: Integer, the frame number
 
     Returns: True or False"""
-    if strip.frame_final_start < frame and strip.frame_final_end > frame:
+    if strip.left_handle < frame and strip.right_handle > frame:
         return True
     else:
         return False
@@ -307,7 +307,7 @@ class VSEQFQuickTimeline(bpy.types.Operator):
             'strips_end': Like 'strips, but only trims the end frame.
             'selected_start': Like 'selected', but only trims the start frame.
             'selected_end': Like 'selected', but only trims the end frame.
-            'full_auto': moves strips and markers back or up to match with frame 1, then sets start and end to encompass all sequences."""
+            'full_auto': moves strips and markers back or up to match with frame 1, then sets start and end to encompass all strips."""
 
     bl_idname = 'vseqf.quicktimeline'
     bl_label = 'VSEQF Quick Timeline'
@@ -340,16 +340,16 @@ class VSEQFQuickTimeline(bpy.types.Operator):
 
                     for strip in strips:
                         if not hasattr(strip, 'input_1'):
-                            strip.frame_start = strip.frame_start + offset_1
+                            strip.content_start = strip.content_start + offset_1
                     for strip in strips:
                         if not hasattr(strip, 'input_1'):
-                            strip.frame_start = strip.frame_start + offset_2
+                            strip.content_start = strip.content_start + offset_2
                     strips = current_strips(context)
             starts = []
             ends = []
             for strip in strips:
-                starts.append(strip.frame_final_start)
-                ends.append(strip.frame_final_end)
+                starts.append(strip.left_handle)
+                ends.append(strip.right_handle)
             starts.sort()
             ends.sort()
             newstart = starts[0]

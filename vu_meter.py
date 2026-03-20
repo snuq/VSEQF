@@ -36,13 +36,13 @@ def get_volume_unit(frame=None):
     fps = vseqf.get_fps()
     for strip in strips:
         if strip.type == 'SOUND' and timeline.under_cursor(strip, frame) and not timeline.is_muted(sequence_editor, strip):
-            time_from = (frame - 1 - strip.frame_start) / fps
-            time_to = (frame - strip.frame_start) / fps
+            time_from = (frame - 1 - strip.content_start) / fps
+            time_to = (frame - strip.content_start) / fps
             audio = strip.sound.evaluated_get(depsgraph).factory
             chunk = audio.limit(time_from, time_to).data()
             if len(chunk) == 0:
                 #sometimes the chunks cannot be read properly, try to read 2 frames instead
-                time_from_temp = (frame - 2 - strip.frame_start) / fps
+                time_from_temp = (frame - 2 - strip.content_start) / fps
                 chunk = audio.limit(time_from_temp, time_to).data()
             if len(chunk) == 0:
                 #chunk still couldn't be read... just give up :\

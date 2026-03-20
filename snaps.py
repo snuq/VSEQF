@@ -111,10 +111,10 @@ class VSEQFQuickSnaps(bpy.types.Operator):
             scene.frame_current = int(round(round(scene.frame_current / fps) * fps))
         elif self.type == 'cursor_to_beginning':
             if active:
-                scene.frame_current = active.frame_final_start
+                scene.frame_current = active.left_handle
         elif self.type == 'cursor_to_end':
             if active:
-                scene.frame_current = active.frame_final_end
+                scene.frame_current = active.right_handle
 
         #Marker snaps
         elif self.type == 'marker_to_cursor':
@@ -133,7 +133,7 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                 self.report({'WARNING'}, 'Nothing To Snap')
                 return{'CANCELLED'}
 
-            to_snap.sort(key=lambda x: x.frame_final_start)
+            to_snap.sort(key=lambda x: x.left_handle)
             starting_data = grabs.grab_starting_data(strips)
 
             if self.type == 'begin_to_cursor':
@@ -143,7 +143,7 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                     starting_data[data].select_left_handle = False
                     starting_data[data].select_right_handle = False
                 for strip in to_snap:
-                    offset_x = (snap_target - strip.frame_final_start)
+                    offset_x = (snap_target - strip.left_handle)
                     grabs.move_strips(context, starting_data, offset_x, 0, [strip])
 
             elif self.type == 'end_to_cursor':
@@ -153,7 +153,7 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                     starting_data[data].select_left_handle = False
                     starting_data[data].select_right_handle = False
                 for strip in to_snap:
-                    offset_x = (snap_target - strip.frame_final_end)
+                    offset_x = (snap_target - strip.right_handle)
                     grabs.move_strips(context, starting_data, offset_x, 0, [strip])
 
             elif self.type == 'strip_to_previous':
@@ -164,7 +164,7 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                 for strip in to_snap:
                     previous = timeline.find_close_strip(strips, strip, 'previous', 'nooverlap', sounds=True)
                     if previous:
-                        offset_x = (previous.frame_final_end - strip.frame_final_start)
+                        offset_x = (previous.right_handle - strip.left_handle)
                         grabs.move_strips(context, starting_data, offset_x, 0, [strip])
                     else:
                         self.report({'WARNING'}, 'No Previous Strip Found')
@@ -177,7 +177,7 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                 for strip in to_snap:
                     next_seq = timeline.find_close_strip(strips, strip, 'next', 'nooverlap', sounds=True)
                     if next_seq:
-                        offset_x = (next_seq.frame_final_start - strip.frame_final_end)
+                        offset_x = (next_seq.left_handle - strip.right_handle)
                         grabs.move_strips(context, starting_data, offset_x, 0, [strip])
                     else:
                         self.report({'WARNING'}, 'No Next Strip Found')
@@ -187,9 +187,9 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                 check_snap = []
                 for strip in to_snap:
                     if strip.select_right_handle and not strip.select_left_handle:
-                        snap_start = strip.frame_final_end
+                        snap_start = strip.right_handle
                     else:
-                        snap_start = strip.frame_final_start
+                        snap_start = strip.left_handle
                     offset_x = (snap_target - snap_start)
                     grabs.move_strips(context, starting_data, offset_x, 0, [strip], fix_fades=True)
                     check_snap.append([strip, offset_x])
@@ -206,10 +206,10 @@ class VSEQFQuickSnaps(bpy.types.Operator):
                     starting_data[data].select_right_handle = False
                 start = to_snap[0]
                 for strip in to_snap:
-                    if strip.frame_final_start < start.frame_final_start:
+                    if strip.left_handle < start.left_handle:
                         start = strip
                 snap_target = context.scene.frame_current
-                offset_x = (snap_target - start.frame_final_start)
+                offset_x = (snap_target - start.left_handle)
                 grabs.move_strips(context, starting_data, offset_x, 0, to_snap)
 
         return{'FINISHED'}

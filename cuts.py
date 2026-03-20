@@ -88,9 +88,9 @@ class VSEQFCut(bpy.types.Operator):
                 if strip.directory == next_strip.directory and strip.elements[0].filename == next_strip.elements[0].filename:
                     if len(strip.elements) == 1 and len(next_strip.elements) == 1:
                         return True
-                    elif strip.frame_start == next_strip.frame_start:
+                    elif strip.content_start == next_strip.content_start:
                         return True
-            elif strip.frame_start == next_strip.frame_start:
+            elif strip.content_start == next_strip.content_start:
                 if strip.type == 'SOUND':
                     if strip.sound.filepath == next_strip.sound.filepath:
                         return True
@@ -155,13 +155,13 @@ class VSEQFCut(bpy.types.Operator):
                     source_matches = self.check_source(strip, merge_to)
                     if source_matches:
                         if direction == 'next':
-                            newend = merge_to.frame_final_end
+                            newend = merge_to.right_handle
                             self.delete_strip(merge_to)
-                            strip.frame_final_end = newend
+                            strip.right_handle = newend
                         else:
-                            newstart = merge_to.frame_final_start
+                            newstart = merge_to.left_handle
                             self.delete_strip(merge_to)
-                            strip.frame_final_start = newstart
+                            strip.left_handle = newstart
         return{'FINISHED'}
 
     def do_insert(self, context, cut_frame):
@@ -243,26 +243,26 @@ class VSEQFCut(bpy.types.Operator):
         ripple_amount = 0
         for strip in to_cut_temp:
             if side == 'LEFT':
-                cut_amount = cut_frame - strip.frame_final_start
+                cut_amount = cut_frame - strip.left_handle
             else:
-                cut_amount = strip.frame_final_end - cut_frame
+                cut_amount = strip.right_handle - cut_frame
             if cut_amount > ripple_amount:
                 ripple_amount = cut_amount
 
         #perform adjustments
-        to_cut.sort(key=lambda x: x.frame_final_start)
+        to_cut.sort(key=lambda x: x.left_handle)
         for strip in to_cut:
             cutable = timeline.under_cursor(strip, cut_frame)
             if side == 'LEFT':
                 if cutable:
-                    strip.frame_final_start = cut_frame
+                    strip.left_handle = cut_frame
                 if action == 'SLIDE':
-                    strip.frame_start = strip.frame_start - ripple_amount
+                    strip.content_start = strip.content_start - ripple_amount
             else:
                 if cutable:
-                    strip.frame_final_end = cut_frame
+                    strip.right_handle = cut_frame
                 if action == 'SLIDE':
-                    strip.frame_start = strip.frame_start + ripple_amount
+                    strip.content_start = strip.content_start + ripple_amount
 
         #ripple
         if action == 'RIPPLE':
@@ -410,7 +410,7 @@ class VSEQF_PT_QuickCutsPanel(bpy.types.Panel):
         props.tooltip = 'Cut off the left side of '+cut_strips+' strips under the cursor, and slide cut strips back to close the gap'
         props = column.operator('vseqf.cut', text='Ripple Trim Left', icon='BACK')
         props.type = 'RIPPLE_LEFT'
-        props.tooltip = 'Cut off the left side of '+cut_strips+' strips under the cursor, and slide all sequences back to close the gap'
+        props.tooltip = 'Cut off the left side of '+cut_strips+' strips under the cursor, and slide all strips back to close the gap'
         props = column.operator('vseqf.cut', text='UnCut Left', icon='LOOP_BACK')
         props.type = 'UNCUT_LEFT'
         props.tooltip = 'Merge selected strips to those on left if they match source and position'
@@ -455,8 +455,8 @@ class VSEQFDelete(bpy.types.Operator):
         #Determine frames that need to be rippled
         ripple_frames = set()
         for deletable in to_delete:
-            delete_start = deletable.frame_final_start
-            delete_end = deletable.frame_final_end
+            delete_start = deletable.left_handle
+            delete_end = deletable.right_handle
             for frame in range(delete_start, delete_end+1):
                 ripple_frames.add(frame)
 

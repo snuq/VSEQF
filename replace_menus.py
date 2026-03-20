@@ -60,11 +60,9 @@ class SEQUENCER_MT_add(Menu):
 
         layout.separator()
 
-        #layout.operator("sequencer.movie_strip_add", text="Movie", icon='FILE_MOVIE')
-        layout.operator("vseqf.import_strip", text="Movie", icon="FILE_MOVIE").type = 'MOVIE'
+        layout.operator("sequencer.movie_strip_add", text="Movie", icon='FILE_MOVIE')
         layout.operator("sequencer.sound_strip_add", text="Sound", icon='FILE_SOUND')
-        #layout.operator("sequencer.image_strip_add", text="Image/Sequence", icon='FILE_IMAGE')
-        layout.operator("vseqf.import_strip", text="Image/Sequence", icon="FILE_IMAGE").type = 'IMAGE'
+        layout.operator("sequencer.image_strip_add", text="Image/Sequence", icon='FILE_IMAGE')
 
         layout.separator()
 

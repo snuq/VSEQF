@@ -13,22 +13,22 @@ def nudge_selected(frame=0, channel=0):
     if channel < 0:
         to_nudge.sort(key=lambda x: x.channel)
     for strip in to_nudge:
-        oldframe = strip.frame_start
+        oldframe = strip.content_start
         if frame:
             if strip.select_left_handle or strip.select_right_handle:
                 if strip.select_left_handle:
-                    strip.frame_final_start = strip.frame_final_start + frame
+                    strip.left_handle = strip.left_handle + frame
                 if strip.select_right_handle:
-                    strip.frame_final_end = strip.frame_final_end + frame
+                    strip.right_handle = strip.right_handle + frame
             else:
-                newframe = strip.frame_start + frame
-                strip.frame_start = newframe
+                newframe = strip.content_start + frame
+                strip.content_start = newframe
                 oldframe = newframe
         if channel:
             newchannel = strip.channel + channel
             if newchannel > 0:
                 strip.channel = newchannel
-                strip.frame_start = oldframe
+                strip.content_start = oldframe
 
 
 def find_marker(frame, direction):
@@ -69,7 +69,7 @@ def find_edge(frame, direction):
     new_frame = None
     best_delta = None
     for strip in bpy.context.scene.sequence_editor.strips:
-        edges = [strip.frame_final_start, strip.frame_final_end]
+        edges = [strip.left_handle, strip.right_handle]
         for edge in edges:
             if direction == 'next':
                 if edge > frame:

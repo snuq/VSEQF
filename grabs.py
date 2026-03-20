@@ -13,10 +13,10 @@ marker_grab_distance = 100
 class StripPlaceHolder(object):
     strip = None
     name = ''
-    frame_final_start = 0
-    frame_final_end = 0
-    frame_final_duration = 0
-    frame_start = 0
+    left_handle = 0
+    right_handle = 0
+    duration = 0
+    content_start = 0
     channel = 0
     select = False
     select_left_handle = False
@@ -34,11 +34,11 @@ def get_click_mode(context):
     return click_mode
 
 
-def move_strip_position(context, strip, offset_x, offset_y, start_channel, start_frame_start, start_frame_final_start, start_frame_final_end):
+def move_strip_position(context, strip, offset_x, offset_y, start_channel, start_content_start, start_left_handle, start_right_handle):
     #Move a strip by a given offset
 
-    new_start = start_frame_final_start + offset_x
-    new_end = start_frame_final_end + offset_x
+    new_start = start_left_handle + offset_x
+    new_end = start_right_handle + offset_x
     channel = start_channel + offset_y
     if channel < 1:
         channel = 1
@@ -46,95 +46,95 @@ def move_strip_position(context, strip, offset_x, offset_y, start_channel, start
         channel = channel + 1
 
     strip.channel = channel
-    strip.frame_start = start_frame_start + offset_x
+    strip.content_start = start_content_start + offset_x
 
 
-def move_strip_left_handle(context, strip, offset_x, start_channel, start_frame_start, start_frame_final_start, start_frame_final_end, fix_fades=False, only_fix=False):
+def move_strip_left_handle(context, strip, offset_x, start_channel, start_content_start, start_left_handle, start_right_handle, fix_fades=False, only_fix=False):
     #Move a strip left handle and keep it behaving properly
 
-    frame_final_end = start_frame_final_end
-    frame_start_backup = strip.frame_start
+    right_handle = start_right_handle
+    content_start_backup = strip.content_start
     strip.channel = start_channel
-    strip.frame_start = frame_start_backup
-    new_start = start_frame_final_start + offset_x
-    if strip.frame_duration == 1 and strip.type in ['IMAGE', 'ADJUSTMENT', 'MULTICAM', 'TEXT', 'COLOR']:
+    strip.content_start = content_start_backup
+    new_start = start_left_handle + offset_x
+    if strip.content_duration == 1 and strip.type in ['IMAGE', 'ADJUSTMENT', 'MULTICAM', 'TEXT', 'COLOR']:
         #Account for odd behavior of images and unbound effect strips
-        if new_start >= strip.frame_final_end:
+        if new_start >= strip.right_handle:
             #Prevent left handle from being moved beyond ending point of strip
-            new_start = strip.frame_final_end - 1
-        if strip.frame_final_start != new_start:
-            strip.frame_start = new_start
-        if strip.frame_final_end != frame_final_end:
-            strip.frame_final_end = int(frame_final_end)
+            new_start = strip.right_handle - 1
+        if strip.left_handle != new_start:
+            strip.content_start = new_start
+        if strip.right_handle != right_handle:
+            strip.right_handle = int(right_handle)
     else:  #Normal strip
-        if new_start >= frame_final_end + strip.frame_offset_end:
+        if new_start >= right_handle + strip.right_handle_offset:
             #Prevent left handle from being moved beyond ending point of strip
-            new_start = frame_final_end - 1 + strip.frame_offset_end
+            new_start = right_handle - 1 + strip.right_handle_offset
         #if strip.type == 'SOUND':
         #    #Prevent sound strip beginning from being dragged beyond start point
-        #    if new_start < strip.frame_start:
-        #        new_start = strip.frame_start
-        new_position = start_frame_start
-        if strip.frame_final_start != new_start:
-            strip.frame_final_start = int(new_start)
-        if strip.frame_start != new_position:
-            strip.frame_start = int(new_position)
+        #    if new_start < strip.content_start:
+        #        new_start = strip.content_start
+        new_position = start_content_start
+        if strip.left_handle != new_start:
+            strip.left_handle = int(new_start)
+        if strip.content_start != new_position:
+            strip.content_start = int(new_position)
         if fix_fades:
-            fades.fix_fade_in(context, strip, start_frame_final_start)
+            fades.fix_fade_in(context, strip, start_left_handle)
 
 
-def move_strip_right_handle(context, strip, offset_x, start_channel, start_frame_final_end, fix_fades=False, only_fix=False):
+def move_strip_right_handle(context, strip, offset_x, start_channel, start_right_handle, fix_fades=False, only_fix=False):
     #Move strip right handle and keep it behaving properly
 
-    frame_start_backup = strip.frame_start
+    content_start_backup = strip.content_start
     strip.channel = start_channel
-    strip.frame_start = frame_start_backup
-    new_end = start_frame_final_end + offset_x
-    if new_end <= strip.frame_final_start + 1 - strip.frame_offset_start:
+    strip.content_start = content_start_backup
+    new_end = start_right_handle + offset_x
+    if new_end <= strip.left_handle + 1 - strip.left_handle_offset:
         #Prevent right handle from being moved beyond start point of strip
-        new_end = strip.frame_final_start + 1 - strip.frame_offset_start
+        new_end = strip.left_handle + 1 - strip.left_handle_offset
     #if strip.type == 'SOUND':
-    #    if new_end > strip.frame_start + strip.frame_duration:
-    #        new_end = strip.frame_start + strip.frame_duration
-    strip.frame_final_end = int(new_end)
+    #    if new_end > strip.content_start + strip.content_duration:
+    #        new_end = strip.content_start + strip.content_duration
+    strip.right_handle = int(new_end)
     if fix_fades:
-        fades.fix_fade_out(context, strip, start_frame_final_end)
+        fades.fix_fade_out(context, strip, start_right_handle)
 
 
-def move_strip(context, strip, offset_x, offset_y, select_left, select_right, start_channel, start_frame_start, start_frame_final_start, start_frame_final_end, ripple=False, fix_fades=False, only_fix=False):
+def move_strip(context, strip, offset_x, offset_y, select_left, select_right, start_channel, start_content_start, start_left_handle, start_right_handle, ripple=False, fix_fades=False, only_fix=False):
     if not select_left and not select_right and not only_fix:  #Move strip
         #check this first for efficiency since probably the most strips will be only middle-selected
-        move_strip_position(context, strip, offset_x, offset_y, start_channel, start_frame_start, start_frame_final_start, start_frame_final_end)
+        move_strip_position(context, strip, offset_x, offset_y, start_channel, start_content_start, start_left_handle, start_right_handle)
         return
 
     new_channel = start_channel + offset_y
     if select_left or select_right and not ripple:
         #make strips that are having the handles adjusted behave better
-        new_start = strip.frame_final_start
-        new_end = strip.frame_final_end
+        new_start = strip.left_handle
+        new_end = strip.right_handle
         while timeline.sequencer_area_filled(new_start, new_end, new_channel, new_channel, [strip]):
             new_channel = new_channel + 1
     if new_channel != strip.channel:
-        old_frame_start = strip.frame_start
+        old_content_start = strip.content_start
         strip.channel = new_channel
-        if strip.frame_start != old_frame_start:
+        if strip.content_start != old_content_start:
             #For some reason, the first time a grab is run, the channel setting doesn't work right... double check and fix if needed
-            strip.frame_start = old_frame_start
+            strip.content_start = old_content_start
 
     if select_left:  #Move left handle
-        move_strip_left_handle(context, strip, offset_x, new_channel, start_frame_start, start_frame_final_start, start_frame_final_end, fix_fades=fix_fades, only_fix=only_fix)
+        move_strip_left_handle(context, strip, offset_x, new_channel, start_content_start, start_left_handle, start_right_handle, fix_fades=fix_fades, only_fix=only_fix)
     if select_right:  #Move right handle
-        move_strip_right_handle(context, strip, offset_x, new_channel, start_frame_final_end, fix_fades=fix_fades, only_fix=only_fix)
+        move_strip_right_handle(context, strip, offset_x, new_channel, start_right_handle, fix_fades=fix_fades, only_fix=only_fix)
 
 
 def copy_strip(strip):
     data = StripPlaceHolder()
     data.strip = strip
     data.name = strip.name
-    data.frame_final_start = strip.frame_final_start
-    data.frame_final_end = strip.frame_final_end
-    data.frame_final_duration = strip.frame_final_duration
-    data.frame_start = strip.frame_start
+    data.left_handle = strip.left_handle
+    data.right_handle = strip.right_handle
+    data.duration = strip.duration
+    data.content_start = strip.content_start
     data.channel = strip.channel
     data.select = strip.select
     data.select_left_handle = strip.select_left_handle
@@ -156,23 +156,23 @@ def move_strips(context, starting_data, offset_x, offset_y, grabbed_strips, fix_
     #Adjust grabbed strips
     for strip in grabbed_strips:
         data = starting_data[strip.name]
-        move_strip(context, strip, offset_x, offset_y, data.select_left_handle, data.select_right_handle, data.channel, data.frame_start, data.frame_final_start, data.frame_final_end, ripple=ripple, fix_fades=fix_fades, only_fix=not move_root)
-        right_edges.append(strip.frame_final_end)
+        move_strip(context, strip, offset_x, offset_y, data.select_left_handle, data.select_right_handle, data.channel, data.content_start, data.left_handle, data.right_handle, ripple=ripple, fix_fades=fix_fades, only_fix=not move_root)
+        right_edges.append(strip.right_handle)
 
         if ripple:
             if strip.select_left_handle and not strip.select_right_handle and len(grabbed_strips) == 1:
                 #special ripple slide if only one strip and left handle grabbed
-                frame_start = data.frame_final_start
-                ripple_offset = ripple_offset + frame_start - strip.frame_final_start
-                strip.frame_start = data.frame_start + ripple_offset
+                content_start = data.left_handle
+                ripple_offset = ripple_offset + content_start - strip.left_handle
+                strip.content_start = data.content_start + ripple_offset
                 #offset_x = ripple_offset
             else:
                 if ripple_pop and strip.channel != data.channel:
                     #ripple 'pop'
-                    ripple_offset = strip.frame_final_duration
+                    ripple_offset = strip.duration
                     ripple_offset = 0 - ripple_offset
                 else:
-                    ripple_offset = data.frame_final_end - strip.frame_final_end
+                    ripple_offset = data.right_handle - strip.right_handle
                     ripple_offset = 0 - ripple_offset
 
     return ripple_offset
@@ -193,21 +193,21 @@ def grab_ripple_strips(starting_data, ripple_strips, ripple, ripple_offset):
         if ripple:
             data.rippled = True
             new_channel = data.channel
-            while timeline.sequencer_area_filled(data.frame_final_start + ripple_offset, data.frame_final_end + ripple_offset, new_channel, new_channel, [strip]):
+            while timeline.sequencer_area_filled(data.left_handle + ripple_offset, data.right_handle + ripple_offset, new_channel, new_channel, [strip]):
                 new_channel = new_channel + 1
             strip.channel = new_channel
-            strip.frame_start = data.frame_start + ripple_offset
+            strip.content_start = data.content_start + ripple_offset
 
         if data.rippled and not ripple:
             #fix strip locations when ripple is disabled
             new_channel = data.channel
-            new_start = data.frame_final_start
-            new_end = data.frame_final_end
+            new_start = data.left_handle
+            new_end = data.right_handle
             while timeline.sequencer_area_filled(new_start, new_end, new_channel, new_channel, [strip]):
                 new_channel = new_channel + 1
             strip.channel = new_channel
-            strip.frame_start = data.frame_start
-            if strip.frame_start == data.frame_start and strip.channel == data.channel:
+            strip.content_start = data.content_start
+            if strip.content_start == data.content_start and strip.channel == data.channel:
                 #unfortunately, there seems to be a limitation in blender preventing me from putting the strip back where it should be... keep trying until the grabbed strips are out of the way.
                 data.rippled = False
 
@@ -218,16 +218,16 @@ def ripple_timeline(sequencer, strips, start_frame, ripple_amount, select_ripple
 
     to_change = []
     for strip in strips:
-        if not timeline.is_locked(sequencer, strip) and strip.frame_final_end > start_frame - ripple_amount and strip.frame_final_start > start_frame:
-            to_change.append([strip, strip.channel, strip.frame_start + ripple_amount, True])
+        if not timeline.is_locked(sequencer, strip) and strip.right_handle > start_frame - ripple_amount and strip.left_handle > start_frame:
+            to_change.append([strip, strip.channel, strip.content_start + ripple_amount, True])
     for seq in to_change:
         strip = seq[0]
         strip.channel = seq[1]
         if not hasattr(strip, 'input_1'):
-            strip.frame_start = seq[2]
+            strip.content_start = seq[2]
         if select_ripple:
             strip.select = True
-        if (strip.frame_start != seq[2] or strip.channel != seq[1]) and seq[3]:
+        if (strip.content_start != seq[2] or strip.channel != seq[1]) and seq[3]:
             seq[3] = False
             to_change.append(seq)
     if markers:
@@ -248,7 +248,7 @@ def near_marker(context, frame, distance=None):
 
 
 def on_strip(frame, channel, strip):
-    if frame >= strip.frame_final_start and frame <= strip.frame_final_end and int(channel) == strip.channel:
+    if frame >= strip.left_handle and frame <= strip.right_handle and int(channel) == strip.channel:
         return True
     else:
         return False
@@ -454,7 +454,7 @@ class VSEQFGrabAdd(bpy.types.Operator):
 
         view = context.region.view2d
         for strip in self.grabbed_strips:
-            window_x, window_y = view.view_to_region(strip.frame_final_start, strip.channel)
+            window_x, window_y = view.view_to_region(strip.left_handle, strip.channel)
             vseqf.draw_text(window_x, window_y - 6, 12, mode, text_color)
 
     def reset_markers(self):
@@ -472,16 +472,16 @@ class VSEQFGrabAdd(bpy.types.Operator):
             data = self.starting_data[strip.name]
             if not hasattr(strip, 'input_1'):
                 strip.channel = data.channel + self.timeline_height
-                strip.frame_start = data.frame_start + timeline_length
-                strip.frame_final_start = data.frame_final_start + timeline_length
-                strip.frame_final_end = data.frame_final_end + timeline_length
+                strip.content_start = data.content_start + timeline_length
+                strip.left_handle = data.left_handle + timeline_length
+                strip.right_handle = data.right_handle + timeline_length
             else:
                 strip.channel = data.channel + self.timeline_height
         for strip in self.strips:
             data = self.starting_data[strip.name]
             if not hasattr(strip, 'input_1'):
                 strip.channel = data.channel
-                strip.frame_start = data.frame_start
+                strip.content_start = data.content_start
             else:
                 strip.channel = data.channel
 
@@ -524,26 +524,26 @@ class VSEQFGrabAdd(bpy.types.Operator):
             if self.snap_cursor_to_edge:
                 if self.snap_edge:
                     if self.snap_edge == 'left':
-                        frame = self.snap_edge_strip.frame_final_start
+                        frame = self.snap_edge_strip.left_handle
                     else:
-                        frame = self.snap_edge_strip.frame_final_end - 1
+                        frame = self.snap_edge_strip.right_handle - 1
                     context.scene.frame_current = frame
                     if self.secondary_snap_edge:
                         if self.secondary_snap_edge == 'left':
-                            overlay_frame = self.secondary_snap_edge_strip.frame_final_start
+                            overlay_frame = self.secondary_snap_edge_strip.left_handle
                         else:
-                            overlay_frame = self.secondary_snap_edge_strip.frame_final_end - 1
+                            overlay_frame = self.secondary_snap_edge_strip.right_handle - 1
                         context.scene.sequence_editor.overlay_frame = overlay_frame - frame
         offset_x = 0
         pos_y = self.target_grab_strip.channel
-        if self.target_grab_variable == 'frame_start':
-            pos_x = self.target_grab_strip.frame_start
+        if self.target_grab_variable == 'content_start':
+            pos_x = self.target_grab_strip.content_start
             offset_x = pos_x - self.target_grab_start
-        elif self.target_grab_variable == 'frame_final_end':
-            pos_x = self.target_grab_strip.frame_final_end
+        elif self.target_grab_variable == 'right_handle':
+            pos_x = self.target_grab_strip.right_handle
             offset_x = pos_x - self.target_grab_start
-        elif self.target_grab_variable == 'frame_final_start':
-            pos_x = self.target_grab_strip.frame_final_start
+        elif self.target_grab_variable == 'left_handle':
+            pos_x = self.target_grab_strip.left_handle
             offset_x = pos_x - self.target_grab_start
 
         if self.target_grab_strip.select_left_handle or self.target_grab_strip.select_right_handle:
@@ -628,9 +628,9 @@ class VSEQFGrabAdd(bpy.types.Operator):
         selected_strips = timeline.current_selected(context)
         for strip in selected_strips:
             if strip.select_right_handle:
-                ripple_point = strip.frame_final_end
+                ripple_point = strip.right_handle
             else:
-                ripple_point = strip.frame_final_start
+                ripple_point = strip.left_handle
             if ripple_point < self.ripple_start and not hasattr(strip, 'input_1') and not timeline.is_locked(sequencer, strip):
                 self.ripple_start = ripple_point
                 self.ripple_left = ripple_point
@@ -650,11 +650,11 @@ class VSEQFGrabAdd(bpy.types.Operator):
                 if strip.select:
                     self.grabbed_strips.append(strip)
                 else:
-                    if strip.frame_final_start >= self.ripple_start:
+                    if strip.left_handle >= self.ripple_start:
                         self.ripple_strips.append(strip)
         self._timer = context.window_manager.event_timer_add(time_step=0.01, window=context.window)
-        self.ripple_strips.sort(key=lambda x: x.frame_final_start)
-        self.grabbed_strips.sort(key=lambda x: x.frame_final_start)
+        self.ripple_strips.sort(key=lambda x: x.left_handle)
+        self.grabbed_strips.sort(key=lambda x: x.left_handle)
         grabbed_left = False
         grabbed_right = False
         grabbed_center = False
@@ -667,20 +667,20 @@ class VSEQFGrabAdd(bpy.types.Operator):
                 if strip.select_right_handle:
                     grabbed_right = strip
         if grabbed_center:
-            self.target_grab_variable = 'frame_start'
+            self.target_grab_variable = 'content_start'
             self.target_grab_strip = grabbed_center
-            self.target_grab_start = grabbed_center.frame_start
+            self.target_grab_start = grabbed_center.content_start
             self.target_grab_channel = grabbed_center.channel
         else:
             if grabbed_right:
-                self.target_grab_variable = 'frame_final_end'
+                self.target_grab_variable = 'right_handle'
                 self.target_grab_strip = grabbed_right
-                self.target_grab_start = grabbed_right.frame_final_end
+                self.target_grab_start = grabbed_right.right_handle
                 self.target_grab_channel = grabbed_right.channel
             if grabbed_left:
-                self.target_grab_variable = 'frame_final_start'
+                self.target_grab_variable = 'left_handle'
                 self.target_grab_strip = grabbed_left
-                self.target_grab_start = grabbed_left.frame_final_start
+                self.target_grab_start = grabbed_left.left_handle
                 self.target_grab_channel = grabbed_left.channel
 
         #Determine the snap edges
@@ -720,13 +720,13 @@ class VSEQFGrabAdd(bpy.types.Operator):
             else:
                 #neither strip is active, or both are the same strip, make rightmost primary, leftmost secondary
                 if selected_edges[0][1] == 'left':
-                    first_frame = selected_edges[0][0].frame_final_start
+                    first_frame = selected_edges[0][0].left_handle
                 else:
-                    first_frame = selected_edges[0][0].frame_final_end
+                    first_frame = selected_edges[0][0].right_handle
                 if selected_edges[1][1] == 'left':
-                    second_frame = selected_edges[1][0].frame_final_start
+                    second_frame = selected_edges[1][0].left_handle
                 else:
-                    second_frame = selected_edges[1][0].frame_final_end
+                    second_frame = selected_edges[1][0].right_handle
                 if first_frame > second_frame:
                     self.snap_edge = selected_edges[0][1]
                     self.snap_edge_strip = selected_edges[0][0]
@@ -807,10 +807,10 @@ class VSEQFContextMenu(bpy.types.Operator):
             bpy.ops.wm.call_menu(name='VSEQF_MT_context_cursor')
         elif active and on_strip(click_frame, click_channel, active):
             #clicked on strip
-            active_size = active.frame_final_duration * frame_px
-            if abs(click_frame - active.frame_final_start) <= distance * 2 and active_size > 60:
+            active_size = active.duration * frame_px
+            if abs(click_frame - active.left_handle) <= distance * 2 and active_size > 60:
                 bpy.ops.wm.call_menu(name='VSEQF_MT_context_strip_left')
-            elif abs(click_frame - active.frame_final_end) <= distance * 2 and active_size > 60:
+            elif abs(click_frame - active.right_handle) <= distance * 2 and active_size > 60:
                 bpy.ops.wm.call_menu(name='VSEQF_MT_context_strip_right')
             else:
                 bpy.ops.wm.call_menu(name="VSEQF_MT_context_strip")

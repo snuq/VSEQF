@@ -368,34 +368,34 @@ class VSEQFThreePointImport(bpy.types.Operator):
                 return {'CANCELLED'}
             if movie_strip and sound_strip:
                 #Attempt to fix a blender bug where it puts the audio strip too low - https://developer.blender.org/T64964
-                frame_start_backup = movie_strip.frame_start
+                content_start_backup = movie_strip.content_start
                 sound_channel = movie_strip.channel
                 movie_strip.channel = movie_strip.channel + 1
-                movie_strip.frame_start = frame_start_backup
+                movie_strip.content_start = content_start_backup
                 sound_strip.channel = sound_channel
 
             if clip.import_settings.import_frame_in == -1:
                 frame_in = 0
             else:
                 frame_in = clip.import_settings.import_frame_in
-            if clip.import_settings.import_frame_length == -1:
+            if clip.import_settings.import_frame_length < 1:
                 frame_length = clip.frame_duration
             else:
                 frame_length = clip.import_settings.import_frame_length
             import_pos = context.scene.frame_current
-            offset = clip.import_settings.import_frame_length
+            offset = frame_length - frame_in
             if self.type == 'replace':
                 if not active_strip:
                     return {'CANCELLED'}
                 if sound_strip:
                     sound_strip.channel = active_strip.channel + 1
                 movie_strip.channel = active_strip.channel
-                frame_start = active_strip.frame_final_start - frame_in
-                move_forward = offset - active_strip.frame_final_duration
+                content_start = active_strip.left_handle - frame_in
+                move_forward = offset - active_strip.duration
                 if move_forward > 0:
-                    move_frame = active_strip.frame_final_start
+                    move_frame = active_strip.left_handle
                 else:
-                    move_frame = active_strip.frame_final_end
+                    move_frame = active_strip.right_handle
                 with context.temp_override(area=override_area):
                     bpy.ops.sequencer.select_all(action='DESELECT')
                 active_strip.select = True
@@ -409,31 +409,32 @@ class VSEQFThreePointImport(bpy.types.Operator):
                     context.scene.frame_current = old_current
             elif self.type == 'end':
                 import_pos = timeline.find_strips_end(strips)
-                frame_start = import_pos - frame_in
+                content_start = import_pos - frame_in
             elif self.type == 'insert':
                 bpy.ops.vseqf.cut(type='INSERT_ONLY', use_insert=True, insert=offset, use_all=True, all=True)
-                frame_start = import_pos - frame_in
+                content_start = import_pos - frame_in
             elif self.type == 'cut_insert':
                 bpy.ops.vseqf.cut(type='INSERT', use_insert=True, insert=offset, use_all=True, all=True)
-                frame_start = import_pos - frame_in
+                content_start = import_pos - frame_in
             else:
-                frame_start = import_pos - frame_in
+                content_start = import_pos - frame_in
             context.scene.sequence_editor.active_strip = movie_strip
-            movie_strip.frame_offset_start = frame_in  #crashing blender in replace mode???
-            movie_strip.frame_final_duration = frame_length
-            movie_strip.frame_start = frame_start
+            movie_strip.left_handle_offset = frame_in  #crashing blender in replace mode???
+            #movie_strip.duration = frame_length
+            movie_strip.content_start = content_start
+            movie_strip.right_handle = content_start + frame_length
             with context.temp_override(area=override_area):
                 bpy.ops.sequencer.select_all(action='DESELECT')
             movie_strip.select = True
             if sound_strip:
                 sound_strip.select = True
                 channel = sound_strip.channel
-                sound_strip.frame_offset_start = frame_in
-                #sound_strip.frame_offset_end = frame_length
+                sound_strip.left_handle_offset = frame_in
+                #sound_strip.right_handle_offset = frame_length
                 sound_strip.channel = channel
-                sound_strip.frame_start = frame_start
-                if sound_strip.frame_final_end > movie_strip.frame_final_end:
-                    sound_strip.frame_final_end = movie_strip.frame_final_end
+                sound_strip.content_start = content_start
+                if sound_strip.right_handle > movie_strip.right_handle:
+                    sound_strip.right_handle = movie_strip.right_handle
 
             return {'FINISHED'}
         else:
