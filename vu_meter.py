@@ -37,7 +37,7 @@ def get_volume_unit(frame=None):
     for strip in strips:
         if strip.type == 'SOUND' and timeline.under_cursor(strip, frame) and not timeline.is_muted(sequence_editor, strip):
             time_from = (frame - 1 - strip.content_start) / fps
-            time_to = (frame - strip.content_start) / fps
+            time_to = (frame + 1 - strip.content_start) / fps
             audio = strip.sound.evaluated_get(depsgraph).factory
             chunk = audio.limit(time_from, time_to).data()
             if len(chunk) == 0:
