@@ -13,6 +13,7 @@ class VSEQFTempSettings(object):
     cuts = True
     edit = True
     threepoint = True
+    context_menu = True
 
 
 def add_to_value(value, character, is_float=True):
@@ -98,7 +99,7 @@ def draw_text(x, y, size, text, justify='left', color=(1.0, 1.0, 1.0, 1.0)):
 
 #Miscellaneous Functions
 def get_prefs():
-    name = __name__.strip('.vseqf')
+    name = __name__[:-6]
     if name in bpy.context.preferences.addons:
         prefs = bpy.context.preferences.addons[name].preferences
     else:
